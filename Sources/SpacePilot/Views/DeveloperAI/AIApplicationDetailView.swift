@@ -150,22 +150,6 @@ struct AIApplicationDetailView: View {
     }
 
     private var sanitizedDiagnosticSummaries: [String] {
-        var summaries: [String] = []
-        for diagnostic in pluginDiagnostics {
-            let summary: String
-            if diagnostic.hasPrefix("Missing Plugin manifest") {
-                summary = L10n.text(.pluginDiagnosticMissingManifest)
-            } else if diagnostic.hasPrefix("Invalid Plugin manifest") {
-                summary = L10n.text(.pluginDiagnosticInvalidManifest)
-            } else if diagnostic.hasPrefix("Rejected or empty Plugin skill declaration") {
-                summary = L10n.text(.pluginDiagnosticEmptySkill)
-            } else {
-                summary = L10n.text(.pluginDiagnosticGeneric)
-            }
-            if !summaries.contains(summary) {
-                summaries.append(summary)
-            }
-        }
-        return summaries
+        PluginDiagnosticPresentation.summaries(pluginDiagnostics)
     }
 }

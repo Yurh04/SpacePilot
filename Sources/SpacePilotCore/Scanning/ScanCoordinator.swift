@@ -88,8 +88,9 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
             emit(ScanEvent(stage: .targetedAnalysis, progress: 0.62, message: "Analyzed storage and AI data"))
             try Task.checkCancellation()
 
-            let pluginRoots = discoverPluginRoots(homeDirectory: homeDirectory)
-            let pluginResult = try await PluginScanner(skillScanner: SkillScanner()).scan(roots: pluginRoots)
+            let pluginDiscovery = PluginRootDiscovery(access: LocalFileSystemAccess())
+                .discover(homeDirectory: homeDirectory)
+            let pluginResult = try await PluginScanner(skillScanner: SkillScanner()).scan(roots: pluginDiscovery.roots)
             let indexedSkills = SkillConflictDetector().detect(in: standaloneSkills + pluginResult.skills)
 
             var applicationItems: [ScannedItem] = []
@@ -164,7 +165,7 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                 plugins: pluginResult.plugins,
                 skills: indexedSkills,
                 coverage: homeResult.coverage,
-                pluginDiagnostics: pluginResult.diagnostics
+                pluginDiagnostics: pluginDiscovery.diagnostics.map(\.message) + pluginResult.diagnostics
             )
             try await store.save(snapshot: snapshot)
             emit(ScanEvent(stage: .completed, progress: 1, message: "Scan complete", snapshot: snapshot))
@@ -222,20 +223,4 @@ private struct BasicAIApplicationDefinition: Sendable {
             relativeRoots: [".local/share/opencode", ".config/opencode", ".cache/opencode"]
         )
     ]
-}
-
-private func discoverPluginRoots(homeDirectory: URL) -> [URL] {
-    let cache = homeDirectory.appending(path: ".codex/plugins/cache", directoryHint: .isDirectory)
-    guard let enumerator = FileManager.default.enumerator(
-        at: cache,
-        includingPropertiesForKeys: [.isRegularFileKey],
-        options: [.skipsPackageDescendants]
-    ) else { return [] }
-    var roots = Set<URL>()
-    for case let url as URL in enumerator where url.lastPathComponent == "plugin.json" {
-        let manifestDirectory = url.deletingLastPathComponent()
-        guard manifestDirectory.lastPathComponent == ".codex-plugin" else { continue }
-        roots.insert(manifestDirectory.deletingLastPathComponent().standardizedFileURL)
-    }
-    return roots.sorted { $0.path < $1.path }
 }

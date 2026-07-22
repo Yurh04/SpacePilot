@@ -56,6 +56,7 @@ enum L10n {
         static let pluginDiagnosticGeneric = Self(key: "plugins.diagnostic-generic", english: "Plugin discovery reported an issue.")
         static let pluginDiagnosticInvalidManifest = Self(key: "plugins.diagnostic-invalid-manifest", english: "A Plugin manifest could not be read.")
         static let pluginDiagnosticMissingManifest = Self(key: "plugins.diagnostic-missing-manifest", english: "A Plugin manifest could not be found.")
+        static let pluginDiagnosticPathInaccessible = Self(key: "plugins.diagnostic-path-inaccessible", english: "A Plugin path could not be accessed.")
         static let scanCancelled = Self(key: "scan.cancelled", english: "Scan cancelled")
         static let settingsDiagnostics = Self(key: "settings.diagnostics", english: "Diagnostics")
         static let settingsDiagnosticsDescription = Self(key: "settings.diagnostics-description", english: "Exported diagnostics contain counts and status metadata, not file paths, conversations, or log contents.")
@@ -100,6 +101,7 @@ enum L10n {
         "overview.safe-recommendations", "overview.start-scan", "overview.storage-glance",
         "overview.works-locally", "plugins.diagnostic-empty-skill", "plugins.diagnostic-generic",
         "plugins.diagnostic-invalid-manifest", "plugins.diagnostic-missing-manifest",
+        "plugins.diagnostic-path-inaccessible",
         "scan.cancelled", "scan.completed", "scan.indexing", "scan.quick-inventory", "scan.ready",
         "scan.targeted-analysis", "settings.diagnostics", "settings.diagnostics-description",
         "settings.disk-access", "settings.disk-access-description", "settings.export-diagnostics",

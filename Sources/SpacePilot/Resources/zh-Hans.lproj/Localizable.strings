@@ -105,6 +105,7 @@
 "plugins.diagnostic-generic" = "插件发现过程报告了问题。";
 "plugins.diagnostic-invalid-manifest" = "无法读取某个插件清单。";
 "plugins.diagnostic-missing-manifest" = "找不到某个插件清单。";
+"plugins.diagnostic-path-inaccessible" = "无法访问插件路径。";
 "scan.cancelled" = "扫描已取消";
 "scan.completed" = "扫描完成";
 "scan.indexing" = "正在保存本地元数据索引…";

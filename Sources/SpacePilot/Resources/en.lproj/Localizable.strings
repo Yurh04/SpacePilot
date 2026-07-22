@@ -105,6 +105,7 @@
 "plugins.diagnostic-generic" = "Plugin discovery reported an issue.";
 "plugins.diagnostic-invalid-manifest" = "A Plugin manifest could not be read.";
 "plugins.diagnostic-missing-manifest" = "A Plugin manifest could not be found.";
+"plugins.diagnostic-path-inaccessible" = "A Plugin path could not be accessed.";
 "scan.cancelled" = "Scan cancelled";
 "scan.completed" = "Scan complete";
 "scan.indexing" = "Saving local metadata index…";

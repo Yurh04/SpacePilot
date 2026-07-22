@@ -113,6 +113,22 @@
         }
       }
     },
+    "plugins.diagnostic-path-inaccessible": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A Plugin path could not be accessed."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法访问插件路径。"
+          }
+        }
+      }
+    },
     "plugins.diagnostic-missing-manifest": {
       "localizations": {
         "en": {

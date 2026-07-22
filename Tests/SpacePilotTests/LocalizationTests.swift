@@ -118,6 +118,36 @@ final class LocalizationTests: XCTestCase {
         XCTAssertEqual(L10n.noPluginsInstalled(locale: Locale(identifier: "zh-Hans")), "未安装插件")
     }
 
+    func testPluginDiagnosticsAreSpecificLocalizedAndSanitizedForPresentation() {
+        let privatePath = "/Users/private/.codex/plugins/cache/source/plugin/1.0.0"
+        let diagnostics = [
+            PluginDiscoveryDiagnostic.cacheInaccessible.message,
+            "Missing Plugin manifest at \(privatePath)/.codex-plugin/plugin.json",
+            "Invalid Plugin manifest at \(privatePath)/.codex-plugin/plugin.json: private detail"
+        ]
+
+        let english = PluginDiagnosticPresentation.summaries(
+            diagnostics,
+            locale: Locale(identifier: "en")
+        )
+        let chinese = PluginDiagnosticPresentation.summaries(
+            diagnostics,
+            locale: Locale(identifier: "zh-Hans")
+        )
+
+        XCTAssertEqual(english, [
+            "A Plugin path could not be accessed.",
+            "A Plugin manifest could not be found.",
+            "A Plugin manifest could not be read."
+        ])
+        XCTAssertEqual(chinese, [
+            "无法访问插件路径。",
+            "找不到某个插件清单。",
+            "无法读取某个插件清单。"
+        ])
+        XCTAssertFalse((english + chinese).contains { $0.contains(privatePath) })
+    }
+
     func testLocalizationBundleContainsEnglishAndSimplifiedChinese() {
         XCTAssertTrue(
             L10n.availableLocalizations.contains("en"),
@@ -146,7 +176,7 @@ final class LocalizationTests: XCTestCase {
         let english = try stringsTable(at: resources.appending(path: "en.lproj/Localizable.strings"))
         let chinese = try stringsTable(at: resources.appending(path: "zh-Hans.lproj/Localizable.strings"))
 
-        XCTAssertEqual(L10n.allKeys.count, 160)
+        XCTAssertEqual(L10n.allKeys.count, 161)
         XCTAssertEqual(Set(catalogStrings.keys), L10n.allKeys)
         XCTAssertEqual(Set(english.keys), L10n.allKeys)
         XCTAssertEqual(Set(chinese.keys), L10n.allKeys)
