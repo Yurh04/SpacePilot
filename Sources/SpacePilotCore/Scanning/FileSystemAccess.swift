@@ -72,7 +72,7 @@ public struct LocalFileSystemAccess: FileSystemAccess {
         try FileManager.default.contentsOfDirectory(
             at: url,
             includingPropertiesForKeys: nil,
-            options: [.skipsHiddenFiles]
+            options: []
         )
     }
 }
