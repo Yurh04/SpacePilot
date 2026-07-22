@@ -357,6 +357,7 @@ final class ViewProjectionTests: XCTestCase {
 
         XCTAssertEqual(application.dataItems.count, ownedFiles.count)
         XCTAssertEqual(application.totalSize, expectedPluginBytes + expectedStandaloneBytes)
+        XCTAssertEqual(snapshot.uniqueAIAllocatedSize, expectedPluginBytes + expectedStandaloneBytes)
         XCTAssertEqual(managedPathSearch.dataItems.map(\.url), [hiddenPluginFile])
     }
 
