@@ -3,10 +3,10 @@ import SpacePilotCore
 import SwiftUI
 
 struct AIApplicationDetailView: View {
-    let application: AIApplicationRecord
-    let snapshot: ScanSnapshot
+    let projection: AIApplicationProjection
     @Binding var selectedTab: AIApplicationTab
-    let searchText: String
+
+    private var application: AIApplicationRecord { projection.application }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -36,10 +36,10 @@ struct AIApplicationDetailView: View {
         case .overview:
             List {
                 Section("Local footprint") {
-                    LabeledContent("Total indexed space", value: ByteCount.string(totalSize))
-                    LabeledContent("Data items", value: dataItems.count.formatted())
-                    LabeledContent("Plugins", value: plugins.count.formatted())
-                    LabeledContent("Skills visible to \(application.name)", value: skills.count.formatted())
+                    LabeledContent("Total indexed space", value: ByteCount.string(projection.totalSize))
+                    LabeledContent("Data items", value: projection.dataItems.count.formatted())
+                    LabeledContent("Plugins", value: projection.plugins.count.formatted())
+                    LabeledContent("Skills visible to \(application.name)", value: projection.skills.count.formatted())
                 }
                 Section("Privacy") {
                     Label("Conversation and log contents are not indexed.", systemImage: "hand.raised")
@@ -47,7 +47,7 @@ struct AIApplicationDetailView: View {
                 }
             }
         case .dataStorage:
-            Table(filteredDataItems) {
+            Table(projection.dataItems) {
                 TableColumn("Data") { item in
                     VStack(alignment: .leading) {
                         Text(item.url.lastPathComponent)
@@ -78,7 +78,7 @@ struct AIApplicationDetailView: View {
                 }
                 .padding(12)
                 Divider()
-                Table(plugins) {
+                Table(projection.plugins) {
                     TableColumn("Plugin") { plugin in
                         VStack(alignment: .leading) {
                             Text(plugin.name)
@@ -92,7 +92,7 @@ struct AIApplicationDetailView: View {
                 }
             }
         case .skills:
-            Table(filteredSkills) {
+            Table(projection.skills) {
                 TableColumn("Skill") { skill in
                     VStack(alignment: .leading) {
                         Text(skill.name)
@@ -105,39 +105,6 @@ struct AIApplicationDetailView: View {
                 TableColumn("Space") { Text(ByteCount.string($0.allocatedSize)).monospacedDigit() }.width(100)
             }
         }
-    }
-
-    private var dataItems: [ScannedItem] {
-        snapshot.items.filter { application.itemIDs.contains($0.id) }
-            .sorted { $0.allocatedSize > $1.allocatedSize }
-    }
-
-    private var plugins: [PluginRecord] {
-        snapshot.plugins.filter { application.pluginIDs.contains($0.id) }
-    }
-
-    private var skills: [SkillRecord] {
-        snapshot.skills.filter { application.skillIDs.contains($0.id) }
-    }
-
-    private var totalSize: Int64 {
-        application.applicationAllocatedSize
-            + dataItems.reduce(0) { $0 + $1.allocatedSize }
-            + plugins.reduce(0) { $0 + $1.allocatedSize }
-            + skills.filter { skill in
-                guard let parentPluginID = skill.parentPluginID else { return true }
-                return !application.pluginIDs.contains(parentPluginID)
-            }.reduce(0) { $0 + $1.allocatedSize }
-    }
-
-    private var filteredDataItems: [ScannedItem] {
-        guard !searchText.isEmpty else { return dataItems }
-        return dataItems.filter { $0.url.path.localizedCaseInsensitiveContains(searchText) }
-    }
-
-    private var filteredSkills: [SkillRecord] {
-        guard !searchText.isEmpty else { return skills }
-        return skills.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
     }
 
     private func scopeName(_ scope: SkillScope) -> String {

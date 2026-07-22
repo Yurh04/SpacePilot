@@ -43,25 +43,32 @@ struct AppRootView: View {
         switch model.selection ?? .overview {
         case .overview:
             OverviewView(
-                snapshot: model.latestSnapshot,
+                projection: model.projection?.overview,
+                hasSnapshot: model.latestSnapshot != nil,
                 startScan: model.startScan,
                 reviewCleanup: model.prepareCleanup
             )
         case .storage:
             StorageView(
-                snapshot: model.latestSnapshot,
+                projection: model.projection?.storage,
+                hasSnapshot: model.latestSnapshot != nil,
                 searchText: model.searchText,
                 reviewCleanup: model.prepareCleanup
             )
         case .applications:
             ApplicationsView(
-                snapshot: model.latestSnapshot,
+                projection: model.projection?.applications,
+                hasSnapshot: model.latestSnapshot != nil,
                 searchText: model.searchText,
                 uninstall: model.prepareUninstall,
                 reset: model.prepareReset
             )
         case .developerAI:
-            DeveloperAIView(model: model)
+            DeveloperAIView(
+                model: model,
+                projection: model.projection?.developerAI,
+                hasSnapshot: model.latestSnapshot != nil
+            )
         case .history:
             CleanupHistoryView(transactions: model.cleanupHistory)
         }

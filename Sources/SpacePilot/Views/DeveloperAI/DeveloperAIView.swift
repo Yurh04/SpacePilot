@@ -3,14 +3,16 @@ import SwiftUI
 
 struct DeveloperAIView: View {
     @Bindable var model: AppModel
+    let projection: DeveloperAIProjection?
+    let hasSnapshot: Bool
 
     var body: some View {
-        if let snapshot = model.latestSnapshot {
+        if let projection {
             VStack(spacing: 0) {
                 HStack {
                     Label("Developer storage", systemImage: "hammer")
                     Spacer()
-                    Text(ByteCount.string(developerBytes(in: snapshot)))
+                    Text(ByteCount.string(projection.developerBytes))
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
                 }
@@ -18,63 +20,44 @@ struct DeveloperAIView: View {
                 .frame(height: 44)
                 Divider()
                 HSplitView {
-                List(snapshot.aiApplications, selection: $model.selectedAIApplicationID) { application in
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(application.name)
-                            .fontWeight(.medium)
-                        Text("\(application.supportLevel == .deep ? "Deep analysis" : "Basic footprint") · \(ByteCount.string(applicationSize(application, in: snapshot)))")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                    List(projection.applications, selection: $model.selectedAIApplicationID) { application in
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(application.application.name)
+                                .fontWeight(.medium)
+                            Text("\(application.application.supportLevel == .deep ? "Deep analysis" : "Basic footprint") · \(ByteCount.string(application.totalSize))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .tag(application.id)
                     }
-                    .tag(application.id)
-                }
-                .frame(minWidth: 190, idealWidth: 230, maxWidth: 280)
+                    .frame(minWidth: 190, idealWidth: 230, maxWidth: 280)
 
-                if let application = selectedApplication(in: snapshot) {
-                    AIApplicationDetailView(
-                        application: application,
-                        snapshot: snapshot,
-                        selectedTab: $model.selectedAIApplicationTab,
-                        searchText: model.searchText
-                    )
-                } else {
-                    ContentUnavailableView("Select an AI application", systemImage: "sparkles.rectangle.stack")
-                }
+                    if let application = selectedApplication(in: projection.applications) {
+                        AIApplicationDetailView(
+                            projection: application,
+                            selectedTab: $model.selectedAIApplicationTab
+                        )
+                    } else {
+                        ContentUnavailableView("Select an AI application", systemImage: "sparkles.rectangle.stack")
+                    }
                 }
             }
             .navigationTitle("Developer & AI")
             .onAppear {
-                if model.selectedAIApplicationID == nil {
-                    model.selectedAIApplicationID = snapshot.aiApplications.first?.id
+                if !projection.applications.contains(where: { $0.id == model.selectedAIApplicationID }) {
+                    model.selectedAIApplicationID = projection.applications.first?.id
                 }
             }
+        } else if hasSnapshot {
+            ProgressView("Preparing summary…")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .navigationTitle("Developer & AI")
         } else {
             empty("Developer & AI", image: "sparkles.rectangle.stack")
         }
     }
 
-    private func selectedApplication(in snapshot: ScanSnapshot) -> AIApplicationRecord? {
-        snapshot.aiApplications.first { $0.id == model.selectedAIApplicationID }
-    }
-
-    private func developerBytes(in snapshot: ScanSnapshot) -> Int64 {
-        snapshot.items.filter { $0.category == .developer }.reduce(0) { $0 + $1.allocatedSize }
-    }
-
-    private func applicationSize(_ application: AIApplicationRecord, in snapshot: ScanSnapshot) -> Int64 {
-        let pluginSize = snapshot.plugins
-            .filter { application.pluginIDs.contains($0.id) }
-            .reduce(0) { $0 + $1.allocatedSize }
-        let skillSize = snapshot.skills
-            .filter {
-                guard application.skillIDs.contains($0.id) else { return false }
-                guard let parentPluginID = $0.parentPluginID else { return true }
-                return !application.pluginIDs.contains(parentPluginID)
-            }
-            .reduce(0) { $0 + $1.allocatedSize }
-        let itemSize = snapshot.items
-            .filter { application.itemIDs.contains($0.id) }
-            .reduce(0) { $0 + $1.allocatedSize }
-        return application.applicationAllocatedSize + pluginSize + skillSize + itemSize
+    private func selectedApplication(in applications: [AIApplicationProjection]) -> AIApplicationProjection? {
+        applications.first { $0.id == model.selectedAIApplicationID }
     }
 }

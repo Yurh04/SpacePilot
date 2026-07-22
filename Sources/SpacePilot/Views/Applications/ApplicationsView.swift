@@ -3,16 +3,18 @@ import SpacePilotCore
 import SwiftUI
 
 struct ApplicationsView: View {
-    let snapshot: ScanSnapshot?
+    let projection: ApplicationListProjection?
+    let hasSnapshot: Bool
     let searchText: String
     let uninstall: (ApplicationRecord) -> Void
     let reset: (ApplicationRecord) -> Void
     @State private var selectedApplicationID: UUID?
 
     var body: some View {
-        if let snapshot {
+        if let projection {
+            let applications = projection.filtered(by: searchText)
             VStack(spacing: 0) {
-                Table(applications(snapshot), selection: $selectedApplicationID) {
+                Table(applications, selection: $selectedApplicationID) {
                     TableColumn("Application") { application in
                         HStack {
                             Image(nsImage: NSWorkspace.shared.icon(forFile: application.url.path))
@@ -31,21 +33,20 @@ struct ApplicationsView: View {
                             Button("Review Reset…") { reset(application) }
                             Button("Review Uninstall…") { uninstall(application) }
                         }
-                        .accessibilityLabel("\(application.name), \(ByteCount.string(totalSize(application, snapshot: snapshot)))")
+                        .accessibilityLabel("\(application.name), \(ByteCount.string(projection.totalSize(for: application.id)))")
                     }
                     TableColumn("Version", value: \.versionOrDash).width(90)
                     TableColumn("Related") { Text($0.associations.count.formatted()) }.width(70)
                     TableColumn("Total space") {
-                        Text(ByteCount.string(totalSize($0, snapshot: snapshot))).monospacedDigit()
+                        Text(ByteCount.string(projection.totalSize(for: $0.id))).monospacedDigit()
                     }.width(105)
                 }
                 .frame(minHeight: 280)
 
-                if let application = selectedApplication(in: snapshot) {
+                if let application = selectedApplication(in: applications) {
                     Divider()
                     ApplicationDetail(
                         application: application,
-                        snapshot: snapshot,
                         uninstall: { uninstall(application) },
                         reset: { reset(application) }
                     )
@@ -54,35 +55,26 @@ struct ApplicationsView: View {
             }
             .navigationTitle("Applications")
             .onAppear {
-                if selectedApplicationID == nil {
-                    selectedApplicationID = applications(snapshot).first?.id
+                if !applications.contains(where: { $0.id == selectedApplicationID }) {
+                    selectedApplicationID = applications.first?.id
                 }
             }
+        } else if hasSnapshot {
+            ProgressView("Preparing summary…")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .navigationTitle("Applications")
         } else {
             empty("Applications", image: "square.grid.2x2")
         }
     }
 
-    private func applications(_ snapshot: ScanSnapshot) -> [ApplicationRecord] {
-        snapshot.applications.filter {
-            searchText.isEmpty || $0.name.localizedCaseInsensitiveContains(searchText)
-        }.sorted { totalSize($0, snapshot: snapshot) > totalSize($1, snapshot: snapshot) }
-    }
-
-    private func selectedApplication(in snapshot: ScanSnapshot) -> ApplicationRecord? {
-        snapshot.applications.first { $0.id == selectedApplicationID }
-    }
-
-    private func totalSize(_ application: ApplicationRecord, snapshot: ScanSnapshot) -> Int64 {
-        application.allocatedSize + snapshot.items
-            .filter { $0.ownerID == application.id }
-            .reduce(0) { $0 + $1.allocatedSize }
+    private func selectedApplication(in applications: [ApplicationRecord]) -> ApplicationRecord? {
+        applications.first { $0.id == selectedApplicationID }
     }
 }
 
 private struct ApplicationDetail: View {
     let application: ApplicationRecord
-    let snapshot: ScanSnapshot
     let uninstall: () -> Void
     let reset: () -> Void
 
@@ -100,37 +92,25 @@ private struct ApplicationDetail: View {
             }
             .padding(.horizontal)
 
-            List(associations) { pair in
+            List(associations) { association in
                 HStack {
                     VStack(alignment: .leading) {
-                        Text(pair.item.url.lastPathComponent)
-                        Text("\(pair.association.evidence.displayName) · \(pair.association.confidence.displayName) confidence")
+                        Text(association.evidence.displayName)
+                        Text("\(association.confidence.displayName) confidence")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Text(pair.item.risk.displayName).foregroundStyle(.secondary)
-                    Text(ByteCount.string(pair.item.allocatedSize)).monospacedDigit()
+                    Text(association.risk.displayName).foregroundStyle(.secondary)
                 }
-                .contextMenu { Button("Reveal in Finder") { reveal(pair.item.url) } }
             }
             .listStyle(.inset)
         }
         .padding(.vertical, 10)
     }
 
-    private var associations: [AssociationPair] {
-        application.associations.compactMap { association in
-            snapshot.items.first { $0.id == association.itemID }.map {
-                AssociationPair(association: association, item: $0)
-            }
-        }.sorted { $0.association.confidence > $1.association.confidence }
+    private var associations: [ArtifactAssociation] {
+        application.associations.sorted { $0.confidence > $1.confidence }
     }
-}
-
-private struct AssociationPair: Identifiable {
-    var id: UUID { association.id }
-    let association: ArtifactAssociation
-    let item: ScannedItem
 }
 
 private extension ApplicationRecord {

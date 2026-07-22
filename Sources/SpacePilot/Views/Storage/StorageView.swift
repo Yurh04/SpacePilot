@@ -3,14 +3,14 @@ import SpacePilotCore
 import SwiftUI
 
 struct StorageView: View {
-    let snapshot: ScanSnapshot?
+    let projection: StorageProjection?
+    let hasSnapshot: Bool
     let searchText: String
     let reviewCleanup: ([ScannedItem]) -> Void
     @State private var mode: StorageItemMode = .largest
 
     var body: some View {
-        if let snapshot {
-            let projection = StorageProjection(snapshot: snapshot)
+        if let projection {
             VStack(spacing: 0) {
                 Table(projection.categories) {
                     TableColumn("Category") { summary in
@@ -65,6 +65,10 @@ struct StorageView: View {
                 }
             }
             .navigationTitle("Storage")
+        } else if hasSnapshot {
+            ProgressView("Preparing summary…")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .navigationTitle("Storage")
         } else {
             empty("Storage", image: "internaldrive")
         }

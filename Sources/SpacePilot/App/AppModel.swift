@@ -14,6 +14,7 @@ final class AppModel {
     var selectedAIApplicationID: UUID?
     var selectedAIApplicationTab: AIApplicationTab = .overview
     var latestSnapshot: ScanSnapshot?
+    var projection: AppSnapshotProjection?
     var scanStage: ScanStage?
     var scanProgress = 0.0
     var scanMessage = "Ready to scan"
@@ -27,6 +28,7 @@ final class AppModel {
 
     private var scanTask: Task<Void, Never>?
     private var cleanupTask: Task<Void, Never>?
+    private var projectionTask: Task<Void, Never>?
     private let runtime: SpacePilotRuntime?
 
     init() {
@@ -50,7 +52,7 @@ final class AppModel {
                     scanStage = event.stage
                     scanProgress = event.progress
                     scanMessage = event.message
-                    if let snapshot = event.snapshot { latestSnapshot = snapshot }
+                    if let snapshot = event.snapshot { apply(snapshot: snapshot) }
                     Self.logger.info("Scan stage: \(event.stage.rawValue, privacy: .public)")
                 }
             } catch is CancellationError {
@@ -137,10 +139,25 @@ final class AppModel {
     private func loadSavedState() async {
         guard let runtime else { return }
         do {
-            latestSnapshot = try await runtime.store.latestSnapshot()
+            if let snapshot = try await runtime.store.latestSnapshot() {
+                apply(snapshot: snapshot)
+            }
             cleanupHistory = try await runtime.store.cleanupHistory()
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    private func apply(snapshot: ScanSnapshot) {
+        latestSnapshot = snapshot
+        projection = nil
+        projectionTask?.cancel()
+        projectionTask = Task {
+            let result = await Task.detached(priority: .userInitiated) {
+                AppSnapshotProjection(snapshot: snapshot)
+            }.value
+            guard !Task.isCancelled, latestSnapshot?.id == result.snapshotID else { return }
+            projection = result
         }
     }
 

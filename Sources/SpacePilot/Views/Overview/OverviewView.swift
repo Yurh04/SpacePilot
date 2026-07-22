@@ -2,14 +2,14 @@ import SpacePilotCore
 import SwiftUI
 
 struct OverviewView: View {
-    let snapshot: ScanSnapshot?
+    let projection: OverviewProjection?
+    let hasSnapshot: Bool
     let startScan: () -> Void
     let reviewCleanup: ([ScannedItem]) -> Void
 
     var body: some View {
         Group {
-            if let snapshot {
-                let projection = OverviewProjection(snapshot: snapshot)
+            if let projection {
                 List {
                     Section {
                         LabeledContent("Internal disk used", value: ByteCount.string(projection.totalUsedBytes))
@@ -33,15 +33,12 @@ struct OverviewView: View {
                             .buttonStyle(.borderedProminent)
                         }
                     }
-
-                    if !snapshot.coverage.isComplete {
-                        Section("Limited coverage") {
-                            Label("Some folders could not be read. Results show only verified data.", systemImage: "lock.trianglebadge.exclamationmark")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
                 }
                 .navigationTitle("Overview")
+            } else if hasSnapshot {
+                ProgressView("Preparing summary…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .navigationTitle("Overview")
             } else {
                 ContentUnavailableView {
                     Label("Analyze this Mac", systemImage: "internaldrive")
