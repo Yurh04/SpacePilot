@@ -167,11 +167,40 @@ final class ViewProjectionTests: XCTestCase {
         XCTAssertEqual(StorageProjection(snapshot: snapshot).oldItems.map(\.id), [old.id])
     }
 
-    func testStorageProjectionBoundsOldItemResultsForDisplay() {
-        let items = (0...StorageProjection.itemDisplayLimit).map { index in
+    func testStorageProjectionRetainsExactlyLargestItemsInDescendingOrder() {
+        let adversarialSizes = (0..<50).flatMap { [$0, 100 - $0] } + [50]
+        let items = adversarialSizes.map { size in
+            ScannedItem.fixture(allocatedSize: Int64(size))
+        }
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: items,
+            applications: [],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: .complete
+        )
+        let expectedItems = items
+            .sorted { $0.allocatedSize > $1.allocatedSize }
+            .prefix(StorageProjection.itemDisplayLimit)
+
+        let projection = StorageProjection(snapshot: snapshot)
+
+        XCTAssertEqual(projection.largestItems.map(\.id), expectedItems.map(\.id))
+        XCTAssertEqual(
+            projection.largestItems.map(\.allocatedSize),
+            Array((1...100).reversed()).map(Int64.init)
+        )
+    }
+
+    func testStorageProjectionRetainsExactlyOldestItemsInAscendingOrder() {
+        let adversarialOffsets = (0..<50).flatMap { [$0, 100 - $0] } + [50]
+        let items = adversarialOffsets.map { offset in
             ScannedItem.fixture(
-                allocatedSize: Int64(index),
-                modificationDate: Date.distantPast.addingTimeInterval(TimeInterval(index))
+                allocatedSize: Int64(offset),
+                modificationDate: Date.distantPast.addingTimeInterval(TimeInterval(offset))
             )
         }
         let snapshot = ScanSnapshot(
@@ -184,10 +213,14 @@ final class ViewProjectionTests: XCTestCase {
             skills: [],
             coverage: .complete
         )
+        let expectedItems = items
+            .sorted { ($0.modificationDate ?? .distantFuture) < ($1.modificationDate ?? .distantFuture) }
+            .prefix(StorageProjection.itemDisplayLimit)
 
         let projection = StorageProjection(snapshot: snapshot)
 
-        XCTAssertEqual(projection.oldItems.count, StorageProjection.itemDisplayLimit)
+        XCTAssertEqual(projection.oldItems.map(\.id), expectedItems.map(\.id))
+        XCTAssertEqual(projection.oldItems.map(\.modificationDate), expectedItems.map(\.modificationDate))
     }
 
     func testApplicationListProjectionAggregatesRelatedSizesBeforeSorting() {
