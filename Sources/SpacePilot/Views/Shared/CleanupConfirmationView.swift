@@ -11,9 +11,9 @@ struct CleanupConfirmationView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Review Cleanup")
+            Text(verbatim: L10n.text(.cleanupReview))
                 .font(.title2.weight(.semibold))
-            Text("These exact items will be moved to the Trash. You can restore them from the Trash until it is emptied.")
+            Text(verbatim: L10n.text(.cleanupReviewDescription))
                 .foregroundStyle(.secondary)
 
             List(items) { item in
@@ -27,23 +27,23 @@ struct CleanupConfirmationView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
-                    Text("\(item.risk.displayName) · \(item.explanation)")
+                    Text(verbatim: "\(L10n.name(for: item.risk)) · \(L10n.explanation(item.explanation))")
                         .font(.caption)
                         .foregroundStyle(item.risk == .sensitive ? .orange : .secondary)
                 }
             }
             .frame(minHeight: 220)
 
-            Toggle("I understand these items will be moved to the Trash", isOn: $understandsTrash)
+            Toggle(L10n.text(.cleanupConfirmTrash), isOn: $understandsTrash)
             if hasSensitiveItems {
-                Toggle("Also move the sensitive conversation, project, or settings data listed above", isOn: $confirmsSensitive)
+                Toggle(L10n.text(.cleanupConfirmSensitive), isOn: $confirmsSensitive)
             }
 
             HStack {
                 Spacer()
-                Button("Cancel", action: onCancel)
+                Button(L10n.cancel(), action: onCancel)
                     .keyboardShortcut(.cancelAction)
-                Button(isExecuting ? "Moving…" : "Move to Trash") {
+                Button(isExecuting ? L10n.text(.cleanupMoving) : L10n.text(.cleanupMoveTrash)) {
                     onConfirm(confirmsSensitive)
                 }
                 .buttonStyle(.borderedProminent)

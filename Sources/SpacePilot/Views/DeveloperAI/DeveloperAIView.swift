@@ -10,7 +10,7 @@ struct DeveloperAIView: View {
         if let projection {
             VStack(spacing: 0) {
                 HStack {
-                    Label("Developer storage", systemImage: "hammer")
+                    Label(L10n.text(.aiDeveloperStorage), systemImage: "hammer")
                     Spacer()
                     Text(ByteCount.string(projection.developerBytes))
                         .monospacedDigit()
@@ -24,7 +24,7 @@ struct DeveloperAIView: View {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(application.application.name)
                                 .fontWeight(.medium)
-                            Text("\(application.application.supportLevel == .deep ? "Deep analysis" : "Basic footprint") · \(ByteCount.string(application.totalSize))")
+                            Text(verbatim: "\(application.application.supportLevel == .deep ? L10n.text(.aiDeepAnalysis) : L10n.text(.aiBasicFootprint)) · \(ByteCount.string(application.totalSize))")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -44,22 +44,22 @@ struct DeveloperAIView: View {
                             selectedTab: $model.selectedAIApplicationTab
                         )
                     } else {
-                        ContentUnavailableView("Select an AI application", systemImage: "sparkles.rectangle.stack")
+                        ContentUnavailableView(L10n.text(.aiSelectApplication), systemImage: "sparkles.rectangle.stack")
                     }
                 }
             }
-            .navigationTitle("Developer & AI")
+            .navigationTitle(L10n.developerAI())
             .onAppear {
                 if !projection.applications.contains(where: { $0.id == model.selectedAIApplicationID }) {
                     model.selectedAIApplicationID = projection.applications.first?.id
                 }
             }
         } else if hasSnapshot {
-            ProgressView("Preparing summary…")
+            ProgressView(L10n.preparingSummary())
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .navigationTitle("Developer & AI")
+                .navigationTitle(L10n.developerAI())
         } else {
-            empty("Developer & AI", image: "sparkles.rectangle.stack")
+            empty(L10n.developerAI(), image: "sparkles.rectangle.stack")
         }
     }
 

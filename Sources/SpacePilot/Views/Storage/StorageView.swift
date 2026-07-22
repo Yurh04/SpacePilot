@@ -13,14 +13,14 @@ struct StorageView: View {
         if let projection {
             VStack(spacing: 0) {
                 Table(projection.categories) {
-                    TableColumn("Category") { summary in
-                        Text(summary.category.displayName)
+                    TableColumn(L10n.text(.category)) { summary in
+                        Text(verbatim: L10n.name(for: summary.category))
                     }
-                    TableColumn("Items") { summary in
+                    TableColumn(L10n.text(.items)) { summary in
                         Text(summary.itemCount.formatted())
                     }
                     .width(70)
-                    TableColumn("Space") { summary in
+                    TableColumn(L10n.space()) { summary in
                         Text(ByteCount.string(summary.allocatedSize))
                             .monospacedDigit()
                     }
@@ -30,9 +30,9 @@ struct StorageView: View {
 
                 Divider()
 
-                Picker("Items", selection: $mode) {
+                Picker(L10n.text(.items), selection: $mode) {
                     ForEach(StorageItemMode.allCases) { mode in
-                        Text(mode.title).tag(mode)
+                        Text(verbatim: mode == .largest ? L10n.text(.storageLargest) : L10n.text(.storageOlder180)).tag(mode)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -41,36 +41,36 @@ struct StorageView: View {
                 .padding(10)
 
                 Table(filtered(mode == .largest ? projection.largestItems : projection.oldItems)) {
-                    TableColumn(mode == .largest ? "Largest analyzed items" : "Not modified in 180+ days") { item in
+                    TableColumn(mode == .largest ? L10n.text(.storageLargestItems) : L10n.text(.storageOldItems)) { item in
                         Text(item.url.lastPathComponent)
                             .contextMenu {
-                                Button("Reveal in Finder") { reveal(item.url) }
+                                Button(L10n.text(.revealFinder)) { reveal(item.url) }
                                 if item.risk == .safe {
-                                    Button("Review Cleanup") { reviewCleanup([item]) }
+                                    Button(L10n.text(.cleanupReview)) { reviewCleanup([item]) }
                                 }
                             }
                     }
-                    TableColumn("Location") { item in
+                    TableColumn(L10n.location()) { item in
                         Text(item.url.deletingLastPathComponent().path(percentEncoded: false))
                             .foregroundStyle(.secondary)
                     }
-                    TableColumn("Risk") { item in
-                        Text(item.risk.displayName)
+                    TableColumn(L10n.risk()) { item in
+                        Text(verbatim: L10n.name(for: item.risk))
                     }
                     .width(120)
-                    TableColumn("Space") { item in
+                    TableColumn(L10n.space()) { item in
                         Text(ByteCount.string(item.allocatedSize)).monospacedDigit()
                     }
                     .width(100)
                 }
             }
-            .navigationTitle("Storage")
+            .navigationTitle(L10n.storage())
         } else if hasSnapshot {
-            ProgressView("Preparing summary…")
+            ProgressView(L10n.preparingSummary())
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .navigationTitle("Storage")
+                .navigationTitle(L10n.storage())
         } else {
-            empty("Storage", image: "internaldrive")
+            empty(L10n.storage(), image: "internaldrive")
         }
     }
 
@@ -85,7 +85,6 @@ private enum StorageItemMode: String, CaseIterable, Identifiable {
     case old
 
     var id: Self { self }
-    var title: String { self == .largest ? "Largest" : "Older than 180 days" }
 }
 
 func reveal(_ url: URL) {
@@ -94,6 +93,6 @@ func reveal(_ url: URL) {
 
 @ViewBuilder
 func empty(_ title: String, image: String) -> some View {
-    ContentUnavailableView(title, systemImage: image, description: Text("Run a scan to see local results."))
+    ContentUnavailableView(title, systemImage: image, description: Text(verbatim: L10n.noData()))
         .navigationTitle(title)
 }

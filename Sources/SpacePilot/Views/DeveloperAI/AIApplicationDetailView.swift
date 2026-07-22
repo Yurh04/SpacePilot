@@ -16,9 +16,9 @@ struct AIApplicationDetailView: View {
             VStack(alignment: .leading, spacing: 10) {
                 Text(application.name)
                     .font(.title2.weight(.semibold))
-                Picker("Section", selection: $selectedTab) {
+                Picker(L10n.text(.aiSection), selection: $selectedTab) {
                     ForEach(AIApplicationTab.allCases) { tab in
-                        Text(tab.title).tag(tab)
+                        Text(verbatim: L10n.title(for: tab)).tag(tab)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -38,45 +38,45 @@ struct AIApplicationDetailView: View {
         switch selectedTab {
         case .overview:
             List {
-                Section("Local footprint") {
-                    LabeledContent("Total indexed space", value: ByteCount.string(projection.totalSize))
-                    LabeledContent("Data items", value: projection.dataItems.count.formatted())
-                    LabeledContent("Plugins", value: projection.plugins.count.formatted())
-                    LabeledContent("Skills visible to \(application.name)", value: projection.skills.count.formatted())
+                Section(L10n.text(.aiLocalFootprint)) {
+                    LabeledContent(L10n.text(.aiTotalIndexedSpace), value: ByteCount.string(projection.totalSize))
+                    LabeledContent(L10n.text(.aiDataItems), value: projection.dataItems.count.formatted())
+                    LabeledContent(L10n.plugins(), value: projection.plugins.count.formatted())
+                    LabeledContent(L10n.skillsVisible(to: application.name), value: projection.skills.count.formatted())
                 }
-                Section("Privacy") {
-                    Label("Conversation and log contents are not indexed.", systemImage: "hand.raised")
+                Section(L10n.text(.aiPrivacy)) {
+                    Label(L10n.text(.aiNoContentIndexed), systemImage: "hand.raised")
                         .foregroundStyle(.secondary)
                 }
             }
         case .dataStorage:
             if isPreparingQuery {
-                ProgressView("Searching…")
+                ProgressView(L10n.text(.aiSearching))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 Table(queryProjection?.dataItems ?? projection.dataItems) {
-                    TableColumn("Data") { item in
+                    TableColumn(L10n.title(for: .dataStorage)) { item in
                         VStack(alignment: .leading) {
                             Text(item.url.lastPathComponent)
-                            Text(item.category.displayName)
+                            Text(verbatim: L10n.name(for: item.category))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
-                        .contextMenu { Button("Reveal in Finder") { reveal(item.url) } }
-                        .accessibilityLabel("\(item.url.lastPathComponent), \(ByteCount.string(item.allocatedSize)), \(item.risk.displayName)")
+                        .contextMenu { Button(L10n.text(.revealFinder)) { reveal(item.url) } }
+                        .accessibilityLabel("\(item.url.lastPathComponent), \(ByteCount.string(item.allocatedSize)), \(L10n.name(for: item.risk))")
                     }
-                    TableColumn("Risk") { Text($0.risk.displayName) }.width(120)
-                    TableColumn("Space") { Text(ByteCount.string($0.allocatedSize)).monospacedDigit() }.width(100)
+                    TableColumn(L10n.risk()) { Text(verbatim: L10n.name(for: $0.risk)) }.width(120)
+                    TableColumn(L10n.space()) { Text(ByteCount.string($0.allocatedSize)).monospacedDigit() }.width(100)
                 }
             }
         case .plugins:
             VStack(spacing: 0) {
                 HStack {
-                    Text("Plugin packages are managed by their owning application.")
+                    Text(verbatim: L10n.text(.aiPluginsManaged))
                         .foregroundStyle(.secondary)
                     Spacer()
                     if let applicationURL = application.applicationURL {
-                        Button("Manage in \(application.name)") {
+                        Button(L10n.manageIn(application.name)) {
                             NSWorkspace.shared.openApplication(
                                 at: applicationURL,
                                 configuration: .init()
@@ -89,13 +89,13 @@ struct AIApplicationDetailView: View {
                 if projection.plugins.isEmpty {
                     if pluginDiagnostics.isEmpty {
                         ContentUnavailableView(
-                            "No Plugins installed",
+                            L10n.noPluginsInstalled(),
                             systemImage: "puzzlepiece.extension"
                         )
                     } else {
                         VStack(spacing: 12) {
                             ContentUnavailableView(
-                                "Plugin discovery failed",
+                                L10n.pluginDiscoveryFailed(),
                                 systemImage: "exclamationmark.triangle"
                             )
                             VStack(alignment: .leading, spacing: 6) {
@@ -111,17 +111,17 @@ struct AIApplicationDetailView: View {
                     }
                 } else {
                     Table(projection.plugins) {
-                        TableColumn("Plugin") { plugin in
+                        TableColumn(L10n.text(.plugin)) { plugin in
                             VStack(alignment: .leading) {
                                 Text(plugin.name)
                                 Text(plugin.source).font(.caption).foregroundStyle(.secondary)
                             }
-                            .contextMenu { Button("Reveal in Finder") { reveal(plugin.url) } }
+                            .contextMenu { Button(L10n.text(.revealFinder)) { reveal(plugin.url) } }
                         }
-                        TableColumn("Version") { Text($0.version ?? "—") }.width(90)
-                        TableColumn("Skills") { Text($0.skillCount.formatted()) }.width(70)
-                        TableColumn("Management") { _ in Text("Official handoff") }.width(130)
-                        TableColumn("Space") {
+                        TableColumn(L10n.version()) { Text($0.version ?? "—") }.width(90)
+                        TableColumn(L10n.skills()) { Text($0.skillCount.formatted()) }.width(70)
+                        TableColumn(L10n.management()) { _ in Text(verbatim: L10n.officialHandoff()) }.width(130)
+                        TableColumn(L10n.space()) {
                             Text(ByteCount.string($0.allocatedSize)).monospacedDigit()
                         }
                         .width(100)
@@ -130,39 +130,22 @@ struct AIApplicationDetailView: View {
             }
         case .skills:
             if isPreparingQuery {
-                ProgressView("Searching…")
+                ProgressView(L10n.text(.aiSearching))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 Table(queryProjection?.skills ?? projection.skills) {
-                    TableColumn("Skill") { skill in
+                    TableColumn(L10n.text(.skill)) { skill in
                         VStack(alignment: .leading) {
                             Text(skill.name)
                             Text(skill.summary).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                         }
-                        .contextMenu { Button("Reveal in Finder") { reveal(skill.url) } }
+                        .contextMenu { Button(L10n.text(.revealFinder)) { reveal(skill.url) } }
                     }
-                    TableColumn("Source") { Text(scopeName($0.scope)) }.width(130)
-                    TableColumn("Management") { Text(managementName($0.managementStatus)) }.width(120)
-                    TableColumn("Space") { Text(ByteCount.string($0.allocatedSize)).monospacedDigit() }.width(100)
+                    TableColumn(L10n.text(.source)) { Text(verbatim: L10n.name(for: $0.scope)) }.width(130)
+                    TableColumn(L10n.management()) { Text(verbatim: L10n.name(for: $0.managementStatus)) }.width(120)
+                    TableColumn(L10n.space()) { Text(ByteCount.string($0.allocatedSize)).monospacedDigit() }.width(100)
                 }
             }
-        }
-    }
-
-    private func scopeName(_ scope: SkillScope) -> String {
-        switch scope {
-        case .sharedAgents: "Shared"
-        case .agentSpecific(let agent): agent
-        case .pluginProvided: "Plugin"
-        case .systemManaged: "System"
-        }
-    }
-
-    private func managementName(_ status: SkillManagementStatus) -> String {
-        switch status {
-        case .standalone: "Standalone"
-        case .parentManaged: "Plugin managed"
-        case .systemReadOnly: "Read only"
         }
     }
 
@@ -171,13 +154,13 @@ struct AIApplicationDetailView: View {
         for diagnostic in pluginDiagnostics {
             let summary: String
             if diagnostic.hasPrefix("Missing Plugin manifest") {
-                summary = "A Plugin manifest could not be found."
+                summary = L10n.text(.pluginDiagnosticMissingManifest)
             } else if diagnostic.hasPrefix("Invalid Plugin manifest") {
-                summary = "A Plugin manifest could not be read."
+                summary = L10n.text(.pluginDiagnosticInvalidManifest)
             } else if diagnostic.hasPrefix("Rejected or empty Plugin skill declaration") {
-                summary = "A Plugin skill declaration was rejected or empty."
+                summary = L10n.text(.pluginDiagnosticEmptySkill)
             } else {
-                summary = "Plugin discovery reported an issue."
+                summary = L10n.text(.pluginDiagnosticGeneric)
             }
             if !summaries.contains(summary) {
                 summaries.append(summary)

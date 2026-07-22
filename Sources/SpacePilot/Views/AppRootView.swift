@@ -11,14 +11,14 @@ struct AppRootView: View {
             detail
         }
         .tint(.blue)
-        .searchable(text: $model.searchText, placement: .toolbar, prompt: "Search current view")
+        .searchable(text: $model.searchText, placement: .toolbar, prompt: L10n.text(.searchCurrent))
         .toolbar {
             ToolbarItemGroup {
                 if model.isScanning {
-                    Button("Cancel", systemImage: "xmark") { model.cancelScan() }
+                    Button(L10n.cancel(), systemImage: "xmark") { model.cancelScan() }
                         .keyboardShortcut(.cancelAction)
                 } else {
-                    Button("Scan", systemImage: "arrow.clockwise") { model.startScan() }
+                    Button(L10n.scan(), systemImage: "arrow.clockwise") { model.startScan() }
                         .keyboardShortcut("r", modifiers: .command)
                 }
             }

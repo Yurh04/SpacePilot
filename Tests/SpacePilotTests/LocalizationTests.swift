@@ -1,8 +1,57 @@
 import Foundation
+import SpacePilotCore
 import XCTest
 @testable import SpacePilot
 
 final class LocalizationTests: XCTestCase {
+    func testNavigationAndPluginLabelsUseEnglishAndSimplifiedChinese() {
+        let english = Locale(identifier: "en")
+        let chinese = Locale(identifier: "zh-Hans")
+
+        XCTAssertEqual(L10n.title(for: NavigationDestination.storage, locale: english), "Storage")
+        XCTAssertEqual(L10n.title(for: NavigationDestination.storage, locale: chinese), "储存空间")
+        XCTAssertEqual(L10n.title(for: AIApplicationTab.plugins, locale: english), "Plugins")
+        XCTAssertEqual(L10n.title(for: AIApplicationTab.plugins, locale: chinese), "插件")
+    }
+
+    func testScanStagesUseEnglishAndSimplifiedChinese() {
+        let english = Locale(identifier: "en")
+        let chinese = Locale(identifier: "zh-Hans")
+
+        XCTAssertEqual(L10n.scanStatus(for: .quickInventory, locale: english), "Scanning applications…")
+        XCTAssertEqual(L10n.scanStatus(for: .quickInventory, locale: chinese), "正在扫描应用程序…")
+        XCTAssertEqual(L10n.scanStatus(for: .completed, locale: english), "Scan complete")
+        XCTAssertEqual(L10n.scanStatus(for: .completed, locale: chinese), "扫描完成")
+    }
+
+    func testEveryDisplayEnumHasEnglishAndSimplifiedChineseText() {
+        let english = Locale(identifier: "en")
+        let chinese = Locale(identifier: "zh-Hans")
+
+        for category in ItemCategory.allCases {
+            XCTAssertFalse(L10n.name(for: category, locale: english).isEmpty)
+            XCTAssertFalse(L10n.name(for: category, locale: chinese).isEmpty)
+        }
+        for risk in RiskLevel.allCases {
+            XCTAssertFalse(L10n.name(for: risk, locale: english).isEmpty)
+            XCTAssertFalse(L10n.name(for: risk, locale: chinese).isEmpty)
+        }
+        XCTAssertEqual(L10n.name(for: SkillScope.sharedAgents, locale: english), "Shared")
+        XCTAssertEqual(L10n.name(for: SkillScope.sharedAgents, locale: chinese), "共享")
+        XCTAssertEqual(L10n.name(for: SkillManagementStatus.systemReadOnly, locale: english), "Read only")
+        XCTAssertEqual(L10n.name(for: SkillManagementStatus.systemReadOnly, locale: chinese), "只读")
+    }
+
+    func testKnownScannerExplanationsAreLocalizedAtPresentationTime() {
+        let chinese = Locale(identifier: "zh-Hans")
+        XCTAssertEqual(L10n.explanation("Codex conversation history", locale: chinese), "Codex 对话历史")
+        XCTAssertEqual(L10n.explanation("Found under Downloads", locale: chinese), "在 Downloads 下发现")
+        XCTAssertEqual(
+            L10n.explanation("Recognized ChatGPT data root; contents were not indexed", locale: chinese),
+            "已识别 ChatGPT 数据根目录；未索引其中内容"
+        )
+    }
+
     func testNavigationUsesEnglishAndSimplifiedChinese() {
         XCTAssertEqual(L10n.overview(locale: Locale(identifier: "en")), "Overview")
         XCTAssertEqual(L10n.overview(locale: Locale(identifier: "zh-Hans")), "概览")
@@ -32,7 +81,7 @@ final class LocalizationTests: XCTestCase {
         )
     }
 
-    func testCatalogAndRuntimeTablesContainTheSameThirtyFiveKeysAndValues() throws {
+    func testCatalogAndRuntimeTablesContainTheSameKeysAndValues() throws {
         let resources = repositoryRoot.appending(path: "Sources/SpacePilot/Resources")
         let catalogData = try Data(contentsOf: resources.appending(path: "Localizable.xcstrings"))
         let catalog = try XCTUnwrap(
@@ -42,7 +91,6 @@ final class LocalizationTests: XCTestCase {
         let english = try stringsTable(at: resources.appending(path: "en.lproj/Localizable.strings"))
         let chinese = try stringsTable(at: resources.appending(path: "zh-Hans.lproj/Localizable.strings"))
 
-        XCTAssertEqual(L10n.allKeys.count, 35)
         XCTAssertEqual(Set(catalogStrings.keys), L10n.allKeys)
         XCTAssertEqual(Set(english.keys), L10n.allKeys)
         XCTAssertEqual(Set(chinese.keys), L10n.allKeys)

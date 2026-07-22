@@ -7,21 +7,24 @@ struct CleanupHistoryView: View {
     var body: some View {
         if transactions.isEmpty {
             ContentUnavailableView {
-                Label("No cleanup history", systemImage: "clock.arrow.circlepath")
+                Label(L10n.text(.cleanupHistoryEmpty), systemImage: "clock.arrow.circlepath")
             } description: {
-                Text("Verified cleanup operations will appear here.")
+                Text(verbatim: L10n.text(.cleanupHistoryEmptyDescription))
             }
-            .navigationTitle("Cleanup History")
+            .navigationTitle(L10n.cleanupHistory())
         } else {
             List(transactions) { transaction in
                 DisclosureGroup {
                     ForEach(transaction.outcomes) { outcome in
-                        LabeledContent(outcome.message, value: outcome.status.displayName)
+                        LabeledContent(
+                            outcome.status == .failed ? outcome.message : L10n.name(for: outcome.status),
+                            value: L10n.name(for: outcome.status)
+                        )
                     }
                 } label: {
                     HStack {
                         VStack(alignment: .leading) {
-                            Text(transaction.summary.displayName)
+                            Text(verbatim: L10n.name(for: transaction.summary))
                                 .fontWeight(.medium)
                             Text(transaction.completedAt.formatted(date: .abbreviated, time: .shortened))
                                 .font(.caption)
@@ -29,37 +32,16 @@ struct CleanupHistoryView: View {
                         }
                         Spacer()
                         VStack(alignment: .trailing) {
-                            Text("\(transaction.outcomes.filter { $0.status == .movedToTrash }.count) moved")
+                            Text(verbatim: L10n.movedCount(transaction.outcomes.filter { $0.status == .movedToTrash }.count))
                             if let bytes = transaction.verifiedFreedBytes {
-                                Text("\(ByteCount.string(bytes)) verified")
+                                Text(verbatim: L10n.verifiedSpace(ByteCount.string(bytes)))
                             }
                         }
                         .foregroundStyle(.secondary)
                     }
                 }
             }
-            .navigationTitle("Cleanup History")
-        }
-    }
-}
-
-private extension CleanupSummary {
-    var displayName: String {
-        switch self {
-        case .success: "Completed"
-        case .partialFailure: "Partially completed"
-        case .failed: "Not completed"
-        }
-    }
-}
-
-private extension CleanupOutcomeStatus {
-    var displayName: String {
-        switch self {
-        case .movedToTrash: "Moved to Trash"
-        case .skippedChanged: "Skipped: changed"
-        case .skippedProtected: "Skipped: protected"
-        case .failed: "Failed"
+            .navigationTitle(L10n.cleanupHistory())
         }
     }
 }

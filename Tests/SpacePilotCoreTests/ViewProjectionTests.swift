@@ -144,8 +144,8 @@ final class ViewProjectionTests: XCTestCase {
     }
 
     func testAIApplicationTabsRemainNestedUnderSelectedApplication() {
-        XCTAssertEqual(AIApplicationTab.allCases.map(\.title), [
-            "Overview", "Data & Storage", "Plugins", "Skills"
+        XCTAssertEqual(AIApplicationTab.allCases.map(\.rawValue), [
+            "overview", "dataStorage", "plugins", "skills"
         ])
     }
 

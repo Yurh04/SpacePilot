@@ -1,6 +1,75 @@
 import Foundation
+import SpacePilotCore
 
 enum L10n {
+    struct Copy: Sendable {
+        fileprivate let key: String
+        fileprivate let english: String
+
+        static let aiBasicFootprint = Self(key: "ai.basic-footprint", english: "Basic footprint")
+        static let aiDataItems = Self(key: "ai.data-items", english: "Data items")
+        static let aiDeepAnalysis = Self(key: "ai.deep-analysis", english: "Deep analysis")
+        static let aiDeveloperStorage = Self(key: "ai.developer-storage", english: "Developer storage")
+        static let aiLocalFootprint = Self(key: "ai.local-footprint", english: "Local footprint")
+        static let aiNoContentIndexed = Self(key: "ai.no-content-indexed", english: "Conversation and log contents are not indexed.")
+        static let aiPluginsManaged = Self(key: "ai.plugins-managed", english: "Plugin packages are managed by their owning application.")
+        static let aiPrivacy = Self(key: "ai.privacy", english: "Privacy")
+        static let aiSearching = Self(key: "ai.searching", english: "Searching…")
+        static let aiSection = Self(key: "ai.section", english: "Section")
+        static let aiSelectApplication = Self(key: "ai.select-application", english: "Select an AI application")
+        static let aiTotalIndexedSpace = Self(key: "ai.total-indexed-space", english: "Total indexed space")
+        static let application = Self(key: "app.application", english: "Application")
+        static let applicationOnlyHighConfidence = Self(key: "app.only-high-confidence", english: "Only high-confidence related files are preselected.")
+        static let applicationRelated = Self(key: "app.related", english: "Related")
+        static let applicationReset = Self(key: "app.reset", english: "Reset…")
+        static let applicationReviewReset = Self(key: "app.review-reset", english: "Review Reset…")
+        static let applicationReviewUninstall = Self(key: "app.review-uninstall", english: "Review Uninstall…")
+        static let applicationTotalSpace = Self(key: "app.total-space", english: "Total space")
+        static let applicationUninstall = Self(key: "app.uninstall", english: "Uninstall…")
+        static let cleanupConfirmSensitive = Self(key: "cleanup.confirm-sensitive", english: "Also move the sensitive conversation, project, or settings data listed above")
+        static let cleanupConfirmTrash = Self(key: "cleanup.confirm-trash", english: "I understand these items will be moved to the Trash")
+        static let cleanupHistoryEmpty = Self(key: "cleanup.history-empty", english: "No cleanup history")
+        static let cleanupHistoryEmptyDescription = Self(key: "cleanup.history-empty-description", english: "Verified cleanup operations will appear here.")
+        static let cleanupMoveTrash = Self(key: "cleanup.move-trash", english: "Move to Trash")
+        static let cleanupMoving = Self(key: "cleanup.moving", english: "Moving…")
+        static let cleanupReview = Self(key: "cleanup.review", english: "Review Cleanup")
+        static let cleanupReviewDescription = Self(key: "cleanup.review-description", english: "These exact items will be moved to the Trash. You can restore them from the Trash until it is emptied.")
+        static let category = Self(key: "common.category", english: "Category")
+        static let items = Self(key: "common.items", english: "Items")
+        static let name = Self(key: "common.name", english: "Name")
+        static let plugin = Self(key: "common.plugin", english: "Plugin")
+        static let revealFinder = Self(key: "common.reveal-finder", english: "Reveal in Finder")
+        static let searchCurrent = Self(key: "common.search-current", english: "Search current view")
+        static let skill = Self(key: "common.skill", english: "Skill")
+        static let source = Self(key: "common.source", english: "Source")
+        static let overviewAnalyzeMac = Self(key: "overview.analyze-mac", english: "Analyze this Mac")
+        static let overviewAnalyzedLocally = Self(key: "overview.analyzed-locally", english: "Analyzed locally")
+        static let overviewInternalDiskUsed = Self(key: "overview.internal-disk-used", english: "Internal disk used")
+        static let overviewLimitedCoverage = Self(key: "overview.limited-coverage", english: "Limited coverage")
+        static let overviewLimitedCoverageDescription = Self(key: "overview.limited-coverage-description", english: "Some folders could not be read. Results show only verified data.")
+        static let overviewNoRecommendations = Self(key: "overview.no-recommendations", english: "No safe cleanup recommendations yet.")
+        static let overviewSafeRecommendations = Self(key: "overview.safe-recommendations", english: "Safe recommendations")
+        static let overviewStartScan = Self(key: "overview.start-scan", english: "Start Scan")
+        static let overviewStorageGlance = Self(key: "overview.storage-glance", english: "Storage at a glance")
+        static let overviewWorksLocally = Self(key: "overview.works-locally", english: "SpacePilot works locally and indexes metadata only.")
+        static let pluginDiagnosticEmptySkill = Self(key: "plugins.diagnostic-empty-skill", english: "A Plugin skill declaration was rejected or empty.")
+        static let pluginDiagnosticGeneric = Self(key: "plugins.diagnostic-generic", english: "Plugin discovery reported an issue.")
+        static let pluginDiagnosticInvalidManifest = Self(key: "plugins.diagnostic-invalid-manifest", english: "A Plugin manifest could not be read.")
+        static let pluginDiagnosticMissingManifest = Self(key: "plugins.diagnostic-missing-manifest", english: "A Plugin manifest could not be found.")
+        static let scanCancelled = Self(key: "scan.cancelled", english: "Scan cancelled")
+        static let settingsDiagnostics = Self(key: "settings.diagnostics", english: "Diagnostics")
+        static let settingsDiagnosticsDescription = Self(key: "settings.diagnostics-description", english: "Exported diagnostics contain counts and status metadata, not file paths, conversations, or log contents.")
+        static let settingsDiskAccess = Self(key: "settings.disk-access", english: "Disk access")
+        static let settingsDiskAccessDescription = Self(key: "settings.disk-access-description", english: "Grant Full Disk Access only if you want broader coverage. SpacePilot reports inaccessible folders instead of guessing.")
+        static let settingsExportDiagnostics = Self(key: "settings.export-diagnostics", english: "Export Diagnostics…")
+        static let settingsOpenDiskAccess = Self(key: "settings.open-disk-access", english: "Open Full Disk Access Settings")
+        static let settingsPrivacy = Self(key: "settings.privacy", english: "Privacy")
+        static let settingsPrivacyDescription = Self(key: "settings.privacy-description", english: "All analysis stays on this Mac. SpacePilot stores metadata, not conversation or log contents.")
+        static let storageLargest = Self(key: "storage.largest", english: "Largest")
+        static let storageLargestItems = Self(key: "storage.largest-items", english: "Largest analyzed items")
+        static let storageOldItems = Self(key: "storage.old-items", english: "Not modified in 180+ days")
+        static let storageOlder180 = Self(key: "storage.older-180", english: "Older than 180 days")
+    }
     static let allKeys: Set<String> = [
         "category.ai-data", "category.application", "category.cache", "category.conversation",
         "category.developer", "category.log", "category.model", "category.personal",
@@ -10,7 +79,42 @@ enum L10n {
         "nav.cleanup-history", "nav.developer-ai", "nav.overview", "nav.storage",
         "plugins.discovery-failed", "plugins.empty", "plugins.official-handoff", "plugins.title",
         "risk.managed", "risk.rebuildable", "risk.safe", "risk.sensitive", "state.no-data",
-        "state.preparing-summary"
+        "state.preparing-summary",
+        "ai.basic-footprint", "ai.data-items", "ai.deep-analysis", "ai.developer-storage",
+        "ai.local-footprint", "ai.manage-in", "ai.no-content-indexed", "ai.plugins-managed",
+        "ai.privacy", "ai.searching", "ai.section", "ai.select-application",
+        "ai.skills-visible", "ai.total-indexed-space", "app.application", "app.association-confidence",
+        "app.evidence.bundle-id", "app.evidence.container-id", "app.evidence.known-rule",
+        "app.evidence.name", "app.evidence.signed-helper", "app.only-high-confidence",
+        "app.related", "app.reset", "app.review-reset", "app.review-uninstall", "app.total-space",
+        "app.uninstall", "cleanup.confirm-sensitive", "cleanup.confirm-trash", "cleanup.history-empty",
+        "cleanup.history-empty-description", "cleanup.move-trash", "cleanup.moved-count",
+        "cleanup.moving", "cleanup.review", "cleanup.review-description", "cleanup.summary.failed",
+        "cleanup.summary.partial", "cleanup.summary.success", "cleanup.verified-space",
+        "common.application-name", "common.category", "common.data", "common.items", "common.name",
+        "common.plugin", "common.related", "common.reveal-finder", "common.search-current",
+        "common.skill", "common.source", "confidence.high", "confidence.low", "confidence.medium",
+        "error.quit-before-uninstall", "error.reset-unavailable", "overview.analyze-mac",
+        "overview.analyzed-locally", "overview.internal-disk-used", "overview.limited-coverage",
+        "overview.limited-coverage-description", "overview.no-recommendations", "overview.review-cleanup",
+        "overview.safe-recommendations", "overview.start-scan", "overview.storage-glance",
+        "overview.works-locally", "plugins.diagnostic-empty-skill", "plugins.diagnostic-generic",
+        "plugins.diagnostic-invalid-manifest", "plugins.diagnostic-missing-manifest",
+        "scan.cancelled", "scan.completed", "scan.indexing", "scan.quick-inventory", "scan.ready",
+        "scan.targeted-analysis", "settings.diagnostics", "settings.diagnostics-description",
+        "settings.disk-access", "settings.disk-access-description", "settings.export-diagnostics",
+        "settings.open-disk-access", "settings.privacy", "settings.privacy-description",
+        "skill.scope.plugin", "skill.scope.shared", "skill.scope.system", "skill.status.parent-managed",
+        "skill.status.read-only", "skill.status.standalone", "storage.largest", "storage.largest-items",
+        "storage.old-items", "storage.older-180", "cleanup.outcome.failed", "cleanup.outcome.moved",
+        "cleanup.outcome.skipped-changed", "cleanup.outcome.skipped-protected",
+        "explanation.application-bundle", "explanation.application-name-match",
+        "explanation.claude-cache", "explanation.claude-conversation", "explanation.claude-logs",
+        "explanation.claude-settings", "explanation.codex-cache", "explanation.codex-configuration",
+        "explanation.codex-conversation", "explanation.codex-logs", "explanation.exact-bundle-match",
+        "explanation.found-under", "explanation.gradle-cache", "explanation.homebrew-cache",
+        "explanation.npm-cache", "explanation.pip-cache", "explanation.recognized-root",
+        "explanation.simulator-data", "explanation.xcode-archives", "explanation.xcode-build"
     ]
 
     private static let resourceBundle: Bundle = {
@@ -67,6 +171,15 @@ enum L10n {
             return defaultValue
         }
         return bundle.localizedString(forKey: key, value: defaultValue, table: nil)
+    }
+
+    private static func format(
+        _ key: String,
+        default defaultValue: String,
+        locale: Locale?,
+        _ arguments: CVarArg...
+    ) -> String {
+        String(format: value(key, default: defaultValue, locale: locale), locale: locale ?? .current, arguments: arguments)
     }
 
     static func overview(locale: Locale? = nil) -> String {
@@ -207,5 +320,192 @@ enum L10n {
 
     static func categoryUnclassified(locale: Locale? = nil) -> String {
         value("category.unclassified", default: "Unclassified", locale: locale)
+    }
+
+    static func title(for destination: NavigationDestination, locale: Locale? = nil) -> String {
+        switch destination {
+        case .overview: overview(locale: locale)
+        case .storage: storage(locale: locale)
+        case .applications: applications(locale: locale)
+        case .developerAI: developerAI(locale: locale)
+        case .history: cleanupHistory(locale: locale)
+        }
+    }
+
+    static func title(for tab: AIApplicationTab, locale: Locale? = nil) -> String {
+        switch tab {
+        case .overview: overview(locale: locale)
+        case .dataStorage: value("common.data", default: "Data & Storage", locale: locale)
+        case .plugins: plugins(locale: locale)
+        case .skills: skills(locale: locale)
+        }
+    }
+
+    static func name(for category: ItemCategory, locale: Locale? = nil) -> String {
+        switch category {
+        case .application: categoryApplication(locale: locale)
+        case .personal: categoryPersonal(locale: locale)
+        case .developer: categoryDeveloper(locale: locale)
+        case .aiData: categoryAIData(locale: locale)
+        case .cache: categoryCache(locale: locale)
+        case .log: categoryLog(locale: locale)
+        case .conversation: categoryConversation(locale: locale)
+        case .model: categoryModel(locale: locale)
+        case .plugin: categoryPlugin(locale: locale)
+        case .skill: categorySkill(locale: locale)
+        case .system: categorySystem(locale: locale)
+        case .unclassified: categoryUnclassified(locale: locale)
+        }
+    }
+
+    static func name(for risk: RiskLevel, locale: Locale? = nil) -> String {
+        switch risk {
+        case .safe: riskSafe(locale: locale)
+        case .rebuildable: riskRebuildable(locale: locale)
+        case .sensitive: riskSensitive(locale: locale)
+        case .managed: riskManaged(locale: locale)
+        }
+    }
+
+    static func name(for scope: SkillScope, locale: Locale? = nil) -> String {
+        switch scope {
+        case .sharedAgents: value("skill.scope.shared", default: "Shared", locale: locale)
+        case .agentSpecific(let agent): agent
+        case .pluginProvided: value("skill.scope.plugin", default: "Plugin", locale: locale)
+        case .systemManaged: value("skill.scope.system", default: "System", locale: locale)
+        }
+    }
+
+    static func name(for status: SkillManagementStatus, locale: Locale? = nil) -> String {
+        switch status {
+        case .standalone: value("skill.status.standalone", default: "Standalone", locale: locale)
+        case .parentManaged: value("skill.status.parent-managed", default: "Plugin managed", locale: locale)
+        case .systemReadOnly: value("skill.status.read-only", default: "Read only", locale: locale)
+        }
+    }
+
+    static func name(for evidence: AssociationEvidence, locale: Locale? = nil) -> String {
+        switch evidence {
+        case .exactBundleIdentifier: value("app.evidence.bundle-id", default: "Bundle identifier", locale: locale)
+        case .exactContainerIdentifier: value("app.evidence.container-id", default: "Container identifier", locale: locale)
+        case .knownRule: value("app.evidence.known-rule", default: "Known application rule", locale: locale)
+        case .signedHelperRelationship: value("app.evidence.signed-helper", default: "Signed helper", locale: locale)
+        case .vendorAndNameMatch: value("app.evidence.name", default: "Application name", locale: locale)
+        }
+    }
+
+    static func name(for confidence: AssociationConfidence, locale: Locale? = nil) -> String {
+        switch confidence {
+        case .low: value("confidence.low", default: "Low", locale: locale)
+        case .medium: value("confidence.medium", default: "Medium", locale: locale)
+        case .high: value("confidence.high", default: "High", locale: locale)
+        }
+    }
+
+    static func association(_ evidence: AssociationEvidence, confidence: AssociationConfidence, locale: Locale? = nil) -> String {
+        format(
+            "app.association-confidence",
+            default: "%@ · %@ confidence",
+            locale: locale,
+            name(for: evidence, locale: locale),
+            name(for: confidence, locale: locale)
+        )
+    }
+
+    static func name(for summary: CleanupSummary, locale: Locale? = nil) -> String {
+        switch summary {
+        case .success: value("cleanup.summary.success", default: "Completed", locale: locale)
+        case .partialFailure: value("cleanup.summary.partial", default: "Partially completed", locale: locale)
+        case .failed: value("cleanup.summary.failed", default: "Not completed", locale: locale)
+        }
+    }
+
+    static func name(for status: CleanupOutcomeStatus, locale: Locale? = nil) -> String {
+        switch status {
+        case .movedToTrash: value("cleanup.outcome.moved", default: "Moved to Trash", locale: locale)
+        case .skippedChanged: value("cleanup.outcome.skipped-changed", default: "Skipped: changed", locale: locale)
+        case .skippedProtected: value("cleanup.outcome.skipped-protected", default: "Skipped: protected", locale: locale)
+        case .failed: value("cleanup.outcome.failed", default: "Failed", locale: locale)
+        }
+    }
+
+    static func scanStatus(for stage: ScanStage?, locale: Locale? = nil) -> String {
+        guard let stage else { return value("scan.ready", default: "Ready to scan", locale: locale) }
+        return switch stage {
+        case .quickInventory: value("scan.quick-inventory", default: "Scanning applications…", locale: locale)
+        case .targetedAnalysis: value("scan.targeted-analysis", default: "Analyzing storage and AI data…", locale: locale)
+        case .indexing: value("scan.indexing", default: "Saving local metadata index…", locale: locale)
+        case .completed: value("scan.completed", default: "Scan complete", locale: locale)
+        }
+    }
+
+    static func text(_ copy: Copy, locale: Locale? = nil) -> String {
+        value(copy.key, default: copy.english, locale: locale)
+    }
+
+    static func manageIn(_ application: String, locale: Locale? = nil) -> String {
+        format("ai.manage-in", default: "Manage in %@", locale: locale, application)
+    }
+
+    static func skillsVisible(to application: String, locale: Locale? = nil) -> String {
+        format("ai.skills-visible", default: "Skills visible to %@", locale: locale, application)
+    }
+
+    static func reviewCleanup(_ space: String, locale: Locale? = nil) -> String {
+        format("overview.review-cleanup", default: "Review %@ Cleanup", locale: locale, space)
+    }
+
+    static func quitBeforeUninstall(_ application: String, locale: Locale? = nil) -> String {
+        format("error.quit-before-uninstall", default: "Quit %@ before uninstalling it.", locale: locale, application)
+    }
+
+    static func resetUnavailable(_ application: String, locale: Locale? = nil) -> String {
+        format("error.reset-unavailable", default: "No high-confidence settings or caches are available to reset for %@.", locale: locale, application)
+    }
+
+    static func movedCount(_ count: Int, locale: Locale? = nil) -> String {
+        format("cleanup.moved-count", default: "%lld moved", locale: locale, Int64(count))
+    }
+
+    static func verifiedSpace(_ space: String, locale: Locale? = nil) -> String {
+        format("cleanup.verified-space", default: "%@ verified", locale: locale, space)
+    }
+
+    static func explanation(_ source: String, locale: Locale? = nil) -> String {
+        let exact: [String: (String, String)] = [
+            "Application bundle": ("explanation.application-bundle", "Application bundle"),
+            "Application name match in a known service directory": ("explanation.application-name-match", "Application name match in a known service directory"),
+            "Claude project conversation data": ("explanation.claude-conversation", "Claude project conversation data"),
+            "Claude diagnostic logs": ("explanation.claude-logs", "Claude diagnostic logs"),
+            "Claude rebuildable cache": ("explanation.claude-cache", "Claude rebuildable cache"),
+            "Claude settings": ("explanation.claude-settings", "Claude settings"),
+            "Codex conversation history": ("explanation.codex-conversation", "Codex conversation history"),
+            "Codex diagnostic logs": ("explanation.codex-logs", "Codex diagnostic logs"),
+            "Codex rebuildable cache": ("explanation.codex-cache", "Codex rebuildable cache"),
+            "Codex configuration": ("explanation.codex-configuration", "Codex configuration"),
+            "Xcode build products and indexes": ("explanation.xcode-build", "Xcode build products and indexes"),
+            "Xcode release archives": ("explanation.xcode-archives", "Xcode release archives"),
+            "Simulator runtimes and device data": ("explanation.simulator-data", "Simulator runtimes and device data"),
+            "npm download cache": ("explanation.npm-cache", "npm download cache"),
+            "Gradle dependency cache": ("explanation.gradle-cache", "Gradle dependency cache"),
+            "Homebrew download cache": ("explanation.homebrew-cache", "Homebrew download cache"),
+            "Python pip download cache": ("explanation.pip-cache", "Python pip download cache")
+        ]
+        if let translation = exact[source] {
+            return value(translation.0, default: translation.1, locale: locale)
+        }
+        if source.hasPrefix("Found under ") {
+            return format("explanation.found-under", default: "Found under %@", locale: locale, String(source.dropFirst(12)))
+        }
+        if source.hasPrefix("Exact bundle identifier match: ") {
+            return format("explanation.exact-bundle-match", default: "Exact bundle identifier match: %@", locale: locale, String(source.dropFirst(31)))
+        }
+        let recognizedPrefix = "Recognized "
+        let recognizedSuffix = " data root; contents were not indexed"
+        if source.hasPrefix(recognizedPrefix), source.hasSuffix(recognizedSuffix) {
+            let name = source.dropFirst(recognizedPrefix.count).dropLast(recognizedSuffix.count)
+            return format("explanation.recognized-root", default: "Recognized %@ data root; contents were not indexed", locale: locale, String(name))
+        }
+        return source
     }
 }

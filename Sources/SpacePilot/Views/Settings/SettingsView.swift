@@ -6,20 +6,20 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section("Privacy") {
-                Text("All analysis stays on this Mac. SpacePilot stores metadata, not conversation or log contents.")
+            Section(L10n.text(.settingsPrivacy)) {
+                Text(verbatim: L10n.text(.settingsPrivacyDescription))
             }
-            Section("Disk access") {
-                Text("Grant Full Disk Access only if you want broader coverage. SpacePilot reports inaccessible folders instead of guessing.")
+            Section(L10n.text(.settingsDiskAccess)) {
+                Text(verbatim: L10n.text(.settingsDiskAccessDescription))
                     .foregroundStyle(.secondary)
-                Button("Open Full Disk Access Settings") {
+                Button(L10n.text(.settingsOpenDiskAccess)) {
                     PermissionService().openFullDiskAccessSettings()
                 }
             }
-            Section("Diagnostics") {
-                Text("Exported diagnostics contain counts and status metadata, not file paths, conversations, or log contents.")
+            Section(L10n.text(.settingsDiagnostics)) {
+                Text(verbatim: L10n.text(.settingsDiagnosticsDescription))
                     .foregroundStyle(.secondary)
-                Button("Export Diagnostics…") { model.exportDiagnostics() }
+                Button(L10n.text(.settingsExportDiagnostics)) { model.exportDiagnostics() }
             }
         }
         .formStyle(.grouped)

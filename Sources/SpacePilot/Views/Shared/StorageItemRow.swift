@@ -8,7 +8,7 @@ struct StorageItemRow: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.url.lastPathComponent)
-                Text(item.explanation)
+                Text(verbatim: L10n.explanation(item.explanation))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -18,7 +18,7 @@ struct StorageItemRow: View {
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
         }
-        .contextMenu { Button("Reveal in Finder") { reveal(item.url) } }
-        .accessibilityLabel("\(item.url.lastPathComponent), \(ByteCount.string(item.allocatedSize)), \(item.risk.displayName)")
+        .contextMenu { Button(L10n.text(.revealFinder)) { reveal(item.url) } }
+        .accessibilityLabel("\(item.url.lastPathComponent), \(ByteCount.string(item.allocatedSize)), \(L10n.name(for: item.risk))")
     }
 }

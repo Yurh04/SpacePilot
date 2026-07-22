@@ -8,7 +8,7 @@ struct ScanStatusView: View {
             if model.isScanning {
                 ProgressView(value: model.scanProgress)
                     .frame(width: 120)
-                Text(model.scanMessage)
+                Text(verbatim: L10n.scanStatus(for: model.scanStage))
                     .foregroundStyle(.secondary)
             }
             if let error = model.errorMessage {

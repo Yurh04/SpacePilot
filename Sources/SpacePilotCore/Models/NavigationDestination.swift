@@ -7,16 +7,6 @@ public enum NavigationDestination: String, CaseIterable, Identifiable, Sendable 
 
     public var id: Self { self }
 
-    public var title: String {
-        switch self {
-        case .overview: "Overview"
-        case .storage: "Storage"
-        case .applications: "Applications"
-        case .developerAI: "Developer & AI"
-        case .history: "Cleanup History"
-        }
-    }
-
     public var systemImage: String {
         switch self {
         case .overview: "gauge.with.dots.needle.50percent"

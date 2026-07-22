@@ -24,7 +24,7 @@ final class AppModel {
     var aiQueryProjection: AIApplicationQueryProjection?
     var scanStage: ScanStage?
     var scanProgress = 0.0
-    var scanMessage = "Ready to scan"
+    var scanMessage = L10n.scanStatus(for: nil)
     var errorMessage: String?
     var isScanning = false
     var isCleaning = false
@@ -74,7 +74,7 @@ final class AppModel {
                     Self.logger.info("Scan stage: \(event.stage.rawValue, privacy: .public)")
                 }
             } catch is CancellationError {
-                scanMessage = "Scan cancelled"
+                scanMessage = L10n.text(.scanCancelled)
             } catch {
                 errorMessage = error.localizedDescription
                 Self.logger.error("Scan failed: \(error.localizedDescription, privacy: .public)")
@@ -100,7 +100,7 @@ final class AppModel {
         guard let snapshot = latestSnapshot else { return }
         if let bundleID = application.bundleIdentifier,
            !NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).isEmpty {
-            errorMessage = "Quit \(application.name) before uninstalling it."
+            errorMessage = L10n.quitBeforeUninstall(application.name)
             return
         }
         prepareCleanup(items: ApplicationUninstallPlanner().cleanupItems(for: application, snapshot: snapshot))
@@ -110,7 +110,7 @@ final class AppModel {
         guard let snapshot = latestSnapshot else { return }
         let items = ApplicationUninstallPlanner().resetItems(for: application, snapshot: snapshot)
         guard !items.isEmpty else {
-            errorMessage = "No high-confidence settings or caches are available to reset for \(application.name)."
+            errorMessage = L10n.resetUnavailable(application.name)
             return
         }
         prepareCleanup(items: items)

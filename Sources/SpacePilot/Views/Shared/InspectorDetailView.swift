@@ -6,11 +6,11 @@ struct InspectorDetailView: View {
 
     var body: some View {
         Form {
-            LabeledContent("Name", value: item.url.lastPathComponent)
-            LabeledContent("Location", value: item.url.path(percentEncoded: false))
-            LabeledContent("Space", value: ByteCount.string(item.allocatedSize))
-            LabeledContent("Risk", value: item.risk.displayName)
-            Text(item.explanation).foregroundStyle(.secondary)
+            LabeledContent(L10n.text(.name), value: item.url.lastPathComponent)
+            LabeledContent(L10n.location(), value: item.url.path(percentEncoded: false))
+            LabeledContent(L10n.space(), value: ByteCount.string(item.allocatedSize))
+            LabeledContent(L10n.risk(), value: L10n.name(for: item.risk))
+            Text(verbatim: L10n.explanation(item.explanation)).foregroundStyle(.secondary)
         }
         .formStyle(.grouped)
     }

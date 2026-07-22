@@ -15,7 +15,7 @@ struct ApplicationsView: View {
             let applications = projection.filtered(by: searchText)
             VStack(spacing: 0) {
                 Table(applications, selection: $selectedApplicationID) {
-                    TableColumn("Application") { projection in
+                    TableColumn(L10n.text(.application)) { projection in
                         let application = projection.application
                         HStack {
                             Image(nsImage: NSWorkspace.shared.icon(forFile: application.url.path))
@@ -29,16 +29,16 @@ struct ApplicationsView: View {
                             }
                         }
                         .contextMenu {
-                            Button("Reveal in Finder") { reveal(application.url) }
+                            Button(L10n.text(.revealFinder)) { reveal(application.url) }
                             Divider()
-                            Button("Review Reset…") { reset(application) }
-                            Button("Review Uninstall…") { uninstall(application) }
+                            Button(L10n.text(.applicationReviewReset)) { reset(application) }
+                            Button(L10n.text(.applicationReviewUninstall)) { uninstall(application) }
                         }
                         .accessibilityLabel("\(application.name), \(ByteCount.string(projection.totalSize))")
                     }
-                    TableColumn("Version") { Text($0.application.versionOrDash) }.width(90)
-                    TableColumn("Related") { Text($0.associations.count.formatted()) }.width(70)
-                    TableColumn("Total space") {
+                    TableColumn(L10n.version()) { Text($0.application.versionOrDash) }.width(90)
+                    TableColumn(L10n.text(.applicationRelated)) { Text($0.associations.count.formatted()) }.width(70)
+                    TableColumn(L10n.text(.applicationTotalSpace)) {
                         Text(ByteCount.string($0.totalSize)).monospacedDigit()
                     }.width(105)
                 }
@@ -54,18 +54,18 @@ struct ApplicationsView: View {
                     .frame(minHeight: 220, idealHeight: 280)
                 }
             }
-            .navigationTitle("Applications")
+            .navigationTitle(L10n.applications())
             .onChange(of: applications.map(\.id), initial: true) { _, applicationIDs in
                 if !applicationIDs.contains(where: { $0 == selectedApplicationID }) {
                     selectedApplicationID = applicationIDs.first
                 }
             }
         } else if hasSnapshot {
-            ProgressView("Preparing summary…")
+            ProgressView(L10n.preparingSummary())
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .navigationTitle("Applications")
+                .navigationTitle(L10n.applications())
         } else {
-            empty("Applications", image: "square.grid.2x2")
+            empty(L10n.applications(), image: "square.grid.2x2")
         }
     }
 
@@ -86,12 +86,12 @@ private struct ApplicationDetail: View {
             HStack {
                 VStack(alignment: .leading) {
                     Text(application.name).font(.headline)
-                    Text("Only high-confidence related files are preselected.")
+                    Text(verbatim: L10n.text(.applicationOnlyHighConfidence))
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button("Reset…", action: reset)
-                Button("Uninstall…", action: uninstall).buttonStyle(.borderedProminent)
+                Button(L10n.text(.applicationReset), action: reset)
+                Button(L10n.text(.applicationUninstall), action: uninstall).buttonStyle(.borderedProminent)
             }
             .padding(.horizontal)
 
@@ -103,14 +103,14 @@ private struct ApplicationDetail: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
-                        Text("\(pair.association.evidence.displayName) · \(pair.association.confidence.displayName) confidence")
+                        Text(verbatim: L10n.association(pair.association.evidence, confidence: pair.association.confidence))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Text(pair.association.risk.displayName).foregroundStyle(.secondary)
+                    Text(verbatim: L10n.name(for: pair.association.risk)).foregroundStyle(.secondary)
                     Text(ByteCount.string(pair.item.allocatedSize)).monospacedDigit()
                 }
-                .contextMenu { Button("Reveal in Finder") { reveal(pair.item.url) } }
+                .contextMenu { Button(L10n.text(.revealFinder)) { reveal(pair.item.url) } }
             }
             .listStyle(.inset)
         }
@@ -121,26 +121,4 @@ private struct ApplicationDetail: View {
 
 private extension ApplicationRecord {
     var versionOrDash: String { version ?? "—" }
-}
-
-private extension AssociationEvidence {
-    var displayName: String {
-        switch self {
-        case .exactBundleIdentifier: "Bundle identifier"
-        case .exactContainerIdentifier: "Container identifier"
-        case .knownRule: "Known application rule"
-        case .signedHelperRelationship: "Signed helper"
-        case .vendorAndNameMatch: "Application name"
-        }
-    }
-}
-
-private extension AssociationConfidence {
-    var displayName: String {
-        switch self {
-        case .low: "Low"
-        case .medium: "Medium"
-        case .high: "High"
-        }
-    }
 }

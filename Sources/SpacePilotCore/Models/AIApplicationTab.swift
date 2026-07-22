@@ -6,12 +6,4 @@ public enum AIApplicationTab: String, CaseIterable, Identifiable, Sendable {
 
     public var id: Self { self }
 
-    public var title: String {
-        switch self {
-        case .overview: "Overview"
-        case .dataStorage: "Data & Storage"
-        case .plugins: "Plugins"
-        case .skills: "Skills"
-        }
-    }
 }

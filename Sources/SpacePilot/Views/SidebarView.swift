@@ -6,7 +6,7 @@ struct SidebarView: View {
 
     var body: some View {
         List(NavigationDestination.allCases, selection: $model.selection) { destination in
-            Label(destination.title, systemImage: destination.systemImage)
+            Label(L10n.title(for: destination), systemImage: destination.systemImage)
                 .tag(destination)
         }
         .listStyle(.sidebar)

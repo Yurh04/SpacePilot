@@ -12,22 +12,22 @@ struct OverviewView: View {
             if let projection {
                 List {
                     Section {
-                        LabeledContent("Internal disk used", value: ByteCount.string(projection.totalUsedBytes))
-                        LabeledContent("Analyzed locally", value: ByteCount.string(projection.analyzedBytes))
-                        LabeledContent("Safe recommendations", value: ByteCount.string(projection.reclaimableBytes))
+                        LabeledContent(L10n.text(.overviewInternalDiskUsed), value: ByteCount.string(projection.totalUsedBytes))
+                        LabeledContent(L10n.text(.overviewAnalyzedLocally), value: ByteCount.string(projection.analyzedBytes))
+                        LabeledContent(L10n.text(.overviewSafeRecommendations), value: ByteCount.string(projection.reclaimableBytes))
                     } header: {
-                        Text("Storage at a glance")
+                        Text(verbatim: L10n.text(.overviewStorageGlance))
                     }
 
-                    Section("Safe recommendations") {
+                    Section(L10n.text(.overviewSafeRecommendations)) {
                         if projection.preselectedRecommendations.isEmpty {
-                            Text("No safe cleanup recommendations yet.")
+                            Text(verbatim: L10n.text(.overviewNoRecommendations))
                                 .foregroundStyle(.secondary)
                         } else {
                             ForEach(projection.preselectedRecommendations.prefix(8)) { item in
                                 StorageItemRow(item: item)
                             }
-                            Button("Review \(ByteCount.string(projection.reclaimableBytes)) Cleanup") {
+                            Button(L10n.reviewCleanup(ByteCount.string(projection.reclaimableBytes))) {
                                 reviewCleanup(projection.preselectedRecommendations)
                             }
                             .buttonStyle(.borderedProminent)
@@ -35,27 +35,27 @@ struct OverviewView: View {
                     }
 
                     if !projection.coverage.isComplete {
-                        Section("Limited coverage") {
-                            Label("Some folders could not be read. Results show only verified data.", systemImage: "lock.trianglebadge.exclamationmark")
+                        Section(L10n.text(.overviewLimitedCoverage)) {
+                            Label(L10n.text(.overviewLimitedCoverageDescription), systemImage: "lock.trianglebadge.exclamationmark")
                                 .foregroundStyle(.secondary)
                         }
                     }
                 }
-                .navigationTitle("Overview")
+                .navigationTitle(L10n.overview())
             } else if hasSnapshot {
-                ProgressView("Preparing summary…")
+                ProgressView(L10n.preparingSummary())
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .navigationTitle("Overview")
+                    .navigationTitle(L10n.overview())
             } else {
                 ContentUnavailableView {
-                    Label("Analyze this Mac", systemImage: "internaldrive")
+                    Label(L10n.text(.overviewAnalyzeMac), systemImage: "internaldrive")
                 } description: {
-                    Text("SpacePilot works locally and indexes metadata only.")
+                    Text(verbatim: L10n.text(.overviewWorksLocally))
                 } actions: {
-                    Button("Start Scan", action: startScan)
+                    Button(L10n.text(.overviewStartScan), action: startScan)
                         .buttonStyle(.borderedProminent)
                 }
-                .navigationTitle("Overview")
+                .navigationTitle(L10n.overview())
             }
         }
     }

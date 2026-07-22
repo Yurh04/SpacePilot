@@ -2,13 +2,19 @@ import XCTest
 @testable import SpacePilotCore
 
 final class PackageSmokeTests: XCTestCase {
-    func testNavigationDestinationsHaveStableTitles() {
-        XCTAssertEqual(NavigationDestination.allCases.map(\.title), [
-            "Overview",
-            "Storage",
-            "Applications",
-            "Developer & AI",
-            "Cleanup History"
+    func testNavigationDestinationsHaveStableRawValues() {
+        XCTAssertEqual(NavigationDestination.allCases.map(\.rawValue), [
+            "overview",
+            "storage",
+            "applications",
+            "developerAI",
+            "history"
+        ])
+    }
+
+    func testAIApplicationTabsHaveStableRawValues() {
+        XCTAssertEqual(AIApplicationTab.allCases.map(\.rawValue), [
+            "overview", "dataStorage", "plugins", "skills"
         ])
     }
 }

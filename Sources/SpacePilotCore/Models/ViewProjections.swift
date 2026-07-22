@@ -375,33 +375,3 @@ public struct ApplicationListProjection: Sendable {
         totalSizes[applicationID, default: 0]
     }
 }
-
-public extension ItemCategory {
-    var displayName: String {
-        switch self {
-        case .application: "Application Data"
-        case .personal: "Personal Files"
-        case .developer: "Developer Files"
-        case .aiData: "AI Data"
-        case .cache: "Caches"
-        case .log: "Logs"
-        case .conversation: "Conversations"
-        case .model: "Models"
-        case .plugin: "Plugins"
-        case .skill: "Skills"
-        case .system: "System"
-        case .unclassified: "Unclassified"
-        }
-    }
-}
-
-public extension RiskLevel {
-    var displayName: String {
-        switch self {
-        case .safe: "Safe to clean"
-        case .rebuildable: "Rebuildable"
-        case .sensitive: "Sensitive"
-        case .managed: "Provider managed"
-        }
-    }
-}
