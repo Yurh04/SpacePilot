@@ -14,14 +14,7 @@ struct SpacePilotApp: App {
         .defaultSize(width: 1_180, height: 760)
 
         Settings {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("SpacePilot Settings")
-                    .font(.title2.weight(.semibold))
-                Text("Permissions and scan preferences will appear here.")
-                    .foregroundStyle(.secondary)
-            }
-            .padding(24)
-            .frame(width: 460, height: 240, alignment: .topLeading)
+            SettingsView()
         }
     }
 }

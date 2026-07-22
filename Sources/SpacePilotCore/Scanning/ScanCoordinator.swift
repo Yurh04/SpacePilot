@@ -80,7 +80,33 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                 itemsByPath[item.url.path] = item
             }
             let items = itemsByPath.values.sorted { $0.url.path < $1.url.path }
-            let aiApplications = [codex.application, claude.application]
+            let codexSkills = Set(indexedSkills.filter { $0.visibleAgents.contains("Codex") }.map(\.id))
+            let claudeSkills = Set(indexedSkills.filter { $0.visibleAgents.contains("Claude") }.map(\.id))
+            let codexApplication = AIApplicationRecord(
+                id: codex.application.id,
+                name: codex.application.name,
+                bundleIdentifier: codex.application.bundleIdentifier,
+                applicationURL: codex.application.applicationURL,
+                rootURLs: codex.application.rootURLs,
+                itemIDs: codex.application.itemIDs,
+                pluginIDs: Set(pluginResult.plugins.map(\.id)),
+                skillIDs: codexSkills,
+                applicationAllocatedSize: codex.application.applicationAllocatedSize,
+                supportLevel: codex.application.supportLevel
+            )
+            let claudeApplication = AIApplicationRecord(
+                id: claude.application.id,
+                name: claude.application.name,
+                bundleIdentifier: claude.application.bundleIdentifier,
+                applicationURL: claude.application.applicationURL,
+                rootURLs: claude.application.rootURLs,
+                itemIDs: claude.application.itemIDs,
+                pluginIDs: [],
+                skillIDs: claudeSkills,
+                applicationAllocatedSize: claude.application.applicationAllocatedSize,
+                supportLevel: claude.application.supportLevel
+            )
+            let aiApplications = [codexApplication, claudeApplication]
             emit(ScanEvent(stage: .indexing, progress: 0.88, message: "Saving local metadata index"))
             try Task.checkCancellation()
 

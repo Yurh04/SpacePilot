@@ -6,6 +6,9 @@ import SpacePilotCore
 @Observable
 final class AppModel {
     var selection: NavigationDestination? = .overview
+    var searchText = ""
+    var selectedAIApplicationID: UUID?
+    var selectedAIApplicationTab: AIApplicationTab = .overview
     var latestSnapshot: ScanSnapshot?
     var scanStage: ScanStage?
     var scanProgress = 0.0
