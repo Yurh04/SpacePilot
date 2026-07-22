@@ -466,18 +466,20 @@ final class ViewProjectionTests: XCTestCase {
         XCTAssertTrue(observedCancellation)
     }
 
-    func testCancellationAwareOrderingThrowsDuringMergeCopy() {
-        let checker = DeterministicCancellationChecker(cancelAtCheck: 2)
+    func testCancellationAwareOrderingThrowsAtPeriodicMergeCheckpoint() {
+        let checker = DeterministicCancellationChecker(cancelAtCheck: 3)
         let values = Array((0..<4_096).reversed())
 
         XCTAssertThrowsError(try ProjectionCancellationAwareOrdering.sorted(
             values,
-            by: <,
+            by: checker.areInIncreasingOrder,
             checkCancellation: checker.check
         )) { error in
             XCTAssertTrue(error is CancellationError)
         }
-        XCTAssertEqual(checker.checkCount, 2)
+        XCTAssertEqual(checker.checkCount, 3)
+        XCTAssertGreaterThan(checker.comparisonCount, 0)
+        XCTAssertLessThan(checker.comparisonCount, values.count / 2)
     }
 }
 
@@ -485,6 +487,7 @@ private final class DeterministicCancellationChecker: @unchecked Sendable {
     private let lock = NSLock()
     private let cancelAtCheck: Int
     private var storedCheckCount = 0
+    private var storedComparisonCount = 0
 
     init(cancelAtCheck: Int) {
         self.cancelAtCheck = cancelAtCheck
@@ -494,6 +497,10 @@ private final class DeterministicCancellationChecker: @unchecked Sendable {
         lock.withLock { storedCheckCount }
     }
 
+    var comparisonCount: Int {
+        lock.withLock { storedComparisonCount }
+    }
+
     func check() throws {
         try lock.withLock {
             storedCheckCount += 1
@@ -501,5 +508,10 @@ private final class DeterministicCancellationChecker: @unchecked Sendable {
                 throw CancellationError()
             }
         }
+    }
+
+    func areInIncreasingOrder(_ lhs: Int, _ rhs: Int) -> Bool {
+        lock.withLock { storedComparisonCount += 1 }
+        return lhs < rhs
     }
 }
