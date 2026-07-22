@@ -4,6 +4,7 @@ import SwiftUI
 struct OverviewView: View {
     let snapshot: ScanSnapshot?
     let startScan: () -> Void
+    let reviewCleanup: ([ScannedItem]) -> Void
 
     var body: some View {
         Group {
@@ -26,6 +27,10 @@ struct OverviewView: View {
                             ForEach(projection.preselectedRecommendations.prefix(8)) { item in
                                 StorageItemRow(item: item)
                             }
+                            Button("Review \(ByteCount.string(projection.reclaimableBytes)) Cleanup") {
+                                reviewCleanup(projection.preselectedRecommendations)
+                            }
+                            .buttonStyle(.borderedProminent)
                         }
                     }
 

@@ -15,10 +15,7 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
     }
 
     public static func live() throws -> ScanCoordinator {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let databaseURL = home.appending(path: "Library/Application Support/SpacePilot/index.sqlite")
-        let store = try SQLiteIndexStore(url: databaseURL)
-        return ScanCoordinator(homeDirectory: home, store: store)
+        try SpacePilotRuntime.live().coordinator
     }
 
     public init(homeDirectory: URL, store: any SnapshotStoring) {

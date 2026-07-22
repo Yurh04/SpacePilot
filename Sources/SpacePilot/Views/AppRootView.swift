@@ -28,21 +28,41 @@ struct AppRootView: View {
                 ScanStatusView(model: model)
             }
         }
+        .sheet(isPresented: $model.showingCleanupConfirmation) {
+            CleanupConfirmationView(
+                items: model.cleanupCandidates,
+                isExecuting: model.isCleaning,
+                onConfirm: model.executePreparedCleanup,
+                onCancel: { model.showingCleanupConfirmation = false }
+            )
+        }
     }
 
     @ViewBuilder
     private var detail: some View {
         switch model.selection ?? .overview {
         case .overview:
-            OverviewView(snapshot: model.latestSnapshot, startScan: model.startScan)
+            OverviewView(
+                snapshot: model.latestSnapshot,
+                startScan: model.startScan,
+                reviewCleanup: model.prepareCleanup
+            )
         case .storage:
-            StorageView(snapshot: model.latestSnapshot, searchText: model.searchText)
+            StorageView(
+                snapshot: model.latestSnapshot,
+                searchText: model.searchText,
+                reviewCleanup: model.prepareCleanup
+            )
         case .applications:
-            ApplicationsView(snapshot: model.latestSnapshot, searchText: model.searchText)
+            ApplicationsView(
+                snapshot: model.latestSnapshot,
+                searchText: model.searchText,
+                uninstall: model.prepareUninstall
+            )
         case .developerAI:
             DeveloperAIView(model: model)
         case .history:
-            CleanupHistoryView()
+            CleanupHistoryView(transactions: model.cleanupHistory)
         }
     }
 }

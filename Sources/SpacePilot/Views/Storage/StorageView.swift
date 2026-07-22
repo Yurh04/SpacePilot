@@ -5,6 +5,7 @@ import SwiftUI
 struct StorageView: View {
     let snapshot: ScanSnapshot?
     let searchText: String
+    let reviewCleanup: ([ScannedItem]) -> Void
 
     var body: some View {
         if let snapshot {
@@ -33,6 +34,9 @@ struct StorageView: View {
                         Text(item.url.lastPathComponent)
                             .contextMenu {
                                 Button("Reveal in Finder") { reveal(item.url) }
+                                if item.risk == .safe {
+                                    Button("Review Cleanup") { reviewCleanup([item]) }
+                                }
                             }
                     }
                     TableColumn("Location") { item in

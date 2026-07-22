@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Observation
 import SpacePilotCore
@@ -15,21 +16,28 @@ final class AppModel {
     var scanMessage = "Ready to scan"
     var errorMessage: String?
     var isScanning = false
+    var isCleaning = false
+    var showingCleanupConfirmation = false
+    var cleanupCandidates: [ScannedItem] = []
+    var latestCleanupTransaction: CleanupTransaction?
+    var cleanupHistory: [CleanupTransaction] = []
 
     private var scanTask: Task<Void, Never>?
-    private let coordinator: ScanCoordinator?
+    private var cleanupTask: Task<Void, Never>?
+    private let runtime: SpacePilotRuntime?
 
     init() {
         do {
-            coordinator = try .live()
+            runtime = try .live()
         } catch {
-            coordinator = nil
+            runtime = nil
             errorMessage = error.localizedDescription
         }
+        Task { await loadSavedState() }
     }
 
     func startScan() {
-        guard !isScanning, let coordinator else { return }
+        guard !isScanning, let coordinator = runtime?.coordinator else { return }
         errorMessage = nil
         isScanning = true
         scanTask = Task {
@@ -53,5 +61,69 @@ final class AppModel {
 
     func cancelScan() {
         scanTask?.cancel()
+    }
+
+    func prepareCleanup(items: [ScannedItem]) {
+        let eligible = items.filter { $0.risk != .managed }
+        guard !eligible.isEmpty else { return }
+        cleanupCandidates = eligible
+        latestCleanupTransaction = nil
+        showingCleanupConfirmation = true
+    }
+
+    func prepareUninstall(application: ApplicationRecord) {
+        guard let snapshot = latestSnapshot else { return }
+        if let bundleID = application.bundleIdentifier,
+           !NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).isEmpty {
+            errorMessage = "Quit \(application.name) before uninstalling it."
+            return
+        }
+        prepareCleanup(items: ApplicationUninstallPlanner().cleanupItems(for: application, snapshot: snapshot))
+    }
+
+    func executePreparedCleanup(confirmSensitive: Bool) {
+        guard let runtime, let snapshot = latestSnapshot, !isCleaning else { return }
+        isCleaning = true
+        errorMessage = nil
+        cleanupTask = Task {
+            do {
+                let sensitiveIDs = confirmSensitive
+                    ? Set(cleanupCandidates.filter { $0.risk == .sensitive }.map(\.id))
+                    : []
+                let policy = PathSafetyPolicy(
+                    homeDirectory: runtime.homeDirectory,
+                    allowedVolumeRoot: URL(fileURLWithPath: "/", isDirectory: true)
+                )
+                let plan = try CleanupPlanner(policy: policy).makePlan(
+                    snapshotID: snapshot.id,
+                    items: cleanupCandidates,
+                    selectedIDs: Set(cleanupCandidates.map(\.id)),
+                    separatelyConfirmedSensitiveIDs: sensitiveIDs
+                )
+                let transaction = try await CleanupExecutor(
+                    policy: policy,
+                    mover: FileManagerTrashMover(),
+                    store: runtime.store
+                ).execute(plan: plan)
+                latestCleanupTransaction = transaction
+                cleanupHistory = try await runtime.store.cleanupHistory()
+                showingCleanupConfirmation = false
+                startScan()
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+            isCleaning = false
+            cleanupTask = nil
+        }
+    }
+
+    private func loadSavedState() async {
+        guard let runtime else { return }
+        do {
+            latestSnapshot = try await runtime.store.latestSnapshot()
+            cleanupHistory = try await runtime.store.cleanupHistory()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }

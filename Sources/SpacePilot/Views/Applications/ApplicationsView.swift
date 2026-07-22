@@ -4,6 +4,7 @@ import SwiftUI
 struct ApplicationsView: View {
     let snapshot: ScanSnapshot?
     let searchText: String
+    let uninstall: (ApplicationRecord) -> Void
 
     var body: some View {
         if let snapshot {
@@ -21,6 +22,8 @@ struct ApplicationsView: View {
                         }
                         .contextMenu {
                             Button("Reveal in Finder") { reveal(application.url) }
+                            Divider()
+                            Button("Review Uninstall…") { uninstall(application) }
                         }
                     }
                     .accessibilityLabel("\(application.name), \(ByteCount.string(totalSize(application, snapshot: snapshot)))")
