@@ -72,21 +72,8 @@ public struct SkillScanner: SkillScanning {
     }
 
     private func folderMetadata(_ root: URL) -> (allocatedSize: Int64, relativeFileNames: [String]) {
-        guard let enumerator = FileManager.default.enumerator(
-            at: root,
-            includingPropertiesForKeys: [.isRegularFileKey, .totalFileAllocatedSizeKey],
-            options: [.skipsHiddenFiles]
-        ) else { return (0, []) }
-        var allocatedSize: Int64 = 0
-        var names: [String] = []
-        for case let url as URL in enumerator {
-            guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .totalFileAllocatedSizeKey]),
-                  values.isRegularFile == true else { continue }
-            allocatedSize += Int64(values.totalFileAllocatedSize ?? 0)
-            let prefix = root.standardizedFileURL.path + "/"
-            names.append(String(url.standardizedFileURL.path.dropFirst(prefix.count)))
-        }
-        return (allocatedSize, names)
+        let metadata = ManagedAssetDirectoryMetadata.scan(root: root)
+        return (metadata.allocatedSize, metadata.relativeFileNames)
     }
 
     private func visibleAgents(for scope: SkillScope) -> Set<String> {

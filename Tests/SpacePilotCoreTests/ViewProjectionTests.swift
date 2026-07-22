@@ -267,6 +267,99 @@ final class ViewProjectionTests: XCTestCase {
         XCTAssertEqual(application.totalSize, 80)
     }
 
+    func testRealScannersCountHiddenManagedFilesExactlyOnceInProjection() async throws {
+        let fixture = try PluginFixture.make(
+            name: "product-design",
+            version: "0.1.52",
+            skillNames: ["index"]
+        )
+        let pluginManifest = fixture.root.appending(path: ".codex-plugin/plugin.json")
+        let pluginSkillManifest = fixture.root.appending(path: "skills/index/SKILL.md")
+        let hiddenPluginFile = fixture.root.appending(path: ".plugin-state")
+        let hiddenPluginSkillFile = fixture.root.appending(path: "skills/index/.skill-state")
+        try Data(repeating: 1, count: 8_192).write(to: hiddenPluginFile)
+        try Data(repeating: 2, count: 12_288).write(to: hiddenPluginSkillFile)
+
+        let standaloneSkillRoot = fixture.tree.url.appending(
+            path: ".codex/skills/local-helper",
+            directoryHint: .isDirectory
+        )
+        try FileManager.default.createDirectory(at: standaloneSkillRoot, withIntermediateDirectories: true)
+        let standaloneManifest = standaloneSkillRoot.appending(path: "SKILL.md")
+        let hiddenStandaloneFile = standaloneSkillRoot.appending(path: ".local-state")
+        try Data("---\nname: local-helper\ndescription: Local helper\n---\nInstructions".utf8)
+            .write(to: standaloneManifest)
+        try Data(repeating: 3, count: 16_384).write(to: hiddenStandaloneFile)
+
+        let outsideFile = fixture.tree.url.appending(path: "outside.bin")
+        try Data(repeating: 4, count: 32_768).write(to: outsideFile)
+        try FileManager.default.createSymbolicLink(
+            at: fixture.root.appending(path: "external-link"),
+            withDestinationURL: outsideFile
+        )
+
+        let pluginResult = try await PluginScanner(skillScanner: SkillScanner()).scan(roots: [fixture.root])
+        let standaloneSkills = try await SkillScanner().scan(roots: [SkillRoot(
+            url: standaloneSkillRoot.deletingLastPathComponent(),
+            scope: .agentSpecific(agent: "Codex")
+        )])
+        let plugin = try XCTUnwrap(pluginResult.plugins.first)
+        let pluginSkill = try XCTUnwrap(pluginResult.skills.first)
+        let standaloneSkill = try XCTUnwrap(standaloneSkills.first)
+
+        func allocatedSize(of url: URL) throws -> Int64 {
+            let values = try url.resourceValues(forKeys: [.totalFileAllocatedSizeKey])
+            return Int64(try XCTUnwrap(values.totalFileAllocatedSize))
+        }
+        let pluginFiles = [
+            pluginManifest, pluginSkillManifest, hiddenPluginFile, hiddenPluginSkillFile
+        ]
+        let standaloneFiles = [standaloneManifest, hiddenStandaloneFile]
+        let expectedPluginBytes = try pluginFiles.reduce(Int64(0)) {
+            $0 + (try allocatedSize(of: $1))
+        }
+        let expectedPluginSkillBytes = try [pluginSkillManifest, hiddenPluginSkillFile]
+            .reduce(Int64(0)) { $0 + (try allocatedSize(of: $1)) }
+        let expectedStandaloneBytes = try standaloneFiles.reduce(Int64(0)) {
+            $0 + (try allocatedSize(of: $1))
+        }
+
+        XCTAssertEqual(plugin.allocatedSize, expectedPluginBytes)
+        XCTAssertEqual(pluginSkill.allocatedSize, expectedPluginSkillBytes)
+        XCTAssertEqual(standaloneSkill.allocatedSize, expectedStandaloneBytes)
+
+        let ownedFiles = pluginFiles + standaloneFiles
+        let items = try ownedFiles.map { url in
+            ScannedItem.fixture(path: url.path, allocatedSize: try allocatedSize(of: url))
+        }
+        let codex = AIApplicationRecord.fixture(
+            name: "Codex",
+            itemIDs: Set(items.map(\.id)),
+            pluginIDs: [plugin.id],
+            skillIDs: [pluginSkill.id, standaloneSkill.id]
+        )
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: items,
+            applications: [],
+            aiApplications: [codex],
+            plugins: [plugin],
+            skills: [pluginSkill, standaloneSkill],
+            coverage: .complete
+        )
+
+        let application = try XCTUnwrap(DeveloperAIProjection(snapshot: snapshot).applications.first)
+        let managedPathSearch = try AIApplicationQueryProjection.build(
+            application: application,
+            query: ".plugin-state"
+        )
+
+        XCTAssertEqual(application.dataItems.count, ownedFiles.count)
+        XCTAssertEqual(application.totalSize, expectedPluginBytes + expectedStandaloneBytes)
+        XCTAssertEqual(managedPathSearch.dataItems.map(\.url), [hiddenPluginFile])
+    }
+
     func testAIApplicationTabsRemainNestedUnderSelectedApplication() {
         XCTAssertEqual(AIApplicationTab.allCases.map(\.rawValue), [
             "overview", "dataStorage", "plugins", "skills"
