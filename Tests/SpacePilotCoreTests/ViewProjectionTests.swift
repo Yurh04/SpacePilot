@@ -143,6 +143,130 @@ final class ViewProjectionTests: XCTestCase {
         XCTAssertEqual(application.totalSize, 670)
     }
 
+    func testDeveloperAIProjectionAssignsCodexManagedBytesToExactlyOneComponent() throws {
+        let pluginID = UUID()
+        let pluginRoot = "/Users/test/.codex/plugins/cache/openai-curated-remote/product-design/0.1.52"
+        let pluginSkill = SkillRecord(
+            name: "product-design-index",
+            summary: "Fixture plugin skill",
+            url: URL(fileURLWithPath: "\(pluginRoot)/skills/index"),
+            allocatedSize: 200,
+            scope: .pluginProvided(pluginID: pluginID.uuidString),
+            visibleAgents: ["Codex"],
+            parentPluginID: pluginID,
+            fingerprint: "plugin-skill",
+            conflict: nil,
+            managementStatus: .parentManaged
+        )
+        let standaloneSkill = SkillRecord(
+            name: "codex-helper",
+            summary: "Fixture standalone skill",
+            url: URL(fileURLWithPath: "/Users/test/.codex/skills/codex-helper"),
+            allocatedSize: 300,
+            scope: .agentSpecific(agent: "Codex"),
+            visibleAgents: ["Codex"],
+            parentPluginID: nil,
+            fingerprint: "standalone-skill",
+            conflict: nil,
+            managementStatus: .standalone
+        )
+        let plugin = PluginRecord(
+            id: pluginID,
+            name: "product-design",
+            version: "0.1.52",
+            url: URL(fileURLWithPath: pluginRoot),
+            source: "openai-curated-remote",
+            allocatedSize: 700,
+            skillIDs: [pluginSkill.id]
+        )
+        let items = [
+            ScannedItem.fixture(path: "/Users/test/.codex/sessions/session.json", allocatedSize: 100),
+            ScannedItem.fixture(path: "\(pluginRoot)/.codex-plugin/plugin.json", allocatedSize: 500),
+            ScannedItem.fixture(path: "\(pluginRoot)/skills/index/SKILL.md", allocatedSize: 200),
+            ScannedItem.fixture(path: "/Users/test/.codex/skills/codex-helper/SKILL.md", allocatedSize: 300),
+            // This is not beneath `codex-helper`; component-safe matching must retain it.
+            ScannedItem.fixture(path: "/Users/test/.codex/skills/codex-helper-backup/cache.db", allocatedSize: 70)
+        ]
+        let codex = AIApplicationRecord.fixture(
+            name: "Codex",
+            itemIDs: Set(items.map(\.id)),
+            pluginIDs: [plugin.id],
+            skillIDs: [pluginSkill.id, standaloneSkill.id],
+            applicationAllocatedSize: 10
+        )
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: items,
+            applications: [],
+            aiApplications: [codex],
+            plugins: [plugin],
+            skills: [pluginSkill, standaloneSkill],
+            coverage: .complete
+        )
+
+        let application = try XCTUnwrap(DeveloperAIProjection(snapshot: snapshot).applications.first)
+
+        XCTAssertEqual(application.dataItems.count, 5, "Managed rows remain searchable and visible")
+        XCTAssertEqual(application.plugins.reduce(0) { $0 + $1.allocatedSize }, 700)
+        XCTAssertEqual(
+            application.skills.filter { $0.parentPluginID == nil }.reduce(0) { $0 + $1.allocatedSize },
+            300
+        )
+        XCTAssertEqual(application.totalSize, 1_180, "10 app + 170 generic + 700 plugin + 300 skill")
+    }
+
+    func testDeveloperAIProjectionCanonicalizesSymlinkedManagedRoots() throws {
+        let temporaryRoot = FileManager.default.temporaryDirectory
+            .appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        let canonicalPluginRoot = temporaryRoot.appending(path: "real/plugin", directoryHint: .isDirectory)
+        let symlinkedPluginRoot = temporaryRoot.appending(path: "alias-plugin", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: canonicalPluginRoot, withIntermediateDirectories: true)
+        let manifestURL = canonicalPluginRoot.appending(path: ".codex-plugin/plugin.json")
+        try FileManager.default.createDirectory(
+            at: manifestURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data("fixture".utf8).write(to: manifestURL)
+        try FileManager.default.createSymbolicLink(
+            at: symlinkedPluginRoot,
+            withDestinationURL: canonicalPluginRoot
+        )
+        defer { try? FileManager.default.removeItem(at: temporaryRoot) }
+
+        let plugin = PluginRecord(
+            name: "symlinked",
+            version: "1",
+            url: symlinkedPluginRoot,
+            source: "fixture",
+            allocatedSize: 80
+        )
+        let managedItem = ScannedItem.fixture(
+            path: manifestURL.resolvingSymlinksInPath().path,
+            allocatedSize: 80
+        )
+        let codex = AIApplicationRecord.fixture(
+            name: "Codex",
+            itemIDs: [managedItem.id],
+            pluginIDs: [plugin.id]
+        )
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: [managedItem],
+            applications: [],
+            aiApplications: [codex],
+            plugins: [plugin],
+            skills: [],
+            coverage: .complete
+        )
+
+        let application = try XCTUnwrap(DeveloperAIProjection(snapshot: snapshot).applications.first)
+
+        XCTAssertEqual(application.dataItems.map(\.id), [managedItem.id])
+        XCTAssertEqual(application.totalSize, 80)
+    }
+
     func testAIApplicationTabsRemainNestedUnderSelectedApplication() {
         XCTAssertEqual(AIApplicationTab.allCases.map(\.rawValue), [
             "overview", "dataStorage", "plugins", "skills"
