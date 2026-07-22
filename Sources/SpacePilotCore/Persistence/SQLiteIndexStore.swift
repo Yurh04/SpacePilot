@@ -72,11 +72,16 @@ public actor SQLiteIndexStore: SnapshotStoring {
                 try connection.bind(snapshot.id.uuidString, to: 1, in: statement)
                 try connection.stepDone(statement)
             }
+            try connection.statement("DELETE FROM snapshots WHERE id <> ?;") { statement in
+                try connection.bind(snapshot.id.uuidString, to: 1, in: statement)
+                try connection.stepDone(statement)
+            }
             try connection.execute("COMMIT;")
         } catch {
             try? connection.execute("ROLLBACK;")
             throw error
         }
+        try? connection.execute("PRAGMA wal_checkpoint(TRUNCATE);")
     }
 
     public func latestSnapshot() throws -> ScanSnapshot? {
