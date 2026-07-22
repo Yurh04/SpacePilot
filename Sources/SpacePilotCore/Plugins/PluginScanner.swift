@@ -46,10 +46,11 @@ public struct PluginScanner<Scanner: SkillScanning>: PluginScanning {
             let pluginID = UUID()
             var acceptedFolders: [URL] = []
             for relativePath in manifest.skills {
-                if let folder = validatedComponent(relativePath, beneath: root) {
-                    acceptedFolders.append(folder)
+                let folders = skillFolders(for: relativePath, beneath: root)
+                if folders.isEmpty {
+                    diagnostics.append("Rejected or empty Plugin skill declaration: \(relativePath)")
                 } else {
-                    diagnostics.append("Rejected Plugin component path: \(relativePath)")
+                    acceptedFolders.append(contentsOf: folders)
                 }
             }
 
@@ -105,6 +106,21 @@ public struct PluginScanner<Scanner: SkillScanning>: PluginScanning {
         guard candidate.path.hasPrefix(canonicalRoot.path + "/"),
               FileManager.default.fileExists(atPath: candidate.path) else { return nil }
         return candidate
+    }
+
+    private func skillFolders(for relativePath: String, beneath root: URL) -> [URL] {
+        guard let candidate = validatedComponent(relativePath, beneath: root) else { return [] }
+        let manifest = candidate.appending(path: "SKILL.md")
+        if FileManager.default.fileExists(atPath: manifest.path) { return [candidate] }
+
+        guard let children = try? FileManager.default.contentsOfDirectory(
+            at: candidate,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+        return children.filter {
+            FileManager.default.fileExists(atPath: $0.appending(path: "SKILL.md").path)
+        }
     }
 
     private func allocatedSize(of root: URL) -> Int64 {

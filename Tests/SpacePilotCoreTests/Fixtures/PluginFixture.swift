@@ -1,6 +1,11 @@
 import Foundation
 @testable import SpacePilotCore
 
+enum PluginSkillsEncoding {
+    case directory(String)
+    case paths([String])
+}
+
 final class PluginFixture: @unchecked Sendable {
     let tree: TemporaryTree
     let root: URL
@@ -14,17 +19,24 @@ final class PluginFixture: @unchecked Sendable {
         name: String,
         version: String,
         skillNames: [String],
-        extraSkillPaths: [String] = []
+        extraSkillPaths: [String] = [],
+        skillsEncoding: PluginSkillsEncoding? = nil
     ) throws -> PluginFixture {
         let tree = try TemporaryTree(files: [:])
         let root = tree.url.appending(path: name, directoryHint: .isDirectory)
         let manifestDirectory = root.appending(path: ".codex-plugin", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: manifestDirectory, withIntermediateDirectories: true)
-        let skillPaths = skillNames.map { "skills/\($0)" } + extraSkillPaths
+        let explicitPaths = skillNames.map { "skills/\($0)" } + extraSkillPaths
+        let declaration = skillsEncoding ?? .paths(explicitPaths)
+        let skillsJSON: Any
+        switch declaration {
+        case .directory(let path): skillsJSON = path
+        case .paths(let paths): skillsJSON = paths
+        }
         let manifest: [String: Any] = [
             "name": name,
             "version": version,
-            "skills": skillPaths,
+            "skills": skillsJSON,
             "dependencies": ["codex"]
         ]
         let data = try JSONSerialization.data(withJSONObject: manifest)

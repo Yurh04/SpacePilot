@@ -2,6 +2,23 @@ import XCTest
 @testable import SpacePilotCore
 
 final class PluginScannerTests: XCTestCase {
+    func testDirectorySkillsDeclarationDiscoversChildSkills() async throws {
+        let fixture = try PluginFixture.make(
+            name: "product-design",
+            version: "0.1.52",
+            skillNames: ["index", "audit"],
+            skillsEncoding: .directory("./skills/")
+        )
+
+        let result = try await PluginScanner(skillScanner: SkillScanner()).scan(roots: [fixture.root])
+
+        let plugin = try XCTUnwrap(result.plugins.first)
+        XCTAssertEqual(plugin.name, "product-design")
+        XCTAssertEqual(plugin.skillIDs.count, 2)
+        XCTAssertEqual(Set(result.skills.map(\.name)), ["index", "audit"])
+        XCTAssertTrue(result.skills.allSatisfy { $0.parentPluginID == plugin.id })
+    }
+
     func testPluginOwnsBundledSkills() async throws {
         let plugin = try PluginFixture.make(
             name: "product-design",
