@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "SpacePilot",
+    defaultLocalization: "en",
     platforms: [.macOS(.v15)],
     products: [
         .library(name: "SpacePilotCore", targets: ["SpacePilotCore"]),
@@ -15,7 +16,12 @@ let package = Package(
         ),
         .executableTarget(
             name: "SpacePilot",
-            dependencies: ["SpacePilotCore"]
+            dependencies: ["SpacePilotCore"],
+            resources: [.process("Resources")]
+        ),
+        .testTarget(
+            name: "SpacePilotTests",
+            dependencies: ["SpacePilot"]
         ),
         .testTarget(
             name: "SpacePilotCoreTests",
