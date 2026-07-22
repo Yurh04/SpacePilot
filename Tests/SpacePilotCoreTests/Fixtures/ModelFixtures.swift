@@ -1,6 +1,29 @@
 import Foundation
 @testable import SpacePilotCore
 
+extension ScannedItem {
+    static func fixture(
+        id: UUID = UUID(),
+        path: String = "/Users/test/Library/Caches/app/file",
+        risk: RiskLevel = .safe,
+        allocatedSize: Int64 = 0,
+        modificationDate: Date? = nil,
+        resourceIdentifier: String? = nil
+    ) -> Self {
+        .init(
+            id: id,
+            url: URL(fileURLWithPath: path),
+            logicalSize: allocatedSize,
+            allocatedSize: allocatedSize,
+            modificationDate: modificationDate,
+            resourceIdentifier: resourceIdentifier,
+            category: .cache,
+            risk: risk,
+            explanation: "Fixture"
+        )
+    }
+}
+
 extension AIApplicationRecord {
     static func fixture(
         id: UUID = UUID(),
