@@ -73,12 +73,13 @@ extension SkillRecord {
 extension ScanSnapshot {
     static func fixture(
         id: UUID = UUID(),
+        completedAt: Date = .now,
         aiApplications: [AIApplicationRecord] = [],
         skills: [SkillRecord] = []
     ) -> Self {
         .init(
             id: id,
-            completedAt: .now,
+            completedAt: completedAt,
             volume: nil,
             items: [],
             applications: [],

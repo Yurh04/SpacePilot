@@ -1,0 +1,84 @@
+import Foundation
+import SQLite3
+
+public struct SQLiteStoreError: Error, LocalizedError, Sendable {
+    public let message: String
+    public var errorDescription: String? { message }
+}
+
+final class SQLiteConnection {
+    private var database: OpaquePointer?
+    private let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+
+    init(url: URL) throws {
+        var handle: OpaquePointer?
+        let flags = SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX
+        guard sqlite3_open_v2(url.path, &handle, flags, nil) == SQLITE_OK else {
+            let message = handle.map { String(cString: sqlite3_errmsg($0)) } ?? "Could not open SQLite index"
+            if let handle { sqlite3_close(handle) }
+            throw SQLiteStoreError(message: message)
+        }
+        database = handle
+    }
+
+    deinit {
+        if let database { sqlite3_close(database) }
+    }
+
+    func execute(_ sql: String) throws {
+        guard let database else { throw SQLiteStoreError(message: "SQLite index is closed") }
+        var errorMessage: UnsafeMutablePointer<CChar>?
+        guard sqlite3_exec(database, sql, nil, nil, &errorMessage) == SQLITE_OK else {
+            let message = errorMessage.map { String(cString: $0) } ?? String(cString: sqlite3_errmsg(database))
+            sqlite3_free(errorMessage)
+            throw SQLiteStoreError(message: message)
+        }
+    }
+
+    func statement<T>(_ sql: String, _ body: (OpaquePointer) throws -> T) throws -> T {
+        guard let database else { throw SQLiteStoreError(message: "SQLite index is closed") }
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK,
+              let statement else {
+            throw SQLiteStoreError(message: String(cString: sqlite3_errmsg(database)))
+        }
+        defer { sqlite3_finalize(statement) }
+        return try body(statement)
+    }
+
+    func bind(_ value: String, to index: Int32, in statement: OpaquePointer) throws {
+        guard sqlite3_bind_text(statement, index, value, -1, transient) == SQLITE_OK else {
+            throw currentError()
+        }
+    }
+
+    func bind(_ value: Double, to index: Int32, in statement: OpaquePointer) throws {
+        guard sqlite3_bind_double(statement, index, value) == SQLITE_OK else { throw currentError() }
+    }
+
+    func bind(_ value: Int64, to index: Int32, in statement: OpaquePointer) throws {
+        guard sqlite3_bind_int64(statement, index, value) == SQLITE_OK else { throw currentError() }
+    }
+
+    func bind(_ value: Data, to index: Int32, in statement: OpaquePointer) throws {
+        let result = value.withUnsafeBytes { bytes in
+            sqlite3_bind_blob(statement, index, bytes.baseAddress, Int32(bytes.count), transient)
+        }
+        guard result == SQLITE_OK else { throw currentError() }
+    }
+
+    func stepDone(_ statement: OpaquePointer) throws {
+        guard sqlite3_step(statement) == SQLITE_DONE else { throw currentError() }
+    }
+
+    func blob(at column: Int32, in statement: OpaquePointer) -> Data {
+        let count = Int(sqlite3_column_bytes(statement, column))
+        guard count > 0, let bytes = sqlite3_column_blob(statement, column) else { return Data() }
+        return Data(bytes: bytes, count: count)
+    }
+
+    private func currentError() -> SQLiteStoreError {
+        guard let database else { return SQLiteStoreError(message: "SQLite index is closed") }
+        return SQLiteStoreError(message: String(cString: sqlite3_errmsg(database)))
+    }
+}
