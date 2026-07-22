@@ -96,21 +96,20 @@ final class AppModel {
         showingCleanupConfirmation = true
     }
 
-    func prepareUninstall(application: ApplicationRecord) {
-        guard let snapshot = latestSnapshot else { return }
-        if let bundleID = application.bundleIdentifier,
+    func prepareUninstall(application: ApplicationProjection) {
+        let record = application.application
+        if let bundleID = record.bundleIdentifier,
            !NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).isEmpty {
-            errorMessage = L10n.quitBeforeUninstall(application.name)
+            errorMessage = L10n.quitBeforeUninstall(record.name)
             return
         }
-        prepareCleanup(items: ApplicationUninstallPlanner().cleanupItems(for: application, snapshot: snapshot))
+        prepareCleanup(items: ApplicationUninstallPlanner().cleanupItems(for: application))
     }
 
-    func prepareReset(application: ApplicationRecord) {
-        guard let snapshot = latestSnapshot else { return }
-        let items = ApplicationUninstallPlanner().resetItems(for: application, snapshot: snapshot)
+    func prepareReset(application: ApplicationProjection) {
+        let items = ApplicationUninstallPlanner().resetItems(for: application)
         guard !items.isEmpty else {
-            errorMessage = L10n.resetUnavailable(application.name)
+            errorMessage = L10n.resetUnavailable(application.application.name)
             return
         }
         prepareCleanup(items: items)

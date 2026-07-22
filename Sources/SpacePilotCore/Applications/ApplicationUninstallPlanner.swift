@@ -3,7 +3,8 @@ import Foundation
 public struct ApplicationUninstallPlanner: Sendable {
     public init() {}
 
-    public func cleanupItems(for application: ApplicationRecord, snapshot: ScanSnapshot) -> [ScannedItem] {
+    public func cleanupItems(for projection: ApplicationProjection) -> [ScannedItem] {
+        let application = projection.application
         let values = try? application.url.resourceValues(forKeys: [
             .totalFileAllocatedSizeKey,
             .creationDateKey,
@@ -22,19 +23,29 @@ public struct ApplicationUninstallPlanner: Sendable {
             ownerID: application.id,
             explanation: "Application bundle"
         )
-        let approvedIDs = Set(application.associations
-            .filter { $0.confidence == .high }
-            .map(\.itemID))
-        let related = snapshot.items.filter { approvedIDs.contains($0.id) && $0.risk != .managed }
+        let related = uniqueItems(in: projection.associations) {
+            $0.association.confidence == .high && $0.item.risk != .managed
+        }
         return [appItem] + related.sorted { $0.allocatedSize > $1.allocatedSize }
     }
 
-    public func resetItems(for application: ApplicationRecord, snapshot: ScanSnapshot) -> [ScannedItem] {
-        let approvedIDs = Set(application.associations
-            .filter { $0.confidence == .high && $0.risk != .sensitive && $0.risk != .managed }
-            .map(\.itemID))
-        return snapshot.items
-            .filter { approvedIDs.contains($0.id) }
+    public func resetItems(for projection: ApplicationProjection) -> [ScannedItem] {
+        uniqueItems(in: projection.associations) {
+            $0.association.confidence == .high
+                && $0.association.risk != .sensitive
+                && $0.association.risk != .managed
+        }
             .sorted { $0.allocatedSize > $1.allocatedSize }
+    }
+
+    private func uniqueItems(
+        in associations: [ApplicationAssociationProjection],
+        matching predicate: (ApplicationAssociationProjection) -> Bool
+    ) -> [ScannedItem] {
+        var seenItemIDs: Set<UUID> = []
+        return associations.compactMap { pair in
+            guard predicate(pair), seenItemIDs.insert(pair.item.id).inserted else { return nil }
+            return pair.item
+        }
     }
 }

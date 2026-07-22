@@ -6,8 +6,8 @@ struct ApplicationsView: View {
     let projection: ApplicationListProjection?
     let hasSnapshot: Bool
     let searchText: String
-    let uninstall: (ApplicationRecord) -> Void
-    let reset: (ApplicationRecord) -> Void
+    let uninstall: (ApplicationProjection) -> Void
+    let reset: (ApplicationProjection) -> Void
     @State private var selectedApplicationID: UUID?
 
     var body: some View {
@@ -31,8 +31,8 @@ struct ApplicationsView: View {
                         .contextMenu {
                             Button(L10n.text(.revealFinder)) { reveal(application.url) }
                             Divider()
-                            Button(L10n.text(.applicationReviewReset)) { reset(application) }
-                            Button(L10n.text(.applicationReviewUninstall)) { uninstall(application) }
+                            Button(L10n.text(.applicationReviewReset)) { reset(projection) }
+                            Button(L10n.text(.applicationReviewUninstall)) { uninstall(projection) }
                         }
                         .accessibilityLabel("\(application.name), \(ByteCount.string(projection.totalSize))")
                     }
@@ -48,8 +48,8 @@ struct ApplicationsView: View {
                     Divider()
                     ApplicationDetail(
                         projection: application,
-                        uninstall: { uninstall(application.application) },
-                        reset: { reset(application.application) }
+                        uninstall: { uninstall(application) },
+                        reset: { reset(application) }
                     )
                     .frame(minHeight: 220, idealHeight: 280)
                 }
