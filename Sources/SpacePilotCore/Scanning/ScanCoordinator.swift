@@ -27,10 +27,21 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
             ].filter { FileManager.default.fileExists(atPath: $0.path) }
             let applicationScanner = ApplicationScanner()
             let baseApplications = try await applicationScanner.scan(locations: appLocations)
+            let quickSnapshot = ScanSnapshot(
+                completedAt: .now,
+                volume: volume,
+                items: [],
+                applications: baseApplications,
+                aiApplications: [],
+                plugins: [],
+                skills: [],
+                coverage: .complete
+            )
             emit(ScanEvent(
                 stage: .quickInventory,
                 progress: 0.18,
-                message: "Found \(baseApplications.count) applications"
+                message: "Found \(baseApplications.count) applications",
+                snapshot: quickSnapshot
             ))
 
             try Task.checkCancellation()
@@ -45,6 +56,34 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
             let (homeResult, codex, claude, standaloneSkills) = try await (
                 homeScan, codexScan, claudeScan, standaloneSkillScan
             )
+            let developer = try await DeveloperStorageScanner().scan(homeDirectory: homeDirectory)
+            var basicAIScans: [AIApplicationScanResult] = []
+            for definition in BasicAIApplicationDefinition.standard {
+                let matchedApplication = baseApplications.first {
+                    definition.bundleIdentifiers.contains($0.bundleIdentifier ?? "")
+                        || $0.name.localizedCaseInsensitiveContains(definition.name)
+                }
+                let result = try await BasicAIApplicationScanner().scan(
+                    name: definition.name,
+                    bundleIdentifier: matchedApplication?.bundleIdentifier ?? definition.bundleIdentifiers.first,
+                    homeDirectory: homeDirectory,
+                    relativeRoots: definition.relativeRoots
+                )
+                guard matchedApplication != nil || !result.application.rootURLs.isEmpty else { continue }
+                let application = AIApplicationRecord(
+                    id: result.application.id,
+                    name: result.application.name,
+                    bundleIdentifier: result.application.bundleIdentifier,
+                    applicationURL: matchedApplication?.url,
+                    rootURLs: result.application.rootURLs,
+                    itemIDs: result.application.itemIDs,
+                    pluginIDs: [],
+                    skillIDs: [],
+                    applicationAllocatedSize: matchedApplication?.allocatedSize ?? 0,
+                    supportLevel: .basic
+                )
+                basicAIScans.append(AIApplicationScanResult(application: application, items: result.items))
+            }
             emit(ScanEvent(stage: .targetedAnalysis, progress: 0.62, message: "Analyzed storage and AI data"))
             try Task.checkCancellation()
 
@@ -73,37 +112,45 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
             }
 
             var itemsByPath = Dictionary(uniqueKeysWithValues: homeResult.items.map { ($0.url.path, $0) })
-            for item in applicationItems + codex.items + claude.items {
+            for item in applicationItems + developer.items + codex.items + claude.items + basicAIScans.flatMap(\.items) {
                 itemsByPath[item.url.path] = item
             }
             let items = itemsByPath.values.sorted { $0.url.path < $1.url.path }
             let codexSkills = Set(indexedSkills.filter { $0.visibleAgents.contains("Codex") }.map(\.id))
             let claudeSkills = Set(indexedSkills.filter { $0.visibleAgents.contains("Claude") }.map(\.id))
+            let codexBundle = baseApplications.first {
+                $0.bundleIdentifier == codex.application.bundleIdentifier
+                    || $0.name.localizedCaseInsensitiveContains("Codex")
+            }
+            let claudeBundle = baseApplications.first {
+                $0.bundleIdentifier == claude.application.bundleIdentifier
+                    || $0.name.localizedCaseInsensitiveContains("Claude")
+            }
             let codexApplication = AIApplicationRecord(
                 id: codex.application.id,
                 name: codex.application.name,
                 bundleIdentifier: codex.application.bundleIdentifier,
-                applicationURL: codex.application.applicationURL,
+                applicationURL: codexBundle?.url,
                 rootURLs: codex.application.rootURLs,
                 itemIDs: codex.application.itemIDs,
                 pluginIDs: Set(pluginResult.plugins.map(\.id)),
                 skillIDs: codexSkills,
-                applicationAllocatedSize: codex.application.applicationAllocatedSize,
+                applicationAllocatedSize: codexBundle?.allocatedSize ?? codex.application.applicationAllocatedSize,
                 supportLevel: codex.application.supportLevel
             )
             let claudeApplication = AIApplicationRecord(
                 id: claude.application.id,
                 name: claude.application.name,
                 bundleIdentifier: claude.application.bundleIdentifier,
-                applicationURL: claude.application.applicationURL,
+                applicationURL: claudeBundle?.url,
                 rootURLs: claude.application.rootURLs,
                 itemIDs: claude.application.itemIDs,
                 pluginIDs: [],
                 skillIDs: claudeSkills,
-                applicationAllocatedSize: claude.application.applicationAllocatedSize,
+                applicationAllocatedSize: claudeBundle?.allocatedSize ?? claude.application.applicationAllocatedSize,
                 supportLevel: claude.application.supportLevel
             )
-            let aiApplications = [codexApplication, claudeApplication]
+            let aiApplications = [codexApplication, claudeApplication] + basicAIScans.map(\.application)
             emit(ScanEvent(stage: .indexing, progress: 0.88, message: "Saving local metadata index"))
             try Task.checkCancellation()
 
@@ -145,6 +192,34 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
         guard let completed else { throw CancellationError() }
         return completed
     }
+}
+
+private struct BasicAIApplicationDefinition: Sendable {
+    let name: String
+    let bundleIdentifiers: [String]
+    let relativeRoots: [String]
+
+    static let standard: [Self] = [
+        .init(
+            name: "ChatGPT",
+            bundleIdentifiers: ["com.openai.chat"],
+            relativeRoots: [
+                "Library/Application Support/com.openai.chat",
+                "Library/Application Support/ChatGPT",
+                "Library/Caches/com.openai.chat"
+            ]
+        ),
+        .init(
+            name: "Ollama",
+            bundleIdentifiers: ["com.electron.ollama"],
+            relativeRoots: [".ollama", "Library/Application Support/Ollama"]
+        ),
+        .init(
+            name: "OpenCode",
+            bundleIdentifiers: [],
+            relativeRoots: [".local/share/opencode", ".config/opencode", ".cache/opencode"]
+        )
+    ]
 }
 
 private func discoverPluginRoots(homeDirectory: URL) -> [URL] {

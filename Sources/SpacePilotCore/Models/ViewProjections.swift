@@ -20,6 +20,7 @@ public struct OverviewProjection: Sendable {
             totalUsedBytes = snapshot.items.reduce(0) { $0 + $1.allocatedSize }
         }
         analyzedBytes = snapshot.items.reduce(0) { $0 + $1.allocatedSize }
+            + snapshot.applications.reduce(0) { $0 + $1.allocatedSize }
         preselectedRecommendations = snapshot.items
             .filter { $0.risk == .safe }
             .sorted { $0.allocatedSize > $1.allocatedSize }
@@ -30,9 +31,10 @@ public struct OverviewProjection: Sendable {
 public struct StorageProjection: Sendable {
     public let categories: [StorageCategorySummary]
     public let largestItems: [ScannedItem]
+    public let oldItems: [ScannedItem]
 
     public init(snapshot: ScanSnapshot) {
-        categories = Dictionary(grouping: snapshot.items, by: \.category)
+        var categoryValues = Dictionary(grouping: snapshot.items, by: \.category)
             .map { category, items in
                 StorageCategorySummary(
                     category: category,
@@ -40,8 +42,25 @@ public struct StorageProjection: Sendable {
                     itemCount: items.count
                 )
             }
-            .sorted { $0.allocatedSize > $1.allocatedSize }
+        if let volume = snapshot.volume {
+            let used = max(0, volume.totalCapacity - volume.availableCapacity)
+            let classified = categoryValues.reduce(0) { $0 + $1.allocatedSize }
+                + snapshot.applications.reduce(0) { $0 + $1.allocatedSize }
+            let other = max(0, used - classified)
+            if other > 0 {
+                categoryValues.append(StorageCategorySummary(
+                    category: .system,
+                    allocatedSize: other,
+                    itemCount: 0
+                ))
+            }
+        }
+        categories = categoryValues.sorted { $0.allocatedSize > $1.allocatedSize }
         largestItems = Array(snapshot.items.sorted { $0.allocatedSize > $1.allocatedSize }.prefix(100))
+        let cutoff = Date.now.addingTimeInterval(-180 * 24 * 60 * 60)
+        oldItems = snapshot.items
+            .filter { ($0.modificationDate ?? .distantFuture) < cutoff }
+            .sorted { ($0.modificationDate ?? .distantFuture) < ($1.modificationDate ?? .distantFuture) }
     }
 }
 

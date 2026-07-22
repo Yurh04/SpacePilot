@@ -76,18 +76,26 @@ public struct CleanupExecutor<Mover: TrashMoving>: CleanupExecuting {
             }
         }
 
-        let transaction = CleanupTransaction(planID: plan.id, outcomes: outcomes)
+        let transaction = CleanupTransaction(
+            planID: plan.id,
+            outcomes: outcomes,
+            verifiedFreedBytes: CleanupVerifier().verifiedMovedBytes(plan: plan, outcomes: outcomes)
+        )
         if let store { try await store.save(transaction: transaction) }
         return transaction
     }
 
     private func identityStillMatches(_ candidate: CleanupCandidate, at url: URL) -> Bool {
         guard let values = try? url.resourceValues(forKeys: [
+            .isDirectoryKey,
             .totalFileAllocatedSizeKey,
             .contentModificationDateKey,
             .fileResourceIdentifierKey
         ]) else { return false }
-        if candidate.allocatedSize != Int64(values.totalFileAllocatedSize ?? 0) { return false }
+        let currentAllocatedSize = values.isDirectory == true
+            ? recursiveAllocatedSize(of: url)
+            : Int64(values.totalFileAllocatedSize ?? 0)
+        if candidate.allocatedSize != currentAllocatedSize { return false }
         if let expected = candidate.expectedResourceIdentifier,
            expected != values.fileResourceIdentifier.map({ String(describing: $0) }) { return false }
         if let expected = candidate.expectedModificationDate {
@@ -95,5 +103,20 @@ public struct CleanupExecutor<Mover: TrashMoving>: CleanupExecuting {
                   abs(actual.timeIntervalSince(expected)) < 0.001 else { return false }
         }
         return true
+    }
+
+    private func recursiveAllocatedSize(of root: URL) -> Int64 {
+        guard let enumerator = FileManager.default.enumerator(
+            at: root,
+            includingPropertiesForKeys: [.isRegularFileKey, .totalFileAllocatedSizeKey],
+            options: [.skipsPackageDescendants]
+        ) else { return 0 }
+        var total: Int64 = 0
+        for case let url as URL in enumerator {
+            guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .totalFileAllocatedSizeKey]),
+                  values.isRegularFile == true else { continue }
+            total += Int64(values.totalFileAllocatedSize ?? 0)
+        }
+        return total
     }
 }

@@ -21,3 +21,18 @@ final class RecordingTrashMover: TrashMoving, @unchecked Sendable {
         }
     }
 }
+
+final class FixtureTrashMover: TrashMoving, @unchecked Sendable {
+    private let destination: URL
+
+    init(destination: URL) throws {
+        self.destination = destination
+        try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
+    }
+
+    func moveToTrash(_ url: URL) throws -> URL {
+        let target = destination.appending(path: url.lastPathComponent)
+        try FileManager.default.moveItem(at: url, to: target)
+        return target
+    }
+}

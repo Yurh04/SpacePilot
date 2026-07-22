@@ -1,3 +1,4 @@
+import AppKit
 import SpacePilotCore
 import SwiftUI
 
@@ -46,7 +47,7 @@ struct AIApplicationDetailView: View {
                 }
             }
         case .dataStorage:
-            Table(filtered(dataItems)) {
+            Table(filteredDataItems) {
                 TableColumn("Data") { item in
                     VStack(alignment: .leading) {
                         Text(item.url.lastPathComponent)
@@ -61,20 +62,37 @@ struct AIApplicationDetailView: View {
                 TableColumn("Space") { Text(ByteCount.string($0.allocatedSize)).monospacedDigit() }.width(100)
             }
         case .plugins:
-            Table(plugins) {
-                TableColumn("Plugin") { plugin in
-                    VStack(alignment: .leading) {
-                        Text(plugin.name)
-                        Text(plugin.source).font(.caption).foregroundStyle(.secondary)
+            VStack(spacing: 0) {
+                HStack {
+                    Text("Plugin packages are managed by their owning application.")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    if let applicationURL = application.applicationURL {
+                        Button("Manage in \(application.name)") {
+                            NSWorkspace.shared.openApplication(
+                                at: applicationURL,
+                                configuration: .init()
+                            )
+                        }
                     }
-                    .contextMenu { Button("Reveal in Finder") { reveal(plugin.url) } }
                 }
-                TableColumn("Version") { Text($0.version ?? "—") }.width(90)
-                TableColumn("Management") { _ in Text("Official handoff") }.width(130)
-                TableColumn("Space") { Text(ByteCount.string($0.allocatedSize)).monospacedDigit() }.width(100)
+                .padding(12)
+                Divider()
+                Table(plugins) {
+                    TableColumn("Plugin") { plugin in
+                        VStack(alignment: .leading) {
+                            Text(plugin.name)
+                            Text(plugin.source).font(.caption).foregroundStyle(.secondary)
+                        }
+                        .contextMenu { Button("Reveal in Finder") { reveal(plugin.url) } }
+                    }
+                    TableColumn("Version") { Text($0.version ?? "—") }.width(90)
+                    TableColumn("Management") { _ in Text("Official handoff") }.width(130)
+                    TableColumn("Space") { Text(ByteCount.string($0.allocatedSize)).monospacedDigit() }.width(100)
+                }
             }
         case .skills:
-            Table(filtered(skills)) {
+            Table(filteredSkills) {
                 TableColumn("Skill") { skill in
                     VStack(alignment: .leading) {
                         Text(skill.name)
@@ -105,18 +123,21 @@ struct AIApplicationDetailView: View {
     private var totalSize: Int64 {
         application.applicationAllocatedSize
             + dataItems.reduce(0) { $0 + $1.allocatedSize }
-            + skills.reduce(0) { $0 + $1.allocatedSize }
+            + plugins.reduce(0) { $0 + $1.allocatedSize }
+            + skills.filter { skill in
+                guard let parentPluginID = skill.parentPluginID else { return true }
+                return !application.pluginIDs.contains(parentPluginID)
+            }.reduce(0) { $0 + $1.allocatedSize }
     }
 
-    private func filtered<T>(_ values: [T]) -> [T] where T: Identifiable {
-        guard !searchText.isEmpty else { return values }
-        if let items = values as? [ScannedItem] {
-            return items.filter { $0.url.path.localizedCaseInsensitiveContains(searchText) } as! [T]
-        }
-        if let skills = values as? [SkillRecord] {
-            return skills.filter { $0.name.localizedCaseInsensitiveContains(searchText) } as! [T]
-        }
-        return values
+    private var filteredDataItems: [ScannedItem] {
+        guard !searchText.isEmpty else { return dataItems }
+        return dataItems.filter { $0.url.path.localizedCaseInsensitiveContains(searchText) }
+    }
+
+    private var filteredSkills: [SkillRecord] {
+        guard !searchText.isEmpty else { return skills }
+        return skills.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
     }
 
     private func scopeName(_ scope: SkillScope) -> String {

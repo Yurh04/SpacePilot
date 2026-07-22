@@ -2,8 +2,14 @@
 set -euo pipefail
 
 MODE="${1:-run}"
+BUILD_CONFIGURATION="${SPACEPILOT_BUILD_CONFIGURATION:-debug}"
 APP_NAME="SpacePilot"
 BUNDLE_ID="com.yurunhao.SpacePilot"
+
+if [[ "$(uname -m)" != "arm64" ]]; then
+  echo "$APP_NAME supports Apple Silicon only" >&2
+  exit 1
+fi
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="$ROOT_DIR/dist"
@@ -14,14 +20,15 @@ APP_BINARY="$APP_MACOS/$APP_NAME"
 
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
 
-swift build --package-path "$ROOT_DIR"
-BUILD_BINARY="$(swift build --package-path "$ROOT_DIR" --show-bin-path)/$APP_NAME"
+swift build --package-path "$ROOT_DIR" -c "$BUILD_CONFIGURATION"
+BUILD_BINARY="$(swift build --package-path "$ROOT_DIR" -c "$BUILD_CONFIGURATION" --show-bin-path)/$APP_NAME"
 
 rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_MACOS"
 cp "$BUILD_BINARY" "$APP_BINARY"
 cp "$ROOT_DIR/script/Info.plist" "$APP_CONTENTS/Info.plist"
 chmod +x "$APP_BINARY"
+/usr/bin/codesign --force --deep --options runtime --sign - "$APP_BUNDLE" >/dev/null
 
 open_app() {
   /usr/bin/open -n "$APP_BUNDLE"

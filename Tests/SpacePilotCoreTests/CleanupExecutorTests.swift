@@ -63,6 +63,51 @@ final class CleanupExecutorTests: XCTestCase {
         XCTAssertTrue(mover.movedURLs.isEmpty)
     }
 
+    func testVerifiedBytesCountOnlySourcesThatActuallyMoved() async throws {
+        let tree = try TemporaryTree(files: ["Library/Caches/app/cache.bin": 32])
+        let file = tree.url.appending(path: "Library/Caches/app/cache.bin")
+        let candidate = candidate(for: file)
+        let mover = try FixtureTrashMover(destination: tree.url.appending(path: "FixtureTrash"))
+        let executor = CleanupExecutor(
+            policy: PathSafetyPolicy(homeDirectory: tree.url, allowedVolumeRoot: tree.url),
+            mover: mover
+        )
+
+        let transaction = try await executor.execute(
+            plan: CleanupPlan(snapshotID: UUID(), candidates: [candidate])
+        )
+
+        XCTAssertEqual(transaction.verifiedFreedBytes, candidate.allocatedSize)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
+    }
+
+    func testDirectoryCandidateRevalidatesRecursiveAllocatedSize() async throws {
+        let tree = try TemporaryTree(files: [
+            "Library/Caches/app/one.bin": 16,
+            "Library/Caches/app/nested/two.bin": 16
+        ])
+        let directory = tree.url.appending(path: "Library/Caches/app")
+        let values = try directory.resourceValues(forKeys: [.contentModificationDateKey, .fileResourceIdentifierKey])
+        let candidate = CleanupCandidate(
+            itemID: UUID(),
+            url: directory,
+            allocatedSize: recursiveAllocatedSize(directory),
+            risk: .safe,
+            expectedResourceIdentifier: values.fileResourceIdentifier.map { String(describing: $0) },
+            expectedModificationDate: values.contentModificationDate,
+            explanation: "Directory cache"
+        )
+        let mover = try FixtureTrashMover(destination: tree.url.appending(path: "FixtureTrash"))
+        let executor = CleanupExecutor(
+            policy: PathSafetyPolicy(homeDirectory: tree.url, allowedVolumeRoot: tree.url),
+            mover: mover
+        )
+
+        let result = try await executor.execute(plan: CleanupPlan(snapshotID: UUID(), candidates: [candidate]))
+
+        XCTAssertEqual(result.outcomes.first?.status, .movedToTrash)
+    }
+
     private func candidate(for url: URL, expectedModificationDate: Date? = nil) -> CleanupCandidate {
         let values = try? url.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .contentModificationDateKey, .fileResourceIdentifierKey])
         return CleanupCandidate(
@@ -74,5 +119,19 @@ final class CleanupExecutorTests: XCTestCase {
             expectedModificationDate: expectedModificationDate ?? values?.contentModificationDate,
             explanation: "Test cache"
         )
+    }
+
+    private func recursiveAllocatedSize(_ root: URL) -> Int64 {
+        guard let enumerator = FileManager.default.enumerator(
+            at: root,
+            includingPropertiesForKeys: [.isRegularFileKey, .totalFileAllocatedSizeKey]
+        ) else { return 0 }
+        var total: Int64 = 0
+        for case let url as URL in enumerator {
+            guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .totalFileAllocatedSizeKey]),
+                  values.isRegularFile == true else { continue }
+            total += Int64(values.totalFileAllocatedSize ?? 0)
+        }
+        return total
     }
 }

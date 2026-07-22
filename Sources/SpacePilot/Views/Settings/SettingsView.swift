@@ -2,6 +2,8 @@ import SpacePilotCore
 import SwiftUI
 
 struct SettingsView: View {
+    @Bindable var model: AppModel
+
     var body: some View {
         Form {
             Section("Privacy") {
@@ -14,9 +16,14 @@ struct SettingsView: View {
                     PermissionService().openFullDiskAccessSettings()
                 }
             }
+            Section("Diagnostics") {
+                Text("Exported diagnostics contain counts and status metadata, not file paths, conversations, or log contents.")
+                    .foregroundStyle(.secondary)
+                Button("Export Diagnostics…") { model.exportDiagnostics() }
+            }
         }
         .formStyle(.grouped)
         .padding()
-        .frame(width: 520, height: 330)
+        .frame(width: 520, height: 400)
     }
 }

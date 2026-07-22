@@ -28,8 +28,13 @@ struct CleanupHistoryView: View {
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Text("\(transaction.outcomes.filter { $0.status == .movedToTrash }.count) moved")
-                            .foregroundStyle(.secondary)
+                        VStack(alignment: .trailing) {
+                            Text("\(transaction.outcomes.filter { $0.status == .movedToTrash }.count) moved")
+                            if let bytes = transaction.verifiedFreedBytes {
+                                Text("\(ByteCount.string(bytes)) verified")
+                            }
+                        }
+                        .foregroundStyle(.secondary)
                     }
                 }
             }

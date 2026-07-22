@@ -63,9 +63,17 @@ public struct ScanSnapshot: Identifiable, Codable, Sendable {
     public var uniqueAIAllocatedSize: Int64 {
         let directSize = aiApplications.reduce(Int64(0)) { $0 + $1.applicationAllocatedSize }
         let itemIDs = aiApplications.reduce(into: Set<UUID>()) { $0.formUnion($1.itemIDs) }
+        let pluginIDs = aiApplications.reduce(into: Set<UUID>()) { $0.formUnion($1.pluginIDs) }
         let skillIDs = aiApplications.reduce(into: Set<UUID>()) { $0.formUnion($1.skillIDs) }
         let itemSize = items.lazy.filter { itemIDs.contains($0.id) }.reduce(Int64(0)) { $0 + $1.allocatedSize }
-        let skillSize = skills.lazy.filter { skillIDs.contains($0.id) }.reduce(Int64(0)) { $0 + $1.allocatedSize }
-        return directSize + itemSize + skillSize
+        let pluginSize = plugins.lazy.filter { pluginIDs.contains($0.id) }.reduce(Int64(0)) { $0 + $1.allocatedSize }
+        let skillSize = skills.lazy
+            .filter {
+                guard skillIDs.contains($0.id) else { return false }
+                guard let parentPluginID = $0.parentPluginID else { return true }
+                return !pluginIDs.contains(parentPluginID)
+            }
+            .reduce(Int64(0)) { $0 + $1.allocatedSize }
+        return directSize + itemSize + pluginSize + skillSize
     }
 }

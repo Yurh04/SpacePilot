@@ -37,6 +37,7 @@ public struct ApplicationScanner: Sendable {
             ?? appURL.deletingPathExtension().lastPathComponent
         let executableName = info["CFBundleExecutable"] as? String
         let executableURL = executableName.map { appURL.appending(path: "Contents/MacOS/\($0)") }
+        let lastUsedDate = (try? appURL.resourceValues(forKeys: [.contentAccessDateKey]))?.contentAccessDate
 
         return ApplicationRecord(
             name: name,
@@ -44,7 +45,8 @@ public struct ApplicationScanner: Sendable {
             version: (info["CFBundleShortVersionString"] as? String) ?? (info["CFBundleVersion"] as? String),
             url: appURL,
             executableURL: executableURL,
-            allocatedSize: allocatedSize(of: appURL)
+            allocatedSize: allocatedSize(of: appURL),
+            lastUsedDate: lastUsedDate
         )
     }
 

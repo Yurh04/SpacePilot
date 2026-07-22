@@ -46,4 +46,21 @@ final class ViewProjectionTests: XCTestCase {
 
         XCTAssertEqual(projection.categories.reduce(0) { $0 + $1.allocatedSize }, 256)
     }
+
+    func testOldItemsUseMetadataOnlyCutoff() {
+        let old = ScannedItem.fixture(modificationDate: .distantPast)
+        let recent = ScannedItem.fixture(modificationDate: .now)
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: [old, recent],
+            applications: [],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: .complete
+        )
+
+        XCTAssertEqual(StorageProjection(snapshot: snapshot).oldItems.map(\.id), [old.id])
+    }
 }

@@ -14,6 +14,22 @@ final class ScanCoordinatorTests: XCTestCase {
         XCTAssertEqual(stages.last, .completed)
     }
 
+    func testQuickInventoryCanCarryDisplayablePartialSnapshot() async throws {
+        let quick = ScanSnapshot.fixture()
+        let coordinator = ScanCoordinator(operation: { emit in
+            emit(ScanEvent(stage: .quickInventory, progress: 0.2, message: "Quick", snapshot: quick))
+            emit(ScanEvent(stage: .completed, progress: 1, message: "Done", snapshot: quick))
+            return quick
+        })
+
+        var firstSnapshot: ScanSnapshot?
+        for try await event in coordinator.scan() where event.stage == .quickInventory {
+            firstSnapshot = event.snapshot
+        }
+
+        XCTAssertEqual(firstSnapshot?.id, quick.id)
+    }
+
     func testCancelledScanDoesNotReplaceLatestSnapshot() async throws {
         let previous = ScanSnapshot.fixture()
         let store = InMemorySnapshotStore(latest: previous)

@@ -16,6 +16,10 @@
     <string>1</string>
     <key>LSMinimumSystemVersion</key>
     <string>15.0</string>
+    <key>LSArchitecturePriority</key>
+    <array>
+        <string>arm64</string>
+    </array>
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSPrincipalClass</key>

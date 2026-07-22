@@ -57,7 +57,8 @@ struct AppRootView: View {
             ApplicationsView(
                 snapshot: model.latestSnapshot,
                 searchText: model.searchText,
-                uninstall: model.prepareUninstall
+                uninstall: model.prepareUninstall,
+                reset: model.prepareReset
             )
         case .developerAI:
             DeveloperAIView(model: model)

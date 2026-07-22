@@ -17,6 +17,7 @@ public struct ApplicationArtifactRoot: Sendable {
         .init(relativePath: "Library/Preferences", category: .application, risk: .rebuildable),
         .init(relativePath: "Library/Logs", category: .log, risk: .rebuildable),
         .init(relativePath: "Library/Saved Application State", category: .application, risk: .rebuildable),
+        .init(relativePath: "Library/LaunchAgents", category: .application, risk: .rebuildable),
         .init(relativePath: "Library/Containers", category: .application, risk: .sensitive),
         .init(relativePath: "Library/Group Containers", category: .application, risk: .sensitive)
     ]

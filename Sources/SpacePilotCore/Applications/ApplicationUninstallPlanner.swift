@@ -28,4 +28,13 @@ public struct ApplicationUninstallPlanner: Sendable {
         let related = snapshot.items.filter { approvedIDs.contains($0.id) && $0.risk != .managed }
         return [appItem] + related.sorted { $0.allocatedSize > $1.allocatedSize }
     }
+
+    public func resetItems(for application: ApplicationRecord, snapshot: ScanSnapshot) -> [ScannedItem] {
+        let approvedIDs = Set(application.associations
+            .filter { $0.confidence == .high && $0.risk != .sensitive && $0.risk != .managed }
+            .map(\.itemID))
+        return snapshot.items
+            .filter { approvedIDs.contains($0.id) }
+            .sorted { $0.allocatedSize > $1.allocatedSize }
+    }
 }

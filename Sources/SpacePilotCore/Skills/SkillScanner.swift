@@ -13,7 +13,8 @@ public struct SkillRoot: Sendable {
         [
             .init(url: homeDirectory.appending(path: ".agents/skills"), scope: .sharedAgents),
             .init(url: homeDirectory.appending(path: ".codex/skills"), scope: .agentSpecific(agent: "Codex")),
-            .init(url: homeDirectory.appending(path: ".claude/skills"), scope: .agentSpecific(agent: "Claude"))
+            .init(url: homeDirectory.appending(path: ".claude/skills"), scope: .agentSpecific(agent: "Claude")),
+            .init(url: homeDirectory.appending(path: ".codex/skills/.system"), scope: .systemManaged)
         ]
     }
 }

@@ -28,6 +28,37 @@ final class ModelAggregationTests: XCTestCase {
         XCTAssertEqual(snapshot.uniqueAIAllocatedSize, 350)
     }
 
+    func testPluginProvidedSkillIsNotCountedAgainInsidePluginPackage() {
+        let pluginID = UUID()
+        let skill = SkillRecord.fixture(
+            allocatedSize: 40,
+            scope: .pluginProvided(pluginID: pluginID.uuidString),
+            parentPluginID: pluginID
+        )
+        let plugin = PluginRecord(
+            id: pluginID,
+            name: "plugin",
+            version: "1",
+            url: URL(fileURLWithPath: "/tmp/plugin"),
+            source: "fixture",
+            allocatedSize: 100,
+            skillIDs: [skill.id]
+        )
+        let ai = AIApplicationRecord.fixture(pluginIDs: [pluginID], skillIDs: [skill.id])
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: [],
+            applications: [],
+            aiApplications: [ai],
+            plugins: [plugin],
+            skills: [skill],
+            coverage: .complete
+        )
+
+        XCTAssertEqual(snapshot.uniqueAIAllocatedSize, 100)
+    }
+
     func testRiskSortPlacesSensitiveAndManagedLast() {
         XCTAssertEqual(RiskLevel.allCases.sorted().map(\.rawValue), [
             "safe", "rebuildable", "sensitive", "managed"

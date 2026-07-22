@@ -52,7 +52,8 @@ extension SkillRecord {
     static func fixture(
         id: UUID = UUID(),
         allocatedSize: Int64 = 0,
-        scope: SkillScope = .sharedAgents
+        scope: SkillScope = .sharedAgents,
+        parentPluginID: UUID? = nil
     ) -> Self {
         .init(
             id: id,
@@ -62,10 +63,10 @@ extension SkillRecord {
             allocatedSize: allocatedSize,
             scope: scope,
             visibleAgents: ["Codex", "Claude"],
-            parentPluginID: nil,
+            parentPluginID: parentPluginID,
             fingerprint: "fixture",
             conflict: nil,
-            managementStatus: .standalone
+            managementStatus: parentPluginID == nil ? .standalone : .parentManaged
         )
     }
 }

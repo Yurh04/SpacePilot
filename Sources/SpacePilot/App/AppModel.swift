@@ -1,11 +1,14 @@
 import AppKit
 import Foundation
 import Observation
+import OSLog
 import SpacePilotCore
+import UniformTypeIdentifiers
 
 @MainActor
 @Observable
 final class AppModel {
+    private static let logger = Logger(subsystem: "com.yurunhao.SpacePilot", category: "runtime")
     var selection: NavigationDestination? = .overview
     var searchText = ""
     var selectedAIApplicationID: UUID?
@@ -48,11 +51,13 @@ final class AppModel {
                     scanProgress = event.progress
                     scanMessage = event.message
                     if let snapshot = event.snapshot { latestSnapshot = snapshot }
+                    Self.logger.info("Scan stage: \(event.stage.rawValue, privacy: .public)")
                 }
             } catch is CancellationError {
                 scanMessage = "Scan cancelled"
             } catch {
                 errorMessage = error.localizedDescription
+                Self.logger.error("Scan failed: \(error.localizedDescription, privacy: .public)")
             }
             isScanning = false
             scanTask = nil
@@ -81,6 +86,16 @@ final class AppModel {
         prepareCleanup(items: ApplicationUninstallPlanner().cleanupItems(for: application, snapshot: snapshot))
     }
 
+    func prepareReset(application: ApplicationRecord) {
+        guard let snapshot = latestSnapshot else { return }
+        let items = ApplicationUninstallPlanner().resetItems(for: application, snapshot: snapshot)
+        guard !items.isEmpty else {
+            errorMessage = "No high-confidence settings or caches are available to reset for \(application.name)."
+            return
+        }
+        prepareCleanup(items: items)
+    }
+
     func executePreparedCleanup(confirmSensitive: Bool) {
         guard let runtime, let snapshot = latestSnapshot, !isCleaning else { return }
         isCleaning = true
@@ -107,10 +122,12 @@ final class AppModel {
                 ).execute(plan: plan)
                 latestCleanupTransaction = transaction
                 cleanupHistory = try await runtime.store.cleanupHistory()
+                Self.logger.info("Cleanup finished: \(transaction.summary.rawValue, privacy: .public)")
                 showingCleanupConfirmation = false
                 startScan()
             } catch {
                 errorMessage = error.localizedDescription
+                Self.logger.error("Cleanup failed: \(error.localizedDescription, privacy: .public)")
             }
             isCleaning = false
             cleanupTask = nil
@@ -122,6 +139,21 @@ final class AppModel {
         do {
             latestSnapshot = try await runtime.store.latestSnapshot()
             cleanupHistory = try await runtime.store.cleanupHistory()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func exportDiagnostics() {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "SpacePilot-Diagnostics.json"
+        panel.allowedContentTypes = [.json]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try DiagnosticReport(
+                snapshot: latestSnapshot,
+                cleanupTransactionCount: cleanupHistory.count
+            ).encoded().write(to: url, options: .atomic)
         } catch {
             errorMessage = error.localizedDescription
         }

@@ -6,6 +6,7 @@ struct StorageView: View {
     let snapshot: ScanSnapshot?
     let searchText: String
     let reviewCleanup: ([ScannedItem]) -> Void
+    @State private var mode: StorageItemMode = .largest
 
     var body: some View {
         if let snapshot {
@@ -29,8 +30,18 @@ struct StorageView: View {
 
                 Divider()
 
-                Table(filtered(projection.largestItems)) {
-                    TableColumn("Largest analyzed items") { item in
+                Picker("Items", selection: $mode) {
+                    ForEach(StorageItemMode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 300)
+                .padding(10)
+
+                Table(filtered(mode == .largest ? projection.largestItems : projection.oldItems)) {
+                    TableColumn(mode == .largest ? "Largest analyzed items" : "Not modified in 180+ days") { item in
                         Text(item.url.lastPathComponent)
                             .contextMenu {
                                 Button("Reveal in Finder") { reveal(item.url) }
@@ -63,6 +74,14 @@ struct StorageView: View {
         guard !searchText.isEmpty else { return items }
         return items.filter { $0.url.path.localizedCaseInsensitiveContains(searchText) }
     }
+}
+
+private enum StorageItemMode: String, CaseIterable, Identifiable {
+    case largest
+    case old
+
+    var id: Self { self }
+    var title: String { self == .largest ? "Largest" : "Older than 180 days" }
 }
 
 func reveal(_ url: URL) {
