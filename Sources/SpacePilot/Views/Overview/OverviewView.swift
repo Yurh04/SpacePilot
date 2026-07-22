@@ -33,6 +33,13 @@ struct OverviewView: View {
                             .buttonStyle(.borderedProminent)
                         }
                     }
+
+                    if !projection.coverage.isComplete {
+                        Section("Limited coverage") {
+                            Label("Some folders could not be read. Results show only verified data.", systemImage: "lock.trianglebadge.exclamationmark")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
                 .navigationTitle("Overview")
             } else if hasSnapshot {

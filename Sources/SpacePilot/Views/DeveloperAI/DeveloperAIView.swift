@@ -35,6 +35,8 @@ struct DeveloperAIView: View {
                     if let application = selectedApplication(in: projection.applications) {
                         AIApplicationDetailView(
                             projection: application,
+                            queryProjection: model.aiQueryProjection,
+                            isPreparingQuery: model.isPreparingAIQuery,
                             selectedTab: $model.selectedAIApplicationTab
                         )
                     } else {

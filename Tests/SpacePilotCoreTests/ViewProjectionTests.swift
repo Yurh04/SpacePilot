@@ -25,7 +25,7 @@ final class ViewProjectionTests: XCTestCase {
             pluginDiagnostics: []
         )
 
-        let projection = AppSnapshotProjection(snapshot: snapshot)
+        let projection = try AppSnapshotProjection.build(snapshot: snapshot)
 
         XCTAssertEqual(projection.snapshotID, snapshot.id)
         XCTAssertEqual(projection.developerAI.applications.first?.plugins.map(\.name), ["product-design"])
@@ -51,6 +51,29 @@ final class ViewProjectionTests: XCTestCase {
         XCTAssertEqual(projection.overview.recommendations.map(\.allocatedSize), Array((492..<500).reversed()).map(Int64.init))
         XCTAssertEqual(projection.overview.reclaimableBytes, items.reduce(0) { $0 + $1.allocatedSize })
         XCTAssertEqual(projection.storage.largestItems.count, 100)
+    }
+
+    func testOverviewProjectionPreservesLimitedCoverageDetails() {
+        let coverage = ScanCoverage(
+            deniedPaths: [URL(fileURLWithPath: "/Users/test/Library/Mail")],
+            notes: ["Full Disk Access is required"]
+        )
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: [],
+            applications: [],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: coverage
+        )
+
+        let projection = OverviewProjection(snapshot: snapshot)
+
+        XCTAssertFalse(projection.coverage.isComplete)
+        XCTAssertEqual(projection.coverage.deniedPaths, coverage.deniedPaths)
+        XCTAssertEqual(projection.coverage.notes, coverage.notes)
     }
 
     func testDeveloperAIProjectionAggregatesIndexedCollectionsWithoutDoubleCountingPluginSkills() throws {
@@ -314,5 +337,132 @@ final class ViewProjectionTests: XCTestCase {
         XCTAssertEqual(projection.applications.map(\.id), [beta.id, alpha.id])
         XCTAssertEqual(projection.filtered(by: "alp").map(\.id), [alpha.id])
         XCTAssertEqual(projection.filtered(by: "").map(\.id), [beta.id, alpha.id])
+    }
+
+    func testApplicationProjectionPairsAssociationsWithIndexedItems() throws {
+        let applicationID = UUID()
+        let item = ScannedItem.fixture(
+            path: "/Users/test/Library/Caches/Example/cache.db",
+            risk: .safe,
+            allocatedSize: 4_096
+        )
+        let association = ArtifactAssociation(
+            itemID: item.id,
+            applicationID: applicationID,
+            evidence: .exactBundleIdentifier,
+            confidence: .high,
+            risk: .safe
+        )
+        let missingAssociation = ArtifactAssociation(
+            itemID: UUID(),
+            applicationID: applicationID,
+            evidence: .vendorAndNameMatch,
+            confidence: .low,
+            risk: .sensitive
+        )
+        let application = ApplicationRecord(
+            id: applicationID,
+            name: "Example",
+            bundleIdentifier: "com.example.app",
+            version: "1",
+            url: URL(fileURLWithPath: "/Applications/Example.app"),
+            executableURL: nil,
+            allocatedSize: 1_024,
+            associations: [missingAssociation, association]
+        )
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: [item],
+            applications: [application],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: .complete
+        )
+
+        let result = try XCTUnwrap(ApplicationListProjection(snapshot: snapshot, searchText: "").applications.first)
+        let pair = try XCTUnwrap(result.associations.first)
+
+        XCTAssertEqual(result.application.id, applicationID)
+        XCTAssertEqual(result.associations.count, 1)
+        XCTAssertEqual(pair.association.id, association.id)
+        XCTAssertEqual(pair.item.id, item.id)
+        XCTAssertEqual(pair.item.url.lastPathComponent, "cache.db")
+        XCTAssertEqual(pair.item.allocatedSize, 4_096)
+    }
+
+    func testAIApplicationQueryProjectionFiltersDataAndSkillsWithoutChangingEmptyQuery() throws {
+        let matchingItem = ScannedItem.fixture(path: "/Users/test/.codex/data.json")
+        let otherItem = ScannedItem.fixture(path: "/Users/test/.claude/data.json")
+        let matchingSkill = SkillRecord(
+            name: "Codex Helper",
+            summary: "Fixture",
+            url: URL(fileURLWithPath: "/Users/test/.agents/skills/codex-helper"),
+            allocatedSize: 1,
+            scope: .sharedAgents,
+            visibleAgents: ["Codex"],
+            parentPluginID: nil,
+            fingerprint: "codex",
+            conflict: nil,
+            managementStatus: .standalone
+        )
+        let otherSkill = SkillRecord(
+            name: "Claude Helper",
+            summary: "Fixture",
+            url: URL(fileURLWithPath: "/Users/test/.agents/skills/claude-helper"),
+            allocatedSize: 1,
+            scope: .sharedAgents,
+            visibleAgents: ["Claude"],
+            parentPluginID: nil,
+            fingerprint: "claude",
+            conflict: nil,
+            managementStatus: .standalone
+        )
+        let application = AIApplicationProjection(
+            application: .fixture(),
+            totalSize: 2,
+            dataItems: [matchingItem, otherItem],
+            plugins: [],
+            skills: [matchingSkill, otherSkill]
+        )
+
+        let filtered = try AIApplicationQueryProjection.build(application: application, query: "CoDeX")
+        let unfiltered = try AIApplicationQueryProjection.build(application: application, query: "")
+
+        XCTAssertEqual(filtered.applicationID, application.id)
+        XCTAssertEqual(filtered.query, "CoDeX")
+        XCTAssertEqual(filtered.dataItems.map(\.id), [matchingItem.id])
+        XCTAssertEqual(filtered.skills.map(\.id), [matchingSkill.id])
+        XCTAssertEqual(unfiltered.dataItems.map(\.id), application.dataItems.map(\.id))
+        XCTAssertEqual(unfiltered.skills.map(\.id), application.skills.map(\.id))
+    }
+
+    func testAppSnapshotProjectionBuildThrowsWhenTaskIsCancelled() async {
+        let items = (0..<10_000).map { ScannedItem.fixture(allocatedSize: Int64($0)) }
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: items,
+            applications: [],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: .complete
+        )
+
+        let observedCancellation = await Task.detached {
+            withUnsafeCurrentTask { $0?.cancel() }
+            do {
+                _ = try AppSnapshotProjection.build(snapshot: snapshot)
+                return false
+            } catch is CancellationError {
+                return true
+            } catch {
+                return false
+            }
+        }.value
+
+        XCTAssertTrue(observedCancellation)
     }
 }

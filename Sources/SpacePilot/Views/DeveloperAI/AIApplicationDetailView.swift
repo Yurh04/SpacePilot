@@ -4,6 +4,8 @@ import SwiftUI
 
 struct AIApplicationDetailView: View {
     let projection: AIApplicationProjection
+    let queryProjection: AIApplicationQueryProjection?
+    let isPreparingQuery: Bool
     @Binding var selectedTab: AIApplicationTab
 
     private var application: AIApplicationRecord { projection.application }
@@ -47,19 +49,24 @@ struct AIApplicationDetailView: View {
                 }
             }
         case .dataStorage:
-            Table(projection.dataItems) {
-                TableColumn("Data") { item in
-                    VStack(alignment: .leading) {
-                        Text(item.url.lastPathComponent)
-                        Text(item.category.displayName)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+            if isPreparingQuery {
+                ProgressView("Searching…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                Table(queryProjection?.dataItems ?? projection.dataItems) {
+                    TableColumn("Data") { item in
+                        VStack(alignment: .leading) {
+                            Text(item.url.lastPathComponent)
+                            Text(item.category.displayName)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .contextMenu { Button("Reveal in Finder") { reveal(item.url) } }
+                        .accessibilityLabel("\(item.url.lastPathComponent), \(ByteCount.string(item.allocatedSize)), \(item.risk.displayName)")
                     }
-                    .contextMenu { Button("Reveal in Finder") { reveal(item.url) } }
-                    .accessibilityLabel("\(item.url.lastPathComponent), \(ByteCount.string(item.allocatedSize)), \(item.risk.displayName)")
+                    TableColumn("Risk") { Text($0.risk.displayName) }.width(120)
+                    TableColumn("Space") { Text(ByteCount.string($0.allocatedSize)).monospacedDigit() }.width(100)
                 }
-                TableColumn("Risk") { Text($0.risk.displayName) }.width(120)
-                TableColumn("Space") { Text(ByteCount.string($0.allocatedSize)).monospacedDigit() }.width(100)
             }
         case .plugins:
             VStack(spacing: 0) {
@@ -92,17 +99,22 @@ struct AIApplicationDetailView: View {
                 }
             }
         case .skills:
-            Table(projection.skills) {
-                TableColumn("Skill") { skill in
-                    VStack(alignment: .leading) {
-                        Text(skill.name)
-                        Text(skill.summary).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            if isPreparingQuery {
+                ProgressView("Searching…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                Table(queryProjection?.skills ?? projection.skills) {
+                    TableColumn("Skill") { skill in
+                        VStack(alignment: .leading) {
+                            Text(skill.name)
+                            Text(skill.summary).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                        .contextMenu { Button("Reveal in Finder") { reveal(skill.url) } }
                     }
-                    .contextMenu { Button("Reveal in Finder") { reveal(skill.url) } }
+                    TableColumn("Source") { Text(scopeName($0.scope)) }.width(130)
+                    TableColumn("Management") { Text(managementName($0.managementStatus)) }.width(120)
+                    TableColumn("Space") { Text(ByteCount.string($0.allocatedSize)).monospacedDigit() }.width(100)
                 }
-                TableColumn("Source") { Text(scopeName($0.scope)) }.width(130)
-                TableColumn("Management") { Text(managementName($0.managementStatus)) }.width(120)
-                TableColumn("Space") { Text(ByteCount.string($0.allocatedSize)).monospacedDigit() }.width(100)
             }
         }
     }

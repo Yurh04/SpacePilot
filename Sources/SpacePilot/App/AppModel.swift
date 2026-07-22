@@ -9,12 +9,19 @@ import UniformTypeIdentifiers
 @Observable
 final class AppModel {
     private static let logger = Logger(subsystem: "com.yurunhao.SpacePilot", category: "runtime")
-    var selection: NavigationDestination? = .overview
-    var searchText = ""
-    var selectedAIApplicationID: UUID?
+    var selection: NavigationDestination? = .overview {
+        didSet { refreshAIQueryProjection() }
+    }
+    var searchText = "" {
+        didSet { refreshAIQueryProjection() }
+    }
+    var selectedAIApplicationID: UUID? {
+        didSet { refreshAIQueryProjection() }
+    }
     var selectedAIApplicationTab: AIApplicationTab = .overview
     var latestSnapshot: ScanSnapshot?
     var projection: AppSnapshotProjection?
+    var aiQueryProjection: AIApplicationQueryProjection?
     var scanStage: ScanStage?
     var scanProgress = 0.0
     var scanMessage = "Ready to scan"
@@ -26,9 +33,20 @@ final class AppModel {
     var latestCleanupTransaction: CleanupTransaction?
     var cleanupHistory: [CleanupTransaction] = []
 
+    var isPreparingAIQuery: Bool {
+        guard selection == .developerAI,
+              !searchText.isEmpty,
+              let selectedAIApplicationID else { return false }
+        return aiQueryProjection?.applicationID != selectedAIApplicationID
+            || aiQueryProjection?.query != searchText
+    }
+
     private var scanTask: Task<Void, Never>?
     private var cleanupTask: Task<Void, Never>?
-    private var projectionTask: Task<Void, Never>?
+    private var projectionWorker: Task<AppSnapshotProjection, Error>?
+    private var projectionPublicationTask: Task<Void, Never>?
+    private var aiQueryWorker: Task<AIApplicationQueryProjection, Error>?
+    private var aiQueryPublicationTask: Task<Void, Never>?
     private let runtime: SpacePilotRuntime?
 
     init() {
@@ -151,14 +169,75 @@ final class AppModel {
     private func apply(snapshot: ScanSnapshot) {
         latestSnapshot = snapshot
         projection = nil
-        projectionTask?.cancel()
-        projectionTask = Task {
-            let result = await Task.detached(priority: .userInitiated) {
-                AppSnapshotProjection(snapshot: snapshot)
-            }.value
-            guard !Task.isCancelled, latestSnapshot?.id == result.snapshotID else { return }
-            projection = result
+        cancelAIQueryProjection()
+        projectionPublicationTask?.cancel()
+        projectionWorker?.cancel()
+
+        let worker = Task.detached(priority: .userInitiated) { [snapshot] in
+            try AppSnapshotProjection.build(snapshot: snapshot)
         }
+        projectionWorker = worker
+        projectionPublicationTask = Task { [weak self] in
+            do {
+                let result = try await worker.value
+                guard let self,
+                      !Task.isCancelled,
+                      self.latestSnapshot?.id == result.snapshotID else { return }
+                self.projection = result
+                self.refreshAIQueryProjection()
+            } catch is CancellationError {
+                return
+            } catch {
+                guard let self, self.latestSnapshot?.id == snapshot.id else { return }
+                self.errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func refreshAIQueryProjection() {
+        cancelAIQueryProjection()
+        guard selection == .developerAI,
+              let projection,
+              let selectedAIApplicationID,
+              let application = projection.developerAI.applications.first(where: {
+                  $0.id == selectedAIApplicationID
+              }) else { return }
+
+        let query = searchText
+        if query.isEmpty {
+            aiQueryProjection = try? AIApplicationQueryProjection.build(
+                application: application,
+                query: query
+            )
+            return
+        }
+
+        let snapshotID = projection.snapshotID
+        let worker = Task.detached(priority: .userInitiated) { [application, query] in
+            try AIApplicationQueryProjection.build(application: application, query: query)
+        }
+        aiQueryWorker = worker
+        aiQueryPublicationTask = Task { [weak self] in
+            do {
+                let result = try await worker.value
+                guard let self,
+                      !Task.isCancelled,
+                      self.projection?.snapshotID == snapshotID,
+                      self.selectedAIApplicationID == result.applicationID,
+                      self.searchText == result.query else { return }
+                self.aiQueryProjection = result
+            } catch is CancellationError {
+                return
+            } catch {
+                return
+            }
+        }
+    }
+
+    private func cancelAIQueryProjection() {
+        aiQueryProjection = nil
+        aiQueryPublicationTask?.cancel()
+        aiQueryWorker?.cancel()
     }
 
     func exportDiagnostics() {
