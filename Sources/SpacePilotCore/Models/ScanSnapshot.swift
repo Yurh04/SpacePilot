@@ -37,6 +37,7 @@ public struct ScanSnapshot: Identifiable, Codable, Sendable {
     public let plugins: [PluginRecord]
     public let skills: [SkillRecord]
     public let coverage: ScanCoverage
+    public let pluginDiagnostics: [String]?
 
     public init(
         id: UUID = UUID(),
@@ -47,7 +48,8 @@ public struct ScanSnapshot: Identifiable, Codable, Sendable {
         aiApplications: [AIApplicationRecord],
         plugins: [PluginRecord],
         skills: [SkillRecord],
-        coverage: ScanCoverage
+        coverage: ScanCoverage,
+        pluginDiagnostics: [String]? = nil
     ) {
         self.id = id
         self.completedAt = completedAt
@@ -58,6 +60,7 @@ public struct ScanSnapshot: Identifiable, Codable, Sendable {
         self.plugins = plugins
         self.skills = skills
         self.coverage = coverage
+        self.pluginDiagnostics = pluginDiagnostics
     }
 
     public var uniqueAIAllocatedSize: Int64 {

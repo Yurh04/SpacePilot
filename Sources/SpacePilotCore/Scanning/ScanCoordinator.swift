@@ -35,7 +35,8 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                 aiApplications: [],
                 plugins: [],
                 skills: [],
-                coverage: .complete
+                coverage: .complete,
+                pluginDiagnostics: nil
             )
             emit(ScanEvent(
                 stage: .quickInventory,
@@ -162,7 +163,8 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                 aiApplications: aiApplications,
                 plugins: pluginResult.plugins,
                 skills: indexedSkills,
-                coverage: homeResult.coverage
+                coverage: homeResult.coverage,
+                pluginDiagnostics: pluginResult.diagnostics
             )
             try await store.save(snapshot: snapshot)
             emit(ScanEvent(stage: .completed, progress: 1, message: "Scan complete", snapshot: snapshot))

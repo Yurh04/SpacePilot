@@ -23,6 +23,27 @@ final class SQLiteIndexStoreTests: XCTestCase {
         XCTAssertNil(stored)
     }
 
+    func testPluginDiagnosticsRoundTrip() async throws {
+        let store = try SQLiteIndexStore(url: temporaryDatabaseURL())
+        let snapshot = ScanSnapshot.fixture(pluginDiagnostics: ["Invalid manifest"])
+
+        try await store.save(snapshot: snapshot)
+
+        let storedSnapshot = try await store.latestSnapshot()
+        XCTAssertEqual(storedSnapshot?.pluginDiagnostics, ["Invalid manifest"])
+    }
+
+    func testSnapshotWithoutPluginDiagnosticsDecodesAsNil() throws {
+        let encodedSnapshot = try JSONEncoder().encode(ScanSnapshot.fixture())
+        var oldSnapshot = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: encodedSnapshot) as? [String: Any]
+        )
+        oldSnapshot.removeValue(forKey: "pluginDiagnostics")
+        let oldSnapshotData = try JSONSerialization.data(withJSONObject: oldSnapshot)
+
+        XCTAssertNil(try JSONDecoder().decode(ScanSnapshot.self, from: oldSnapshotData).pluginDiagnostics)
+    }
+
     func testCleanupHistoryRoundTrips() async throws {
         let store = try SQLiteIndexStore(url: temporaryDatabaseURL())
         let transaction = CleanupTransaction(

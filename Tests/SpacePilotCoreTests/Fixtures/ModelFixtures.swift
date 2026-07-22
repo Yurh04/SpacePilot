@@ -76,7 +76,8 @@ extension ScanSnapshot {
         id: UUID = UUID(),
         completedAt: Date = .now,
         aiApplications: [AIApplicationRecord] = [],
-        skills: [SkillRecord] = []
+        skills: [SkillRecord] = [],
+        pluginDiagnostics: [String]? = nil
     ) -> Self {
         .init(
             id: id,
@@ -87,7 +88,8 @@ extension ScanSnapshot {
             aiApplications: aiApplications,
             plugins: [],
             skills: skills,
-            coverage: .complete
+            coverage: .complete,
+            pluginDiagnostics: pluginDiagnostics
         )
     }
 }
