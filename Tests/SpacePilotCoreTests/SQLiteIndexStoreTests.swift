@@ -124,6 +124,8 @@ final class SQLiteIndexStoreTests: XCTestCase {
     func testInvalidDatabaseIsMovedAsideAndFreshStoreIsCreated() async throws {
         let url = temporaryDatabaseURL()
         try Data("not a sqlite database".utf8).write(to: url)
+        try Data("wal".utf8).write(to: URL(fileURLWithPath: url.path + "-wal"))
+        try Data("shm".utf8).write(to: URL(fileURLWithPath: url.path + "-shm"))
 
         let store = try SQLiteIndexStore(url: url)
 
@@ -133,7 +135,64 @@ final class SQLiteIndexStoreTests: XCTestCase {
             at: url.deletingLastPathComponent(),
             includingPropertiesForKeys: nil
         )
-        XCTAssertTrue(siblings.contains { $0.lastPathComponent.hasPrefix(url.lastPathComponent + ".corrupt-") })
+        let quarantinedDatabase = try XCTUnwrap(
+            siblings.first { $0.lastPathComponent.hasPrefix(url.lastPathComponent + ".corrupt-") && !$0.lastPathComponent.hasSuffix("-wal") && !$0.lastPathComponent.hasSuffix("-shm") }
+        )
+        XCTAssertTrue(FileManager.default.fileExists(atPath: quarantinedDatabase.path + "-wal"))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: quarantinedDatabase.path + "-shm"))
+    }
+
+    func testLockedValidDatabaseThrowsWithoutQuarantiningDatabaseOrSidecars() throws {
+        let url = temporaryDatabaseURL()
+        try createValidDatabase(at: url, journalMode: "DELETE")
+
+        var lockingDatabase: OpaquePointer?
+        XCTAssertEqual(sqlite3_open_v2(url.path, &lockingDatabase, SQLITE_OPEN_READWRITE, nil), SQLITE_OK)
+        let database = try XCTUnwrap(lockingDatabase)
+        defer { sqlite3_close(database) }
+        XCTAssertEqual(sqlite3_exec(database, "BEGIN EXCLUSIVE;", nil, nil, nil), SQLITE_OK)
+        defer { sqlite3_exec(database, "ROLLBACK;", nil, nil, nil) }
+        let originalData = try Data(contentsOf: url)
+        let originalIdentifier = try fileIdentifier(at: url)
+
+        XCTAssertThrowsError(try SQLiteIndexStore(url: url)) { error in
+            guard let storeError = error as? SQLiteStoreError else {
+                return XCTFail("Expected SQLiteStoreError, got \(error)")
+            }
+            XCTAssertTrue([SQLITE_BUSY, SQLITE_LOCKED].contains(storeError.primaryCode))
+            XCTAssertFalse(storeError.isConfirmedCorruption)
+        }
+
+        XCTAssertEqual(try fileIdentifier(at: url), originalIdentifier)
+        XCTAssertEqual(try Data(contentsOf: url), originalData)
+        XCTAssertTrue(try corruptSiblings(for: url).isEmpty)
+    }
+
+    func testReadOnlyValidDatabaseThrowsWithoutQuarantiningDatabase() throws {
+        let url = temporaryDatabaseURL()
+        try createValidDatabase(at: url, journalMode: "DELETE", completeSchema: false)
+        let originalData = try Data(contentsOf: url)
+        let originalIdentifier = try fileIdentifier(at: url)
+        let directory = url.deletingLastPathComponent()
+
+        XCTAssertEqual(chmod(url.path, S_IRUSR | S_IRGRP | S_IROTH), 0)
+        XCTAssertEqual(chmod(directory.path, S_IRUSR | S_IXUSR), 0)
+        defer {
+            _ = chmod(directory.path, S_IRWXU)
+            _ = chmod(url.path, S_IRUSR | S_IWUSR)
+        }
+
+        XCTAssertThrowsError(try SQLiteIndexStore(url: url)) { error in
+            guard let storeError = error as? SQLiteStoreError else {
+                return XCTFail("Expected SQLiteStoreError, got \(error)")
+            }
+            XCTAssertTrue([SQLITE_READONLY, SQLITE_CANTOPEN].contains(storeError.primaryCode))
+            XCTAssertFalse(storeError.isConfirmedCorruption)
+        }
+
+        XCTAssertEqual(try fileIdentifier(at: url), originalIdentifier)
+        XCTAssertEqual(try Data(contentsOf: url), originalData)
+        XCTAssertTrue(try corruptSiblings(for: url).isEmpty)
     }
 
     private func temporaryDatabaseURL() -> URL {
@@ -141,6 +200,46 @@ final class SQLiteIndexStoreTests: XCTestCase {
             .appending(path: "SpacePilotDatabaseTests-\(UUID().uuidString)", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory.appending(path: "index.sqlite")
+    }
+
+    private func createValidDatabase(
+        at url: URL,
+        journalMode: String = "WAL",
+        completeSchema: Bool = true
+    ) throws {
+        var database: OpaquePointer?
+        guard sqlite3_open_v2(url.path, &database, SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE, nil) == SQLITE_OK,
+              let database else {
+            if let database { sqlite3_close(database) }
+            throw SQLiteStoreError(message: "Could not create SQLite test index")
+        }
+        defer { sqlite3_close(database) }
+        let statements = completeSchema
+            ? IndexSchema.statements
+            : ["CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);"]
+        guard sqlite3_exec(database, "PRAGMA journal_mode=\(journalMode);", nil, nil, nil) == SQLITE_OK else {
+            throw SQLiteStoreError(message: String(cString: sqlite3_errmsg(database)))
+        }
+        for statement in statements where !statement.hasPrefix("PRAGMA journal_mode=") {
+            guard sqlite3_exec(database, statement, nil, nil, nil) == SQLITE_OK else {
+                throw SQLiteStoreError(message: String(cString: sqlite3_errmsg(database)))
+            }
+        }
+        guard sqlite3_exec(database, "INSERT INTO metadata(key, value) VALUES ('fixture', 'preserved');", nil, nil, nil) == SQLITE_OK else {
+            throw SQLiteStoreError(message: String(cString: sqlite3_errmsg(database)))
+        }
+        _ = sqlite3_wal_checkpoint_v2(database, nil, SQLITE_CHECKPOINT_TRUNCATE, nil, nil)
+    }
+
+    private func fileIdentifier(at url: URL) throws -> AnyHashable {
+        try XCTUnwrap(try url.resourceValues(forKeys: [.fileResourceIdentifierKey]).fileResourceIdentifier as? AnyHashable)
+    }
+
+    private func corruptSiblings(for url: URL) throws -> [URL] {
+        try FileManager.default.contentsOfDirectory(
+            at: url.deletingLastPathComponent(),
+            includingPropertiesForKeys: nil
+        ).filter { $0.lastPathComponent.hasPrefix(url.lastPathComponent + ".corrupt-") }
     }
 
     private func snapshotMetrics(at url: URL) throws -> (

@@ -26,25 +26,13 @@ public actor SQLiteIndexStore: SnapshotStoring {
             let candidate = try SQLiteConnection(url: url)
             try Self.installSchema(on: candidate)
             connection = candidate
-        } catch {
-            if FileManager.default.fileExists(atPath: url.path) {
-                let suffix = String(Int(Date().timeIntervalSince1970 * 1_000))
-                let corruptURL = url.deletingLastPathComponent()
-                    .appending(path: url.lastPathComponent + ".corrupt-" + suffix)
-                try FileManager.default.moveItem(at: url, to: corruptURL)
-                for sidecarSuffix in ["-wal", "-shm"] {
-                    let sidecar = URL(fileURLWithPath: url.path + sidecarSuffix)
-                    if FileManager.default.fileExists(atPath: sidecar.path) {
-                        try? FileManager.default.moveItem(
-                            at: sidecar,
-                            to: URL(fileURLWithPath: corruptURL.path + sidecarSuffix)
-                        )
-                    }
-                }
-            }
+        } catch let error as SQLiteStoreError where error.isConfirmedCorruption {
+            try Self.quarantineCorruptStore(at: url)
             let fresh = try SQLiteConnection(url: url)
             try Self.installSchema(on: fresh)
             connection = fresh
+        } catch {
+            throw error
         }
     }
 
@@ -116,11 +104,51 @@ public actor SQLiteIndexStore: SnapshotStoring {
             try connection.execute(statement)
         }
         try connection.statement("PRAGMA quick_check;") { statement in
-            guard sqlite3_step(statement) == SQLITE_ROW,
-                  let text = sqlite3_column_text(statement, 0),
-                  String(cString: text) == "ok" else {
-                throw SQLiteStoreError(message: "SQLite integrity check failed")
+            guard try connection.step(statement) == SQLITE_ROW else {
+                throw SQLiteStoreError(message: "SQLite integrity check returned no result")
             }
+            guard let text = sqlite3_column_text(statement, 0),
+                  String(cString: text) == "ok" else {
+                throw SQLiteStoreError(
+                    message: "SQLite integrity check failed",
+                    confirmedCorruption: true
+                )
+            }
+        }
+    }
+
+    private static func quarantineCorruptStore(at url: URL) throws {
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        let suffix = String(Int(Date().timeIntervalSince1970 * 1_000)) + "-" + UUID().uuidString
+        let corruptURL = url.deletingLastPathComponent()
+            .appending(path: url.lastPathComponent + ".corrupt-" + suffix)
+        var movedSidecars: [(source: URL, destination: URL)] = []
+
+        do {
+            for sidecarSuffix in ["-wal", "-shm"] {
+                let source = URL(fileURLWithPath: url.path + sidecarSuffix)
+                guard FileManager.default.fileExists(atPath: source.path) else { continue }
+                let destination = URL(fileURLWithPath: corruptURL.path + sidecarSuffix)
+                try FileManager.default.moveItem(at: source, to: destination)
+                movedSidecars.append((source, destination))
+            }
+            try FileManager.default.moveItem(at: url, to: corruptURL)
+        } catch {
+            var rollbackFailure: Error?
+            for move in movedSidecars.reversed() {
+                do {
+                    try FileManager.default.moveItem(at: move.destination, to: move.source)
+                } catch {
+                    rollbackFailure = rollbackFailure ?? error
+                }
+            }
+            if let rollbackFailure {
+                throw SQLiteStoreError(
+                    message: "SQLite quarantine failed: \(error.localizedDescription). "
+                        + "Restoring sidecars also failed: \(rollbackFailure.localizedDescription)"
+                )
+            }
+            throw error
         }
     }
 }
