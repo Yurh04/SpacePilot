@@ -18,6 +18,62 @@ struct ProjectionCancellationCheckpoint {
     }
 }
 
+enum ProjectionCancellationAwareOrdering {
+    static func sorted<Element>(
+        _ elements: [Element],
+        by areInIncreasingOrder: (Element, Element) -> Bool,
+        checkCancellation: @escaping @Sendable () throws -> Void
+    ) throws -> [Element] {
+        try checkCancellation()
+        guard elements.count > 1 else {
+            try checkCancellation()
+            return elements
+        }
+
+        var source = elements
+        var width = 1
+        var checkpoint = ProjectionCancellationCheckpoint(checkCancellation: checkCancellation)
+        while width < source.count {
+            var destination: [Element] = []
+            destination.reserveCapacity(source.count)
+            var lowerBound = 0
+            while lowerBound < source.count {
+                let middle = min(lowerBound + width, source.count)
+                let upperBound = min(middle + width, source.count)
+                var left = lowerBound
+                var right = middle
+
+                while left < middle, right < upperBound {
+                    try checkpoint.checkPeriodically()
+                    if areInIncreasingOrder(source[right], source[left]) {
+                        destination.append(source[right])
+                        right += 1
+                    } else {
+                        destination.append(source[left])
+                        left += 1
+                    }
+                }
+                while left < middle {
+                    try checkpoint.checkPeriodically()
+                    destination.append(source[left])
+                    left += 1
+                }
+                while right < upperBound {
+                    try checkpoint.checkPeriodically()
+                    destination.append(source[right])
+                    right += 1
+                }
+                lowerBound = upperBound
+            }
+            source = destination
+            width = width > source.count / 2 ? source.count : width * 2
+            try checkCancellation()
+        }
+        try checkCancellation()
+        return source
+    }
+}
+
 public struct StorageCategorySummary: Identifiable, Sendable {
     public var id: ItemCategory { category }
     public let category: ItemCategory
@@ -43,6 +99,7 @@ public struct OverviewProjection: Sendable {
         snapshot: ScanSnapshot,
         checkCancellation: @escaping @Sendable () throws -> Void
     ) throws {
+        try checkCancellation()
         var itemBytes: Int64 = 0
         var safeItemBytes: Int64 = 0
         var checkpoint = ProjectionCancellationCheckpoint(checkCancellation: checkCancellation)
@@ -64,11 +121,17 @@ public struct OverviewProjection: Sendable {
         } else {
             totalUsedBytes = itemBytes
         }
-        analyzedBytes = itemBytes
-            + snapshot.applications.reduce(0) { $0 + $1.allocatedSize }
+        var applicationBytes: Int64 = 0
+        for application in snapshot.applications {
+            try checkpoint.checkPeriodically()
+            applicationBytes += application.allocatedSize
+        }
+        analyzedBytes = itemBytes + applicationBytes
         reclaimableBytes = safeItemBytes
+        // The heap is strictly bounded by recommendationDisplayLimit (8).
         recommendations = recommendationSelection.sortedItems
         coverage = snapshot.coverage
+        try checkCancellation()
     }
 }
 
@@ -86,6 +149,7 @@ public struct StorageProjection: Sendable {
         snapshot: ScanSnapshot,
         checkCancellation: @escaping @Sendable () throws -> Void
     ) throws {
+        try checkCancellation()
         var categoryTotals: [ItemCategory: StorageCategoryAccumulator] = [:]
         var checkpoint = ProjectionCancellationCheckpoint(checkCancellation: checkCancellation)
         var largestSelection = BoundedScannedItemSelection(
@@ -107,17 +171,27 @@ public struct StorageProjection: Sendable {
             }
         }
 
-        var categoryValues = categoryTotals.map { category, total in
-            StorageCategorySummary(
+        var categoryValues: [StorageCategorySummary] = []
+        categoryValues.reserveCapacity(ItemCategory.allCases.count)
+        for (category, total) in categoryTotals {
+            try checkpoint.checkPeriodically()
+            categoryValues.append(StorageCategorySummary(
                 category: category,
                 allocatedSize: total.allocatedSize,
                 itemCount: total.itemCount
-            )
+            ))
         }
         if let volume = snapshot.volume {
             let used = max(0, volume.totalCapacity - volume.availableCapacity)
-            let classified = categoryValues.reduce(0) { $0 + $1.allocatedSize }
-                + snapshot.applications.reduce(0) { $0 + $1.allocatedSize }
+            var classified: Int64 = 0
+            // categoryValues is strictly bounded by ItemCategory.allCases (12).
+            for category in categoryValues {
+                classified += category.allocatedSize
+            }
+            for application in snapshot.applications {
+                try checkpoint.checkPeriodically()
+                classified += application.allocatedSize
+            }
             let other = max(0, used - classified)
             if other > 0 {
                 categoryValues.append(StorageCategorySummary(
@@ -127,9 +201,15 @@ public struct StorageProjection: Sendable {
                 ))
             }
         }
-        categories = categoryValues.sorted { $0.allocatedSize > $1.allocatedSize }
+        categories = try ProjectionCancellationAwareOrdering.sorted(
+            categoryValues,
+            by: { $0.allocatedSize > $1.allocatedSize },
+            checkCancellation: checkCancellation
+        )
+        // Both heaps are strictly bounded by itemDisplayLimit (100).
         largestItems = largestSelection.sortedItems
         oldItems = oldestSelection.sortedItems
+        try checkCancellation()
     }
 }
 
@@ -224,6 +304,7 @@ public struct ApplicationListProjection: Sendable {
         snapshot: ScanSnapshot,
         checkCancellation: @escaping @Sendable () throws -> Void
     ) throws {
+        try checkCancellation()
         var checkpoint = ProjectionCancellationCheckpoint(checkCancellation: checkCancellation)
         var associatedItemIDs: Set<UUID> = []
         for application in snapshot.applications {
@@ -264,7 +345,11 @@ public struct ApplicationListProjection: Sendable {
                     ))
                 }
             }
-            associations.sort { $0.association.confidence > $1.association.confidence }
+            associations = try ProjectionCancellationAwareOrdering.sorted(
+                associations,
+                by: { $0.association.confidence > $1.association.confidence },
+                checkCancellation: checkCancellation
+            )
             applicationProjections.append(ApplicationProjection(
                 application: application,
                 totalSize: totalSize,
@@ -273,7 +358,12 @@ public struct ApplicationListProjection: Sendable {
         }
 
         totalSizes = allTotalSizes
-        applications = applicationProjections.sorted { $0.totalSize > $1.totalSize }
+        applications = try ProjectionCancellationAwareOrdering.sorted(
+            applicationProjections,
+            by: { $0.totalSize > $1.totalSize },
+            checkCancellation: checkCancellation
+        )
+        try checkCancellation()
     }
 
     public func filtered(by searchText: String) -> [ApplicationProjection] {

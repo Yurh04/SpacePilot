@@ -21,23 +21,34 @@ public struct AppSnapshotProjection: Sendable {
         let checkCancellation: @Sendable () throws -> Void = {
             try Task.checkCancellation()
         }
+        return try build(snapshot: snapshot, checkCancellation: checkCancellation)
+    }
+
+    static func build(
+        snapshot: ScanSnapshot,
+        checkCancellation: @escaping @Sendable () throws -> Void
+    ) throws -> Self {
         try checkCancellation()
         let overview = try OverviewProjection(
             snapshot: snapshot,
             checkCancellation: checkCancellation
         )
+        try checkCancellation()
         let storage = try StorageProjection(
             snapshot: snapshot,
             checkCancellation: checkCancellation
         )
+        try checkCancellation()
         let applications = try ApplicationListProjection(
             snapshot: snapshot,
             checkCancellation: checkCancellation
         )
+        try checkCancellation()
         let developerAI = try DeveloperAIProjection(
             snapshot: snapshot,
             checkCancellation: checkCancellation
         )
+        try checkCancellation()
         return Self(
             snapshotID: snapshot.id,
             overview: overview,
@@ -97,12 +108,14 @@ public struct AIApplicationQueryProjection: Sendable {
     ) throws -> Self {
         try Task.checkCancellation()
         guard !query.isEmpty else {
-            return Self(
+            let result = Self(
                 applicationID: application.id,
                 query: query,
                 dataItems: application.dataItems,
                 skills: application.skills
             )
+            try Task.checkCancellation()
+            return result
         }
 
         var checkpoint = ProjectionCancellationCheckpoint {
@@ -122,12 +135,14 @@ public struct AIApplicationQueryProjection: Sendable {
                 skills.append(skill)
             }
         }
-        return Self(
+        let result = Self(
             applicationID: application.id,
             query: query,
             dataItems: dataItems,
             skills: skills
         )
+        try Task.checkCancellation()
+        return result
     }
 }
 
@@ -144,6 +159,7 @@ public struct DeveloperAIProjection: Sendable {
         snapshot: ScanSnapshot,
         checkCancellation: @escaping @Sendable () throws -> Void
     ) throws {
+        try checkCancellation()
         var checkpoint = ProjectionCancellationCheckpoint(checkCancellation: checkCancellation)
         var pluginsByID: [UUID: PluginRecord] = [:]
         for plugin in snapshot.plugins {
@@ -182,23 +198,66 @@ public struct DeveloperAIProjection: Sendable {
         applicationProjections.reserveCapacity(snapshot.aiApplications.count)
         for application in snapshot.aiApplications {
             try checkpoint.checkPeriodically()
-            let dataItems = dataItemsByApplicationID[application.id, default: []]
-                .sorted { $0.allocatedSize > $1.allocatedSize }
-            let plugins = application.pluginIDs.compactMap { pluginsByID[$0] }
-                .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-            let skills = application.skillIDs.compactMap { skillsByID[$0] }
-                .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
-            let standaloneSkillBytes = skills.reduce(Int64(0)) { total, skill in
-                guard let parentPluginID = skill.parentPluginID else {
-                    return total + skill.allocatedSize
+            let dataItems = try ProjectionCancellationAwareOrdering.sorted(
+                dataItemsByApplicationID[application.id, default: []],
+                by: { $0.allocatedSize > $1.allocatedSize },
+                checkCancellation: checkCancellation
+            )
+
+            var unorderedPlugins: [PluginRecord] = []
+            unorderedPlugins.reserveCapacity(application.pluginIDs.count)
+            for pluginID in application.pluginIDs {
+                try checkpoint.checkPeriodically()
+                if let plugin = pluginsByID[pluginID] {
+                    unorderedPlugins.append(plugin)
                 }
-                return application.pluginIDs.contains(parentPluginID)
-                    ? total
-                    : total + skill.allocatedSize
+            }
+            let plugins = try ProjectionCancellationAwareOrdering.sorted(
+                unorderedPlugins,
+                by: {
+                    $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+                },
+                checkCancellation: checkCancellation
+            )
+
+            var unorderedSkills: [SkillRecord] = []
+            unorderedSkills.reserveCapacity(application.skillIDs.count)
+            for skillID in application.skillIDs {
+                try checkpoint.checkPeriodically()
+                if let skill = skillsByID[skillID] {
+                    unorderedSkills.append(skill)
+                }
+            }
+            let skills = try ProjectionCancellationAwareOrdering.sorted(
+                unorderedSkills,
+                by: {
+                    $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+                },
+                checkCancellation: checkCancellation
+            )
+
+            var standaloneSkillBytes: Int64 = 0
+            for skill in skills {
+                try checkpoint.checkPeriodically()
+                if let parentPluginID = skill.parentPluginID,
+                   application.pluginIDs.contains(parentPluginID) {
+                    continue
+                }
+                standaloneSkillBytes += skill.allocatedSize
+            }
+            var dataItemBytes: Int64 = 0
+            for item in dataItems {
+                try checkpoint.checkPeriodically()
+                dataItemBytes += item.allocatedSize
+            }
+            var pluginBytes: Int64 = 0
+            for plugin in plugins {
+                try checkpoint.checkPeriodically()
+                pluginBytes += plugin.allocatedSize
             }
             let totalSize = application.applicationAllocatedSize
-                + dataItems.reduce(Int64(0)) { $0 + $1.allocatedSize }
-                + plugins.reduce(Int64(0)) { $0 + $1.allocatedSize }
+                + dataItemBytes
+                + pluginBytes
                 + standaloneSkillBytes
             applicationProjections.append(AIApplicationProjection(
                 application: application,
@@ -207,8 +266,10 @@ public struct DeveloperAIProjection: Sendable {
                 plugins: plugins,
                 skills: skills
             ))
+            try checkCancellation()
         }
         applications = applicationProjections
         pluginDiagnostics = snapshot.pluginDiagnostics ?? []
+        try checkCancellation()
     }
 }

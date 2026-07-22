@@ -465,4 +465,41 @@ final class ViewProjectionTests: XCTestCase {
 
         XCTAssertTrue(observedCancellation)
     }
+
+    func testCancellationAwareOrderingThrowsDuringMergeCopy() {
+        let checker = DeterministicCancellationChecker(cancelAtCheck: 2)
+        let values = Array((0..<4_096).reversed())
+
+        XCTAssertThrowsError(try ProjectionCancellationAwareOrdering.sorted(
+            values,
+            by: <,
+            checkCancellation: checker.check
+        )) { error in
+            XCTAssertTrue(error is CancellationError)
+        }
+        XCTAssertEqual(checker.checkCount, 2)
+    }
+}
+
+private final class DeterministicCancellationChecker: @unchecked Sendable {
+    private let lock = NSLock()
+    private let cancelAtCheck: Int
+    private var storedCheckCount = 0
+
+    init(cancelAtCheck: Int) {
+        self.cancelAtCheck = cancelAtCheck
+    }
+
+    var checkCount: Int {
+        lock.withLock { storedCheckCount }
+    }
+
+    func check() throws {
+        try lock.withLock {
+            storedCheckCount += 1
+            if storedCheckCount == cancelAtCheck {
+                throw CancellationError()
+            }
+        }
+    }
 }
