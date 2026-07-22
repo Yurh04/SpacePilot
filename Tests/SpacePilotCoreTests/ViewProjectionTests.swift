@@ -406,6 +406,111 @@ final class ViewProjectionTests: XCTestCase {
         XCTAssertEqual(projection.categories.reduce(0) { $0 + $1.allocatedSize }, 256)
     }
 
+    func testStorageProjectionMergesResidualVolumeBytesIntoExistingSystemCategory() {
+        let systemItem = ScannedItem(
+            url: URL(fileURLWithPath: "/System/Library/system-data"),
+            logicalSize: 200,
+            allocatedSize: 200,
+            modificationDate: .distantPast,
+            category: .system,
+            risk: .managed,
+            explanation: "System data"
+        )
+        let cacheItem = ScannedItem.fixture(
+            path: "/Users/test/Library/Caches/app/cache",
+            allocatedSize: 400,
+            modificationDate: Date.distantPast.addingTimeInterval(1)
+        )
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: VolumeRecord(
+                url: URL(fileURLWithPath: "/"),
+                name: "Macintosh HD",
+                totalCapacity: 2_000,
+                availableCapacity: 1_000
+            ),
+            items: [systemItem, cacheItem],
+            applications: [],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: .complete
+        )
+
+        let projection = StorageProjection(snapshot: snapshot)
+        let systemSummaries = projection.categories.filter { $0.category == .system }
+
+        XCTAssertEqual(systemSummaries.count, 1)
+        XCTAssertEqual(Set(projection.categories.map(\.id)).count, projection.categories.count)
+        XCTAssertEqual(systemSummaries.first?.allocatedSize, 600)
+        XCTAssertEqual(systemSummaries.first?.itemCount, 1)
+        XCTAssertEqual(projection.categories.map(\.category), [.system, .cache])
+        XCTAssertEqual(projection.categories.reduce(0) { $0 + $1.allocatedSize }, 1_000)
+        XCTAssertEqual(projection.largestItems.map(\.id), [cacheItem.id, systemItem.id])
+        XCTAssertEqual(projection.oldItems.map(\.id), [systemItem.id, cacheItem.id])
+    }
+
+    func testStorageProjectionDoesNotAddResidualWhenClassifiedBytesCoverUsedVolume() {
+        let systemItem = ScannedItem(
+            url: URL(fileURLWithPath: "/System/Library/system-data"),
+            logicalSize: 600,
+            allocatedSize: 600,
+            category: .system,
+            risk: .managed,
+            explanation: "System data"
+        )
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: VolumeRecord(
+                url: URL(fileURLWithPath: "/"),
+                name: "Macintosh HD",
+                totalCapacity: 1_000,
+                availableCapacity: 500
+            ),
+            items: [systemItem],
+            applications: [],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: .complete
+        )
+
+        let projection = StorageProjection(snapshot: snapshot)
+
+        XCTAssertEqual(projection.categories.count, 1)
+        XCTAssertEqual(projection.categories.first?.category, .system)
+        XCTAssertEqual(projection.categories.first?.allocatedSize, 600)
+        XCTAssertEqual(projection.categories.first?.itemCount, 1)
+    }
+
+    func testStorageProjectionCreatesSystemCategoryForResidualWithoutSystemItems() {
+        let cacheItem = ScannedItem.fixture(allocatedSize: 400)
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: VolumeRecord(
+                url: URL(fileURLWithPath: "/"),
+                name: "Macintosh HD",
+                totalCapacity: 1_000,
+                availableCapacity: 400
+            ),
+            items: [cacheItem],
+            applications: [],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: .complete
+        )
+
+        let projection = StorageProjection(snapshot: snapshot)
+        let systemSummaries = projection.categories.filter { $0.category == .system }
+
+        XCTAssertEqual(systemSummaries.count, 1)
+        XCTAssertEqual(systemSummaries.first?.allocatedSize, 200)
+        XCTAssertEqual(systemSummaries.first?.itemCount, 0)
+        XCTAssertEqual(Set(projection.categories.map(\.id)).count, projection.categories.count)
+        XCTAssertEqual(projection.categories.reduce(0) { $0 + $1.allocatedSize }, 600)
+    }
+
     func testOldItemsUseMetadataOnlyCutoff() {
         let old = ScannedItem.fixture(modificationDate: .distantPast)
         let recent = ScannedItem.fixture(modificationDate: .now)

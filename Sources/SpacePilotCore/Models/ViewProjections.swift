@@ -171,6 +171,22 @@ public struct StorageProjection: Sendable {
             }
         }
 
+        if let volume = snapshot.volume {
+            let used = max(0, volume.totalCapacity - volume.availableCapacity)
+            var classified: Int64 = 0
+            // categoryTotals is strictly bounded by ItemCategory.allCases (12).
+            for total in categoryTotals.values {
+                classified += total.allocatedSize
+            }
+            for application in snapshot.applications {
+                try checkpoint.checkPeriodically()
+                classified += application.allocatedSize
+            }
+            let other = max(0, used - classified)
+            if other > 0 {
+                categoryTotals[.system, default: .init()].allocatedSize += other
+            }
+        }
         var categoryValues: [StorageCategorySummary] = []
         categoryValues.reserveCapacity(ItemCategory.allCases.count)
         for (category, total) in categoryTotals {
@@ -180,26 +196,6 @@ public struct StorageProjection: Sendable {
                 allocatedSize: total.allocatedSize,
                 itemCount: total.itemCount
             ))
-        }
-        if let volume = snapshot.volume {
-            let used = max(0, volume.totalCapacity - volume.availableCapacity)
-            var classified: Int64 = 0
-            // categoryValues is strictly bounded by ItemCategory.allCases (12).
-            for category in categoryValues {
-                classified += category.allocatedSize
-            }
-            for application in snapshot.applications {
-                try checkpoint.checkPeriodically()
-                classified += application.allocatedSize
-            }
-            let other = max(0, used - classified)
-            if other > 0 {
-                categoryValues.append(StorageCategorySummary(
-                    category: .system,
-                    allocatedSize: other,
-                    itemCount: 0
-                ))
-            }
         }
         categories = try ProjectionCancellationAwareOrdering.sorted(
             categoryValues,
