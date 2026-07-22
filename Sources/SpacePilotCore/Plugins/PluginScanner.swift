@@ -118,8 +118,16 @@ public struct PluginScanner<Scanner: SkillScanning>: PluginScanning {
             includingPropertiesForKeys: [.isDirectoryKey],
             options: [.skipsHiddenFiles]
         ) else { return [] }
-        return children.filter {
-            FileManager.default.fileExists(atPath: $0.appending(path: "SKILL.md").path)
+        let canonicalRoot = root.standardizedFileURL.resolvingSymlinksInPath()
+        let canonicalCandidate = candidate.standardizedFileURL.resolvingSymlinksInPath()
+        return children.compactMap { child in
+            let canonicalChild = child.standardizedFileURL.resolvingSymlinksInPath()
+            guard canonicalChild.path.hasPrefix(canonicalRoot.path + "/"),
+                  canonicalChild.path.hasPrefix(canonicalCandidate.path + "/"),
+                  FileManager.default.fileExists(atPath: canonicalChild.appending(path: "SKILL.md").path) else {
+                return nil
+            }
+            return canonicalChild
         }
     }
 

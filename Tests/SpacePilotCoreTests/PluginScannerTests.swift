@@ -19,6 +19,32 @@ final class PluginScannerTests: XCTestCase {
         XCTAssertTrue(result.skills.allSatisfy { $0.parentPluginID == plugin.id })
     }
 
+    func testDirectorySkillsDeclarationRejectsOutOfBoundsSymbolicLink() async throws {
+        let fixture = try PluginFixture.make(
+            name: "unsafe-plugin",
+            version: "1.0.0",
+            skillNames: [],
+            skillsEncoding: .directory("./skills/")
+        )
+        let outsideSkill = fixture.tree.url.appending(path: "outside", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: outsideSkill, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(
+            at: fixture.root.appending(path: "skills", directoryHint: .isDirectory),
+            withIntermediateDirectories: true
+        )
+        try Data("---\nname: outside\ndescription: outside skill\n---\nInstructions".utf8)
+            .write(to: outsideSkill.appending(path: "SKILL.md"))
+        try FileManager.default.createSymbolicLink(
+            at: fixture.root.appending(path: "skills/escaped"),
+            withDestinationURL: outsideSkill
+        )
+
+        let result = try await PluginScanner(skillScanner: SkillScanner()).scan(roots: [fixture.root])
+
+        XCTAssertTrue(result.skills.isEmpty)
+        XCTAssertTrue(result.diagnostics.contains { $0.contains("./skills/") })
+    }
+
     func testPluginOwnsBundledSkills() async throws {
         let plugin = try PluginFixture.make(
             name: "product-design",
