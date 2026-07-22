@@ -37,6 +37,10 @@ struct DeveloperAIView: View {
                             projection: application,
                             queryProjection: model.aiQueryProjection,
                             isPreparingQuery: model.isPreparingAIQuery,
+                            pluginDiagnostics: pluginDiagnostics(
+                                for: application,
+                                from: projection.pluginDiagnostics
+                            ),
                             selectedTab: $model.selectedAIApplicationTab
                         )
                     } else {
@@ -61,5 +65,12 @@ struct DeveloperAIView: View {
 
     private func selectedApplication(in applications: [AIApplicationProjection]) -> AIApplicationProjection? {
         applications.first { $0.id == model.selectedAIApplicationID }
+    }
+
+    private func pluginDiagnostics(
+        for application: AIApplicationProjection,
+        from diagnostics: [String]
+    ) -> [String] {
+        application.application.bundleIdentifier == "com.openai.codex" ? diagnostics : []
     }
 }

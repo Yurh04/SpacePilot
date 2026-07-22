@@ -6,6 +6,7 @@ struct AIApplicationDetailView: View {
     let projection: AIApplicationProjection
     let queryProjection: AIApplicationQueryProjection?
     let isPreparingQuery: Bool
+    let pluginDiagnostics: [String]
     @Binding var selectedTab: AIApplicationTab
 
     private var application: AIApplicationRecord { projection.application }
@@ -85,17 +86,46 @@ struct AIApplicationDetailView: View {
                 }
                 .padding(12)
                 Divider()
-                Table(projection.plugins) {
-                    TableColumn("Plugin") { plugin in
-                        VStack(alignment: .leading) {
-                            Text(plugin.name)
-                            Text(plugin.source).font(.caption).foregroundStyle(.secondary)
+                if projection.plugins.isEmpty {
+                    if pluginDiagnostics.isEmpty {
+                        ContentUnavailableView(
+                            "No Plugins installed",
+                            systemImage: "puzzlepiece.extension"
+                        )
+                    } else {
+                        VStack(spacing: 12) {
+                            ContentUnavailableView(
+                                "Plugin discovery failed",
+                                systemImage: "exclamationmark.triangle"
+                            )
+                            VStack(alignment: .leading, spacing: 6) {
+                                ForEach(sanitizedDiagnosticSummaries, id: \.self) { summary in
+                                    Label(summary, systemImage: "exclamationmark.circle")
+                                }
+                            }
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                         }
-                        .contextMenu { Button("Reveal in Finder") { reveal(plugin.url) } }
+                        .padding(.horizontal)
+                        .padding(.bottom)
                     }
-                    TableColumn("Version") { Text($0.version ?? "—") }.width(90)
-                    TableColumn("Management") { _ in Text("Official handoff") }.width(130)
-                    TableColumn("Space") { Text(ByteCount.string($0.allocatedSize)).monospacedDigit() }.width(100)
+                } else {
+                    Table(projection.plugins) {
+                        TableColumn("Plugin") { plugin in
+                            VStack(alignment: .leading) {
+                                Text(plugin.name)
+                                Text(plugin.source).font(.caption).foregroundStyle(.secondary)
+                            }
+                            .contextMenu { Button("Reveal in Finder") { reveal(plugin.url) } }
+                        }
+                        TableColumn("Version") { Text($0.version ?? "—") }.width(90)
+                        TableColumn("Skills") { Text($0.skillCount.formatted()) }.width(70)
+                        TableColumn("Management") { _ in Text("Official handoff") }.width(130)
+                        TableColumn("Space") {
+                            Text(ByteCount.string($0.allocatedSize)).monospacedDigit()
+                        }
+                        .width(100)
+                    }
                 }
             }
         case .skills:
@@ -134,5 +164,25 @@ struct AIApplicationDetailView: View {
         case .parentManaged: "Plugin managed"
         case .systemReadOnly: "Read only"
         }
+    }
+
+    private var sanitizedDiagnosticSummaries: [String] {
+        var summaries: [String] = []
+        for diagnostic in pluginDiagnostics {
+            let summary: String
+            if diagnostic.hasPrefix("Missing Plugin manifest") {
+                summary = "A Plugin manifest could not be found."
+            } else if diagnostic.hasPrefix("Invalid Plugin manifest") {
+                summary = "A Plugin manifest could not be read."
+            } else if diagnostic.hasPrefix("Rejected or empty Plugin skill declaration") {
+                summary = "A Plugin skill declaration was rejected or empty."
+            } else {
+                summary = "Plugin discovery reported an issue."
+            }
+            if !summaries.contains(summary) {
+                summaries.append(summary)
+            }
+        }
+        return summaries
     }
 }

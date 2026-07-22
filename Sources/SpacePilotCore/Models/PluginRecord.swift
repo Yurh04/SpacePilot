@@ -16,6 +16,8 @@ public struct PluginRecord: Identifiable, Codable, Hashable, Sendable {
     public let dependencies: [String]
     public let managementCapability: PluginManagementCapability
 
+    public var skillCount: Int { skillIDs.count }
+
     public init(
         id: UUID = UUID(),
         name: String,

@@ -2,6 +2,21 @@ import XCTest
 @testable import SpacePilotCore
 
 final class ViewProjectionTests: XCTestCase {
+    func testAIApplicationProjectionExposesPluginSkillCount() throws {
+        let skillID = UUID()
+        let plugin = PluginRecord(
+            name: "product-design",
+            version: "1",
+            url: URL(fileURLWithPath: "/tmp/plugin"),
+            source: "openai-curated-remote",
+            allocatedSize: 42,
+            skillIDs: [skillID],
+            dependencies: []
+        )
+
+        XCTAssertEqual(plugin.skillCount, 1)
+    }
+
     func testAppSnapshotProjectionBuildsAllPageInputs() throws {
         let plugin = PluginRecord(
             name: "product-design",
