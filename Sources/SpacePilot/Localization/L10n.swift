@@ -114,7 +114,9 @@ enum L10n {
         "explanation.codex-conversation", "explanation.codex-logs", "explanation.exact-bundle-match",
         "explanation.found-under", "explanation.gradle-cache", "explanation.homebrew-cache",
         "explanation.npm-cache", "explanation.pip-cache", "explanation.recognized-root",
-        "explanation.simulator-data", "explanation.xcode-archives", "explanation.xcode-build"
+        "explanation.simulator-data", "explanation.xcode-archives", "explanation.xcode-build",
+        "cleanup.message.changed", "cleanup.message.moved", "cleanup.message.outside-volume",
+        "cleanup.message.refusing-broad", "cleanup.message.refusing-system"
     ]
 
     private static let resourceBundle: Bundle = {
@@ -507,5 +509,37 @@ enum L10n {
             return format("explanation.recognized-root", default: "Recognized %@ data root; contents were not indexed", locale: locale, String(name))
         }
         return source
+    }
+
+    static func cleanupOutcomeMessage(
+        _ message: String,
+        status: CleanupOutcomeStatus,
+        locale: Locale? = nil
+    ) -> String {
+        if status == .movedToTrash, message == "Moved to Trash" {
+            return value("cleanup.message.moved", default: "Moved to Trash", locale: locale)
+        }
+        if status == .skippedChanged, message == "File changed after the scan and was not moved" {
+            return value(
+                "cleanup.message.changed",
+                default: "File changed after the scan and was not moved",
+                locale: locale
+            )
+        }
+        guard status == .skippedProtected else { return message }
+        let knownPrefixes: [(prefix: String, key: String, fallback: String)] = [
+            ("Refusing broad path: ", "cleanup.message.refusing-broad", "Refusing broad path: %@"),
+            ("Refusing protected system path: ", "cleanup.message.refusing-system", "Refusing protected system path: %@"),
+            ("Path is outside the allowed internal volume: ", "cleanup.message.outside-volume", "Path is outside the allowed internal volume: %@")
+        ]
+        for known in knownPrefixes where message.hasPrefix(known.prefix) {
+            return format(
+                known.key,
+                default: known.fallback,
+                locale: locale,
+                String(message.dropFirst(known.prefix.count))
+            )
+        }
+        return message
     }
 }

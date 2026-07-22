@@ -52,6 +52,61 @@ final class LocalizationTests: XCTestCase {
         )
     }
 
+    func testCleanupOutcomeReasonsLocalizeKnownMessagesAndPreserveUnknownErrors() {
+        let english = Locale(identifier: "en")
+        let chinese = Locale(identifier: "zh-Hans")
+        XCTAssertEqual(
+            L10n.cleanupOutcomeMessage(
+                "File changed after the scan and was not moved",
+                status: .skippedChanged,
+                locale: chinese
+            ),
+            "文件在扫描后发生变化，因此未移动"
+        )
+        XCTAssertEqual(
+            L10n.cleanupOutcomeMessage("Refusing protected system path: /System/Test", status: .skippedProtected, locale: chinese),
+            "拒绝受保护的系统路径：/System/Test"
+        )
+        XCTAssertEqual(
+            L10n.cleanupOutcomeMessage("Moved to Trash", status: .movedToTrash, locale: english),
+            "Moved to Trash"
+        )
+        XCTAssertEqual(
+            L10n.cleanupOutcomeMessage("NSCocoaErrorDomain 513", status: .failed, locale: chinese),
+            "NSCocoaErrorDomain 513"
+        )
+    }
+
+    func testEveryDisplayMappingHasEnglishAndSimplifiedChineseText() {
+        let locales = [Locale(identifier: "en"), Locale(identifier: "zh-Hans")]
+        let scopes: [SkillScope] = [
+            .sharedAgents, .agentSpecific(agent: "Codex"),
+            .pluginProvided(pluginID: "plugin"), .systemManaged
+        ]
+        let managementStatuses: [SkillManagementStatus] = [.standalone, .parentManaged, .systemReadOnly]
+        let evidences: [AssociationEvidence] = [
+            .exactBundleIdentifier, .exactContainerIdentifier, .knownRule,
+            .signedHelperRelationship, .vendorAndNameMatch
+        ]
+        let confidences: [AssociationConfidence] = [.low, .medium, .high]
+        let summaries: [CleanupSummary] = [.success, .partialFailure, .failed]
+        let outcomeStatuses: [CleanupOutcomeStatus] = [
+            .movedToTrash, .skippedChanged, .skippedProtected, .failed
+        ]
+
+        for locale in locales {
+            XCTAssertTrue(scopes.allSatisfy { !L10n.name(for: $0, locale: locale).isEmpty })
+            XCTAssertTrue(managementStatuses.allSatisfy { !L10n.name(for: $0, locale: locale).isEmpty })
+            XCTAssertTrue(evidences.allSatisfy { !L10n.name(for: $0, locale: locale).isEmpty })
+            XCTAssertTrue(confidences.allSatisfy { !L10n.name(for: $0, locale: locale).isEmpty })
+            XCTAssertTrue(summaries.allSatisfy { !L10n.name(for: $0, locale: locale).isEmpty })
+            XCTAssertTrue(outcomeStatuses.allSatisfy { !L10n.name(for: $0, locale: locale).isEmpty })
+            XCTAssertTrue(AIApplicationTab.allCases.allSatisfy { !L10n.title(for: $0, locale: locale).isEmpty })
+            XCTAssertTrue(NavigationDestination.allCases.allSatisfy { !L10n.title(for: $0, locale: locale).isEmpty })
+            XCTAssertTrue(ScanStage.allCases.allSatisfy { !L10n.scanStatus(for: $0, locale: locale).isEmpty })
+        }
+    }
+
     func testNavigationUsesEnglishAndSimplifiedChinese() {
         XCTAssertEqual(L10n.overview(locale: Locale(identifier: "en")), "Overview")
         XCTAssertEqual(L10n.overview(locale: Locale(identifier: "zh-Hans")), "概览")
@@ -91,6 +146,7 @@ final class LocalizationTests: XCTestCase {
         let english = try stringsTable(at: resources.appending(path: "en.lproj/Localizable.strings"))
         let chinese = try stringsTable(at: resources.appending(path: "zh-Hans.lproj/Localizable.strings"))
 
+        XCTAssertEqual(L10n.allKeys.count, 160)
         XCTAssertEqual(Set(catalogStrings.keys), L10n.allKeys)
         XCTAssertEqual(Set(english.keys), L10n.allKeys)
         XCTAssertEqual(Set(chinese.keys), L10n.allKeys)

@@ -153,3 +153,8 @@
 "explanation.simulator-data" = "模拟器运行时和设备数据";
 "explanation.xcode-archives" = "Xcode 发布归档";
 "explanation.xcode-build" = "Xcode 构建产物和索引";
+"cleanup.message.changed" = "文件在扫描后发生变化，因此未移动";
+"cleanup.message.moved" = "已移到废纸篓";
+"cleanup.message.outside-volume" = "路径位于允许的内置磁盘之外：%@";
+"cleanup.message.refusing-broad" = "拒绝范围过大的路径：%@";
+"cleanup.message.refusing-system" = "拒绝受保护的系统路径：%@";

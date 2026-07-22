@@ -17,7 +17,7 @@ struct CleanupHistoryView: View {
                 DisclosureGroup {
                     ForEach(transaction.outcomes) { outcome in
                         LabeledContent(
-                            outcome.status == .failed ? outcome.message : L10n.name(for: outcome.status),
+                            L10n.cleanupOutcomeMessage(outcome.message, status: outcome.status),
                             value: L10n.name(for: outcome.status)
                         )
                     }

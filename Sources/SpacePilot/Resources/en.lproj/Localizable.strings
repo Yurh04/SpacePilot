@@ -153,3 +153,8 @@
 "explanation.simulator-data" = "Simulator runtimes and device data";
 "explanation.xcode-archives" = "Xcode release archives";
 "explanation.xcode-build" = "Xcode build products and indexes";
+"cleanup.message.changed" = "File changed after the scan and was not moved";
+"cleanup.message.moved" = "Moved to Trash";
+"cleanup.message.outside-volume" = "Path is outside the allowed internal volume: %@";
+"cleanup.message.refusing-broad" = "Refusing broad path: %@";
+"cleanup.message.refusing-system" = "Refusing protected system path: %@";
