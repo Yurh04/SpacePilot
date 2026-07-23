@@ -243,6 +243,228 @@ final class ApplicationArtifactResolverTests: XCTestCase {
         XCTAssertEqual(result.items.count, 1)
     }
 
+    func testLaunchAgentTargetAssociatesOnlyItsUpdaterSupportDirectory() async throws {
+        let home = try TemporaryTree(files: [
+            "Library/Application Support/Vendor/BrowserUpdater/Updater.app/Contents/MacOS/Updater": 31,
+            "Library/Application Support/Vendor/UnrelatedService/state.db": 32
+        ])
+        let launchAgentURL = home.url.appending(
+            path: "Library/LaunchAgents/com.vendor.update.agent.plist"
+        )
+        let updaterSupportURL = home.url.appending(
+            path: "Library/Application Support/Vendor/BrowserUpdater",
+            directoryHint: .isDirectory
+        )
+        try EdgeAssociationFixture.writeLaunchAgent(
+            at: launchAgentURL,
+            target: updaterSupportURL.appending(
+                path: "Updater.app/Contents/MacOS/Updater"
+            )
+        )
+        let application = application(
+            name: "Browser",
+            bundleID: "com.vendor.browser"
+        )
+
+        let result = try await ApplicationArtifactResolver().resolve(
+            applications: [application],
+            identities: [identity(for: application)],
+            homeDirectory: home.url
+        )
+
+        let paths = Set(result.items.map { $0.url.standardizedFileURL.path })
+        XCTAssertTrue(paths.contains(launchAgentURL.standardizedFileURL.path))
+        XCTAssertTrue(paths.contains(updaterSupportURL.standardizedFileURL.path))
+        XCTAssertFalse(paths.contains {
+            $0.contains("/Vendor/UnrelatedService")
+        })
+
+        let targetItemIDs = Set(result.items.compactMap {
+            [launchAgentURL, updaterSupportURL]
+                .map(\.standardizedFileURL.path)
+                .contains($0.url.standardizedFileURL.path) ? $0.id : nil
+        })
+        let targetAssociations = result.resolutions
+            .flatMap(\.associations)
+            .filter { targetItemIDs.contains($0.itemID) }
+        XCTAssertEqual(targetItemIDs.count, 2)
+        XCTAssertEqual(targetAssociations.count, 2)
+        XCTAssertTrue(targetAssociations.allSatisfy {
+            $0.evidence == .signedHelperRelationship
+                && $0.ownership != .owned
+        })
+    }
+
+    func testLaunchAgentTargetOutsideKnownSupportRootsIsIgnored() async throws {
+        let home = try TemporaryTree(files: [
+            "Documents/BrowserUpdater/Updater.app/Contents/MacOS/Updater": 33
+        ])
+        let launchAgentURL = home.url.appending(
+            path: "Library/LaunchAgents/com.vendor.update.agent.plist"
+        )
+        try EdgeAssociationFixture.writeLaunchAgent(
+            at: launchAgentURL,
+            target: home.url.appending(
+                path: "Documents/BrowserUpdater/Updater.app/Contents/MacOS/Updater"
+            )
+        )
+        let application = application(
+            name: "Browser",
+            bundleID: "com.vendor.browser"
+        )
+
+        let result = try await ApplicationArtifactResolver().resolve(
+            applications: [application],
+            identities: [identity(for: application)],
+            homeDirectory: home.url
+        )
+
+        XCTAssertTrue(result.items.isEmpty)
+        XCTAssertTrue(result.resolutions.flatMap(\.associations).isEmpty)
+    }
+
+    func testLaunchAgentTargetWithExactComponentIdentityIsOwned() async throws {
+        let home = try TemporaryTree(files: [
+            "Library/Application Support/Vendor/com.vendor.navigation.helper.app/Contents/MacOS/Helper": 34,
+            "Library/Application Support/Vendor/UnrelatedService/state.db": 35
+        ])
+        let launchAgentURL = home.url.appending(
+            path: "Library/LaunchAgents/com.vendor.helper.agent.plist"
+        )
+        let helperURL = home.url.appending(
+            path: "Library/Application Support/Vendor/com.vendor.navigation.helper.app",
+            directoryHint: .isDirectory
+        )
+        try EdgeAssociationFixture.writeLaunchAgent(
+            at: launchAgentURL,
+            target: helperURL
+        )
+        let application = application(
+            name: "Navigator",
+            bundleID: "com.vendor.navigator"
+        )
+        let applicationIdentity = ApplicationIdentity(
+            applicationID: application.id,
+            mainBundleIdentifier: application.bundleIdentifier,
+            componentBundleIdentifiers: ["com.vendor.navigation.helper"],
+            teamIdentifier: "TEAM",
+            applicationGroups: []
+        )
+
+        let result = try await ApplicationArtifactResolver().resolve(
+            applications: [application],
+            identities: [applicationIdentity],
+            homeDirectory: home.url
+        )
+
+        let paths = Set(result.items.map { $0.url.standardizedFileURL.path })
+        XCTAssertTrue(paths.contains(launchAgentURL.standardizedFileURL.path))
+        XCTAssertTrue(paths.contains(helperURL.standardizedFileURL.path))
+        XCTAssertFalse(paths.contains(
+            home.url.appending(
+                path: "Library/Application Support/Vendor"
+            ).standardizedFileURL.path
+        ))
+        XCTAssertFalse(paths.contains {
+            $0.contains("/Vendor/UnrelatedService")
+        })
+        let launchItemID = try XCTUnwrap(
+            result.items.first {
+                $0.url.standardizedFileURL == launchAgentURL.standardizedFileURL
+            }?.id
+        )
+        let launchAssociation = try XCTUnwrap(
+            result.resolutions
+                .flatMap(\.associations)
+                .first { $0.itemID == launchItemID }
+        )
+        XCTAssertEqual(
+            launchAssociation.evidence,
+            .signedHelperRelationship
+        )
+        XCTAssertEqual(launchAssociation.ownership, .owned)
+    }
+
+    func testLaunchItemReaderExtractsProgramAndFirstProgramArgument() throws {
+        let home = try TemporaryTree(files: [:])
+        let plistURL = home.url.appending(
+            path: "Library/LaunchAgents/com.vendor.reader.plist"
+        )
+        let programURL = home.url.appending(
+            path: "Library/Application Support/Vendor/Program"
+        )
+        let firstArgumentURL = home.url.appending(
+            path: "Library/Application Support/Vendor/FirstArgument"
+        )
+        try FileManager.default.createDirectory(
+            at: plistURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let data = try PropertyListSerialization.data(
+            fromPropertyList: [
+                "Program": programURL.path,
+                "ProgramArguments": [
+                    firstArgumentURL.path,
+                    "--ignored"
+                ]
+            ],
+            format: .xml,
+            options: 0
+        )
+        try data.write(to: plistURL)
+
+        let targets = LaunchItemAssociationReader().targetURLs(in: plistURL)
+
+        XCTAssertEqual(
+            targets,
+            [
+                programURL.standardizedFileURL,
+                firstArgumentURL.standardizedFileURL
+            ]
+        )
+    }
+
+    func testEdgeFixtureCoversDeepCategoriesAndSharedAuthenticationGroups() async throws {
+        let fixture = try EdgeAssociationFixture.make()
+
+        let result = try await ApplicationArtifactResolver().resolve(
+            applications: [fixture.application],
+            identities: [fixture.identity],
+            homeDirectory: fixture.tree.url
+        )
+
+        let paths = Set(result.items.map(\.url.path))
+        XCTAssertTrue(paths.contains {
+            $0.hasSuffix("Library/HTTPStorages/com.microsoft.edgemac")
+        })
+        XCTAssertTrue(paths.contains {
+            $0.hasSuffix("Library/WebKit/com.microsoft.edgemac")
+        })
+        XCTAssertTrue(paths.contains {
+            $0.hasSuffix("Library/Application Scripts/com.microsoft.edgemac.wdgExtension")
+        })
+        XCTAssertTrue(paths.contains(fixture.launchAgentURL.path))
+        XCTAssertTrue(paths.contains(fixture.updaterSupportURL.path))
+
+        let itemsByID = Dictionary(
+            uniqueKeysWithValues: result.items.map { ($0.id, $0) }
+        )
+        let ownership = result.resolutions
+            .flatMap(\.associations)
+            .reduce(into: [String: AssociationOwnership]()) {
+                guard let item = itemsByID[$1.itemID] else { return }
+                $0[item.url.lastPathComponent] = $1.ownership
+            }
+        XCTAssertEqual(
+            ownership["UBF8T346G9.com.microsoft.oneauth"],
+            .shared
+        )
+        XCTAssertEqual(
+            ownership["UBF8T346G9.com.microsoft.entrabroker"],
+            .shared
+        )
+    }
+
     private func application(
         id: UUID = UUID(),
         name: String,

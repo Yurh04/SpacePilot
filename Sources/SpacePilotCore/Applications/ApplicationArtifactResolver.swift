@@ -110,6 +110,12 @@ public struct ApplicationArtifactResolver: Sendable {
                 candidatesByPath: &candidatesByPath
             )
         }
+        try discoverLaunchItemAssociations(
+            in: resolvedRoots,
+            applications: applications,
+            identityByApplicationID: identityByApplicationID,
+            candidatesByPath: &candidatesByPath
+        )
 
         var associationsByApplicationID = Dictionary(
             uniqueKeysWithValues: applications.map { ($0.id, [ArtifactAssociation]()) }
@@ -298,6 +304,226 @@ public struct ApplicationArtifactResolver: Sendable {
         }
     }
 
+    private func discoverLaunchItemAssociations(
+        in roots: [ResolvedRoot],
+        applications: [ApplicationRecord],
+        identityByApplicationID: [UUID: ApplicationIdentity],
+        candidatesByPath: inout [String: Candidate]
+    ) throws {
+        let launchItemRoots = roots.filter {
+            $0.rule.relativePath == "Library/LaunchAgents"
+        }
+        let applicationSupportRoots = roots.filter {
+            $0.rule.relativePath == "Library/Application Support"
+        }
+        guard !launchItemRoots.isEmpty, !applicationSupportRoots.isEmpty else {
+            return
+        }
+
+        let normalizedNameCounts = applications.reduce(
+            into: [String: Int]()
+        ) {
+            $0[normalize($1.name), default: 0] += 1
+        }
+        let reader = LaunchItemAssociationReader()
+
+        for launchItemRoot in launchItemRoots {
+            try Task.checkCancellation()
+            guard let children = try? FileManager.default.contentsOfDirectory(
+                at: launchItemRoot.url,
+                includingPropertiesForKeys: [
+                    .isRegularFileKey,
+                    .isSymbolicLinkKey
+                ],
+                options: [.skipsHiddenFiles]
+            ) else {
+                continue
+            }
+
+            for child in children where child.pathExtension == "plist" {
+                try Task.checkCancellation()
+                guard let launchItem = safeNode(
+                    at: child,
+                    strictlyWithin: launchItemRoot.canonicalURL
+                ), !launchItem.isDirectory
+                else {
+                    continue
+                }
+
+                for targetURL in reader.targetURLs(in: launchItem.url) {
+                    try Task.checkCancellation()
+                    guard let supportTarget = supportTarget(
+                        containing: targetURL,
+                        in: applicationSupportRoots
+                    ) else {
+                        continue
+                    }
+                    let matches = applications.compactMap {
+                        application -> (UUID, Match)? in
+                        guard let identity = identityByApplicationID[
+                            application.id
+                        ], let match = launchItemMatch(
+                            targetURL: supportTarget.canonicalTargetURL,
+                            supportRootURL: supportTarget.root.canonicalURL,
+                            application: application,
+                            identity: identity,
+                            normalizedNameCounts: normalizedNameCounts
+                        ) else {
+                            return nil
+                        }
+                        return (application.id, match)
+                    }
+                    guard !matches.isEmpty else { continue }
+
+                    let adjustedMatches: [(UUID, Match)]
+                    if matches.count > 1 {
+                        adjustedMatches = matches.map {
+                            (
+                                $0.0,
+                                Match(
+                                    evidence: $0.1.evidence,
+                                    confidence: $0.1.confidence,
+                                    ownership: .shared,
+                                    explanation: $0.1.explanation
+                                )
+                            )
+                        }
+                    } else {
+                        adjustedMatches = matches
+                    }
+                    merge(
+                        url: launchItem.url,
+                        rule: launchItemRoot.rule,
+                        rootDepth: launchItemRoot.canonicalURL.pathComponents.count,
+                        matches: adjustedMatches,
+                        into: &candidatesByPath
+                    )
+                    merge(
+                        url: supportTarget.directoryURL,
+                        rule: supportTarget.root.rule,
+                        rootDepth: supportTarget.root.canonicalURL.pathComponents.count,
+                        matches: adjustedMatches,
+                        into: &candidatesByPath
+                    )
+                }
+            }
+        }
+    }
+
+    private func supportTarget(
+        containing targetURL: URL,
+        in roots: [ResolvedRoot]
+    ) -> (
+        root: ResolvedRoot,
+        directoryURL: URL,
+        canonicalTargetURL: URL
+    )? {
+        let standardizedTargetURL = targetURL.standardizedFileURL
+        for root in roots {
+            guard isStrictDescendant(
+                standardizedTargetURL,
+                of: root.url.standardizedFileURL
+            ) else {
+                continue
+            }
+            let canonicalTargetURL = standardizedTargetURL
+                .resolvingSymlinksInPath()
+            guard isStrictDescendant(
+                canonicalTargetURL,
+                of: root.canonicalURL
+            ), safeNode(
+                at: standardizedTargetURL,
+                strictlyWithin: root.canonicalURL
+            ) != nil
+            else {
+                continue
+            }
+            let relativeComponents = Array(
+                canonicalTargetURL.pathComponents.dropFirst(
+                    root.canonicalURL.pathComponents.count
+                )
+            )
+            guard !relativeComponents.isEmpty else { continue }
+            let bundleIndex = relativeComponents.firstIndex {
+                URL(fileURLWithPath: $0).pathExtension == "app"
+            }
+            let directoryComponentCount: Int
+            if let bundleIndex {
+                directoryComponentCount = bundleIndex < 2
+                    ? bundleIndex + 1
+                    : bundleIndex
+            } else {
+                directoryComponentCount = min(relativeComponents.count, 2)
+            }
+            let directoryURL = relativeComponents
+                .prefix(directoryComponentCount)
+                .reduce(root.url) {
+                    $0.appending(path: $1, directoryHint: .isDirectory)
+                }
+                .standardizedFileURL
+            guard safeDirectory(
+                at: directoryURL,
+                strictlyWithin: root.canonicalURL
+            ) != nil else {
+                continue
+            }
+            return (root, directoryURL, canonicalTargetURL)
+        }
+        return nil
+    }
+
+    private func launchItemMatch(
+        targetURL: URL,
+        supportRootURL: URL,
+        application: ApplicationRecord,
+        identity: ApplicationIdentity,
+        normalizedNameCounts: [String: Int]
+    ) -> Match? {
+        let relativeComponents = Array(
+            targetURL.pathComponents.dropFirst(
+                supportRootURL.pathComponents.count
+            )
+        )
+        let normalizedComponents = relativeComponents.map(normalize)
+        let normalizedIdentityComponents = relativeComponents.flatMap {
+            [
+                normalize($0),
+                normalize(
+                    URL(fileURLWithPath: $0)
+                        .deletingPathExtension()
+                        .lastPathComponent
+                )
+            ]
+        }
+        let normalizedIdentifiers = Set(
+            identity.allBundleIdentifiers.map(normalize)
+        )
+        if normalizedIdentityComponents.contains(
+            where: normalizedIdentifiers.contains
+        ) {
+            return Match(
+                evidence: .signedHelperRelationship,
+                confidence: .high,
+                ownership: .owned,
+                explanation: "Launch item target matches an application identifier"
+            )
+        }
+
+        let normalizedName = normalize(application.name)
+        guard normalizedNameCounts[normalizedName] == 1,
+              normalizedName.count >= 3,
+              normalizedComponents.joined().contains(normalizedName)
+        else {
+            return nil
+        }
+        return Match(
+            evidence: .signedHelperRelationship,
+            confidence: .medium,
+            ownership: .possible,
+            explanation: "Launch item target matches a unique application name"
+        )
+    }
+
     private func merge(
         url: URL,
         rule: ApplicationArtifactRoot,
@@ -373,7 +599,7 @@ public struct ApplicationArtifactResolver: Sendable {
     }
 
     private func normalize(_ value: String) -> String {
-        value.lowercased().replacingOccurrences(of: " ", with: "")
+        value.lowercased().filter { $0.isLetter || $0.isNumber }
     }
 
     private func sizes(of root: URL) throws -> (
