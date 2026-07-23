@@ -147,9 +147,18 @@ public struct OverviewProjection: Sendable {
                 itemCount: total.itemCount
             ))
         }
+        let categoryOrder = Dictionary(
+            uniqueKeysWithValues: ItemCategory.allCases.enumerated().map { ($1, $0) }
+        )
         categories = try ProjectionCancellationAwareOrdering.sorted(
             categoryValues,
-            by: { $0.allocatedSize > $1.allocatedSize },
+            by: { lhs, rhs in
+                if lhs.allocatedSize != rhs.allocatedSize {
+                    return lhs.allocatedSize > rhs.allocatedSize
+                }
+                return categoryOrder[lhs.category, default: .max]
+                    < categoryOrder[rhs.category, default: .max]
+            },
             checkCancellation: checkCancellation
         )
         // The heap is strictly bounded by recommendationDisplayLimit (8).

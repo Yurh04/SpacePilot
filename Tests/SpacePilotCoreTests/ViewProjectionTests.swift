@@ -139,6 +139,43 @@ final class ViewProjectionTests: XCTestCase {
         XCTAssertLessThanOrEqual(projection.categories.count, ItemCategory.allCases.count)
     }
 
+    func testOverviewOrdersEqualSizedCategoriesByCategoryOrderRegardlessOfItemInputOrder() {
+        let personal = ScannedItem(
+            url: URL(fileURLWithPath: "/Users/test/Documents/archive"),
+            logicalSize: 100,
+            allocatedSize: 100,
+            category: .personal,
+            risk: .sensitive,
+            explanation: "Fixture"
+        )
+        let cache = ScannedItem(
+            url: URL(fileURLWithPath: "/Users/test/Library/Caches/example"),
+            logicalSize: 100,
+            allocatedSize: 100,
+            category: .cache,
+            risk: .safe,
+            explanation: "Fixture"
+        )
+        func snapshot(items: [ScannedItem]) -> ScanSnapshot {
+            ScanSnapshot(
+                completedAt: .now,
+                volume: nil,
+                items: items,
+                applications: [],
+                aiApplications: [],
+                plugins: [],
+                skills: [],
+                coverage: .complete
+            )
+        }
+
+        let forward = OverviewProjection(snapshot: snapshot(items: [personal, cache]))
+        let reversed = OverviewProjection(snapshot: snapshot(items: [cache, personal]))
+
+        XCTAssertEqual(forward.categories.map(\.category), [.personal, .cache])
+        XCTAssertEqual(reversed.categories.map(\.category), forward.categories.map(\.category))
+    }
+
     func testOverviewFallsBackToAnalyzedDiskMetricsWithoutVolumeMetadata() {
         let item = ScannedItem.fixture(allocatedSize: 200)
         let application = ApplicationRecord(
