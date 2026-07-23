@@ -397,7 +397,7 @@ public struct ApplicationArtifactResolver: Sendable {
         guard let enumerator = FileManager.default.enumerator(
             at: root,
             includingPropertiesForKeys: Array(keys),
-            options: [.skipsHiddenFiles]
+            options: []
         ) else {
             return (0, 0)
         }

@@ -55,7 +55,9 @@ final class ScanCoordinatorTests: XCTestCase {
     func testSnapshotKeepsOneSharedItemWithAssociationsForBothApplications() async throws {
         let home = try TemporaryTree(files: [
             "Library/Group Containers/TEAM.shared/token.db": 64,
-            "Library/Application Support/com.openai.chat/state.db": 32
+            "Library/Group Containers/TEAM.shared/.hidden-token.db": 17,
+            "Library/Application Support/com.openai.chat/state.db": 32,
+            "Library/Application Support/com.openai.chat/.hidden-state.db": 19
         ])
         let applicationsDirectory = home.url.appending(
             path: "Applications",
@@ -160,6 +162,23 @@ final class ScanCoordinatorTests: XCTestCase {
 
         let aggregateBytes = try XCTUnwrap(sharedItems.first).allocatedSize
             + chatGPTItem.allocatedSize
+        let expectedAggregateBytes = try [
+            "Library/Group Containers/TEAM.shared/token.db",
+            "Library/Group Containers/TEAM.shared/.hidden-token.db",
+            "Library/Application Support/com.openai.chat/state.db",
+            "Library/Application Support/com.openai.chat/.hidden-state.db"
+        ].reduce(Int64(0)) { total, relativePath in
+            let values = try home.url.appending(
+                path: relativePath
+            ).resourceValues(forKeys: [.totalFileAllocatedSizeKey])
+            return total + Int64(values.totalFileAllocatedSize ?? 0)
+        }
+        XCTAssertEqual(
+            try XCTUnwrap(sharedItems.first).logicalSize,
+            81
+        )
+        XCTAssertEqual(chatGPTItem.logicalSize, 51)
+        XCTAssertEqual(aggregateBytes, expectedAggregateBytes)
         let applicationBytes = snapshot.applications.reduce(Int64(0)) {
             $0 + $1.allocatedSize
         }
