@@ -115,14 +115,19 @@ final class AppModel {
         prepareCleanup(items: items)
     }
 
-    func executePreparedCleanup(confirmSensitive: Bool) {
+    func executePreparedCleanup(selectedIDs: Set<UUID>, confirmSensitive: Bool) {
         guard let runtime, let snapshot = latestSnapshot, !isCleaning else { return }
+        let candidateIDs = Set(cleanupCandidates.map(\.id))
+        let eligibleSelectedIDs = selectedIDs.intersection(candidateIDs)
+        guard !eligibleSelectedIDs.isEmpty else { return }
         isCleaning = true
         errorMessage = nil
         cleanupTask = Task {
             do {
                 let sensitiveIDs = confirmSensitive
-                    ? Set(cleanupCandidates.filter { $0.risk == .sensitive }.map(\.id))
+                    ? Set(cleanupCandidates.filter {
+                        eligibleSelectedIDs.contains($0.id) && $0.risk == .sensitive
+                    }.map(\.id))
                     : []
                 let policy = PathSafetyPolicy(
                     homeDirectory: runtime.homeDirectory,
@@ -131,7 +136,7 @@ final class AppModel {
                 let plan = try CleanupPlanner(policy: policy).makePlan(
                     snapshotID: snapshot.id,
                     items: cleanupCandidates,
-                    selectedIDs: Set(cleanupCandidates.map(\.id)),
+                    selectedIDs: eligibleSelectedIDs,
                     separatelyConfirmedSensitiveIDs: sensitiveIDs
                 )
                 let transaction = try await CleanupExecutor(
