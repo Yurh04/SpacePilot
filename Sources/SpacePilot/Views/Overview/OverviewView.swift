@@ -12,7 +12,30 @@ struct OverviewView: View {
             if let projection {
                 List {
                     Section {
-                        LabeledContent(L10n.text(.overviewInternalDiskUsed), value: ByteCount.string(projection.totalUsedBytes))
+                        ViewThatFits(in: .horizontal) {
+                            HStack(alignment: .top, spacing: 24) {
+                                DiskCapacityChart(
+                                    usedBytes: projection.totalUsedBytes,
+                                    availableBytes: projection.availableBytes,
+                                    totalCapacityBytes: projection.totalCapacityBytes
+                                )
+                                .frame(maxWidth: .infinity)
+
+                                AnalyzedCategoryChart(categories: projection.categories)
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .frame(minWidth: 900)
+
+                            VStack(alignment: .leading, spacing: 24) {
+                                DiskCapacityChart(
+                                    usedBytes: projection.totalUsedBytes,
+                                    availableBytes: projection.availableBytes,
+                                    totalCapacityBytes: projection.totalCapacityBytes
+                                )
+
+                                AnalyzedCategoryChart(categories: projection.categories)
+                            }
+                        }
                         LabeledContent(L10n.text(.overviewAnalyzedLocally), value: ByteCount.string(projection.analyzedBytes))
                         LabeledContent(L10n.text(.overviewSafeRecommendations), value: ByteCount.string(projection.reclaimableBytes))
                     } header: {

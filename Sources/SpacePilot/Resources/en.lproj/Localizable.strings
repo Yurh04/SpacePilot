@@ -99,7 +99,13 @@
 "error.quit-before-uninstall" = "Quit %@ before uninstalling it.";
 "error.reset-unavailable" = "No high-confidence settings or caches are available to reset for %@.";
 "overview.analyze-mac" = "Analyze this Mac";
+"overview.analyzed-categories-chart" = "Locally analyzed categories";
+"overview.analyzed-categories-description" = "These bars cover locally analyzed data, not the whole disk.";
 "overview.analyzed-locally" = "Analyzed locally";
+"overview.disk-available" = "Available";
+"overview.disk-capacity-chart" = "Internal disk capacity";
+"overview.disk-total" = "Total capacity";
+"overview.disk-used" = "Used";
 "overview.internal-disk-used" = "Internal disk used";
 "overview.limited-coverage" = "Limited coverage";
 "overview.limited-coverage-description" = "Some folders could not be read. Results show only verified data.";

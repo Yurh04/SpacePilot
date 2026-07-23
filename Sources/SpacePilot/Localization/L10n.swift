@@ -46,7 +46,13 @@ enum L10n {
         static let skill = Self(key: "common.skill", english: "Skill")
         static let source = Self(key: "common.source", english: "Source")
         static let overviewAnalyzeMac = Self(key: "overview.analyze-mac", english: "Analyze this Mac")
+        static let overviewAnalyzedCategoriesChart = Self(key: "overview.analyzed-categories-chart", english: "Locally analyzed categories")
+        static let overviewAnalyzedCategoriesDescription = Self(key: "overview.analyzed-categories-description", english: "These bars cover locally analyzed data, not the whole disk.")
         static let overviewAnalyzedLocally = Self(key: "overview.analyzed-locally", english: "Analyzed locally")
+        static let overviewDiskAvailable = Self(key: "overview.disk-available", english: "Available")
+        static let overviewDiskCapacityChart = Self(key: "overview.disk-capacity-chart", english: "Internal disk capacity")
+        static let overviewDiskTotal = Self(key: "overview.disk-total", english: "Total capacity")
+        static let overviewDiskUsed = Self(key: "overview.disk-used", english: "Used")
         static let overviewInternalDiskUsed = Self(key: "overview.internal-disk-used", english: "Internal disk used")
         static let overviewLimitedCoverage = Self(key: "overview.limited-coverage", english: "Limited coverage")
         static let overviewLimitedCoverageDescription = Self(key: "overview.limited-coverage-description", english: "Some folders could not be read. Results show only verified data.")
@@ -111,7 +117,9 @@ enum L10n {
         "common.plugin", "common.related", "common.reveal-finder", "common.search-current",
         "common.skill", "common.source", "confidence.high", "confidence.low", "confidence.medium",
         "error.quit-before-uninstall", "error.reset-unavailable", "overview.analyze-mac",
-        "overview.analyzed-locally", "overview.internal-disk-used", "overview.limited-coverage",
+        "overview.analyzed-categories-chart", "overview.analyzed-categories-description",
+        "overview.analyzed-locally", "overview.disk-available", "overview.disk-capacity-chart",
+        "overview.disk-total", "overview.disk-used", "overview.internal-disk-used", "overview.limited-coverage",
         "overview.limited-coverage-description", "overview.no-recommendations", "overview.review-cleanup",
         "overview.safe-recommendations", "overview.start-scan", "overview.storage-glance",
         "overview.works-locally", "plugins.diagnostic-empty-skill", "plugins.diagnostic-generic",

@@ -1,6 +1,102 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "overview.analyzed-categories-chart": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Locally analyzed categories"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本地已分析类别"
+          }
+        }
+      }
+    },
+    "overview.analyzed-categories-description": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "These bars cover locally analyzed data, not the whole disk."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这些条形图涵盖本地已分析的数据，而不是整个磁盘。"
+          }
+        }
+      }
+    },
+    "overview.disk-available": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Available"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可用"
+          }
+        }
+      }
+    },
+    "overview.disk-capacity-chart": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Internal disk capacity"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "内置磁盘容量"
+          }
+        }
+      }
+    },
+    "overview.disk-total": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Total capacity"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "总容量"
+          }
+        }
+      }
+    },
+    "overview.disk-used": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Used"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已使用"
+          }
+        }
+      }
+    },
     "cleanup.clear-selection": {
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Clear" } },

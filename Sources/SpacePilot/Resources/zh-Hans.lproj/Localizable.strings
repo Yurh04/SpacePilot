@@ -99,7 +99,13 @@
 "error.quit-before-uninstall" = "卸载 %@ 前请先退出该应用。";
 "error.reset-unavailable" = "没有可用于重置 %@ 的高置信度设置或缓存。";
 "overview.analyze-mac" = "分析这台 Mac";
+"overview.analyzed-categories-chart" = "本地已分析类别";
+"overview.analyzed-categories-description" = "这些条形图涵盖本地已分析的数据，而不是整个磁盘。";
 "overview.analyzed-locally" = "本地已分析";
+"overview.disk-available" = "可用";
+"overview.disk-capacity-chart" = "内置磁盘容量";
+"overview.disk-total" = "总容量";
+"overview.disk-used" = "已使用";
 "overview.internal-disk-used" = "内置磁盘已使用";
 "overview.limited-coverage" = "覆盖范围有限";
 "overview.limited-coverage-description" = "部分文件夹无法读取。结果仅显示已验证的数据。";

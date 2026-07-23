@@ -184,6 +184,26 @@ final class LocalizationTests: XCTestCase {
         XCTAssertEqual(L10n.visibleItems(5, locale: chinese), "显示 5 项")
     }
 
+    func testOverviewChartTitlesAndCoverageExplanationUseBothLanguages() throws {
+        let resources = repositoryRoot.appending(path: "Sources/SpacePilot/Resources")
+        let english = try stringsTable(at: resources.appending(path: "en.lproj/Localizable.strings"))
+        let chinese = try stringsTable(at: resources.appending(path: "zh-Hans.lproj/Localizable.strings"))
+        let expected: [String: (String, String)] = [
+            "overview.disk-capacity-chart": ("Internal disk capacity", "内置磁盘容量"),
+            "overview.analyzed-categories-chart": ("Locally analyzed categories", "本地已分析类别"),
+            "overview.analyzed-categories-description": (
+                "These bars cover locally analyzed data, not the whole disk.",
+                "这些条形图涵盖本地已分析的数据，而不是整个磁盘。"
+            )
+        ]
+
+        for (key, values) in expected {
+            XCTAssertEqual(english[key], values.0, key)
+            XCTAssertEqual(chinese[key], values.1, key)
+            XCTAssertTrue(L10n.allKeys.contains(key), key)
+        }
+    }
+
     func testPluginDiagnosticsAreSpecificLocalizedAndSanitizedForPresentation() {
         let privatePath = "/Users/private/.codex/plugins/cache/source/plugin/1.0.0"
         let diagnostics = [
@@ -242,7 +262,7 @@ final class LocalizationTests: XCTestCase {
         let english = try stringsTable(at: resources.appending(path: "en.lproj/Localizable.strings"))
         let chinese = try stringsTable(at: resources.appending(path: "zh-Hans.lproj/Localizable.strings"))
 
-        XCTAssertEqual(L10n.allKeys.count, 186)
+        XCTAssertEqual(L10n.allKeys.count, 192)
         XCTAssertEqual(Set(catalogStrings.keys), L10n.allKeys)
         XCTAssertEqual(Set(english.keys), L10n.allKeys)
         XCTAssertEqual(Set(chinese.keys), L10n.allKeys)
