@@ -29,7 +29,7 @@ final class AppModel {
     var isScanning = false
     var isCleaning = false
     var showingCleanupConfirmation = false
-    var cleanupCandidates: [ScannedItem] = []
+    var cleanupCandidates: [CleanupReviewItem] = []
     var latestCleanupTransaction: CleanupTransaction?
     var cleanupHistory: [CleanupTransaction] = []
 
@@ -89,7 +89,16 @@ final class AppModel {
     }
 
     func prepareCleanup(items: [ScannedItem]) {
-        let eligible = items.filter { $0.risk != .managed }
+        let eligible = items
+            .filter { $0.risk != .managed }
+            .map {
+                CleanupReviewItem(item: $0, ownership: .owned, evidence: nil)
+            }
+        prepareCleanup(reviewItems: eligible)
+    }
+
+    private func prepareCleanup(reviewItems: [CleanupReviewItem]) {
+        let eligible = reviewItems.filter { $0.item.risk != .managed }
         guard !eligible.isEmpty else { return }
         cleanupCandidates = eligible
         latestCleanupTransaction = nil
@@ -103,7 +112,9 @@ final class AppModel {
             errorMessage = L10n.quitBeforeUninstall(record.name)
             return
         }
-        prepareCleanup(items: ApplicationUninstallPlanner().cleanupItems(for: application))
+        prepareCleanup(
+            reviewItems: ApplicationUninstallPlanner().cleanupItems(for: application)
+        )
     }
 
     func prepareReset(application: ApplicationProjection) {
@@ -117,7 +128,8 @@ final class AppModel {
 
     func executePreparedCleanup(selectedIDs: Set<UUID>, confirmSensitive: Bool) {
         guard let runtime, let snapshot = latestSnapshot, !isCleaning else { return }
-        let candidateIDs = Set(cleanupCandidates.map(\.id))
+        let candidateItems = cleanupCandidates.map(\.item)
+        let candidateIDs = Set(candidateItems.map(\.id))
         let eligibleSelectedIDs = selectedIDs.intersection(candidateIDs)
         guard !eligibleSelectedIDs.isEmpty else { return }
         isCleaning = true
@@ -125,7 +137,7 @@ final class AppModel {
         cleanupTask = Task {
             do {
                 let sensitiveIDs = confirmSensitive
-                    ? Set(cleanupCandidates.filter {
+                    ? Set(candidateItems.filter {
                         eligibleSelectedIDs.contains($0.id) && $0.risk == .sensitive
                     }.map(\.id))
                     : []
@@ -135,7 +147,7 @@ final class AppModel {
                 )
                 let plan = try CleanupPlanner(policy: policy).makePlan(
                     snapshotID: snapshot.id,
-                    items: cleanupCandidates,
+                    items: candidateItems,
                     selectedIDs: eligibleSelectedIDs,
                     separatelyConfirmedSensitiveIDs: sensitiveIDs
                 )

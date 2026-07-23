@@ -11,7 +11,10 @@ final class CleanupSelectionTests: XCTestCase {
             risk: .sensitive,
             allocatedSize: 300
         )
-        var selection = CleanupSelection(items: [safe, sensitive])
+        var selection = CleanupSelection(items: [
+            reviewItem(safe),
+            reviewItem(sensitive)
+        ])
 
         XCTAssertTrue(selection.selectedIDs.isEmpty)
         XCTAssertEqual(selection.selectedBytes, 0)
@@ -19,7 +22,7 @@ final class CleanupSelectionTests: XCTestCase {
 
         selection.toggle(sensitive.id)
 
-        XCTAssertEqual(selection.selectedItems.map(\.id), [sensitive.id])
+        XCTAssertEqual(selection.selectedItems.map(\.item.id), [sensitive.id])
         XCTAssertEqual(selection.selectedBytes, 300)
         XCTAssertTrue(selection.hasSelectedSensitiveItems)
     }
@@ -29,7 +32,7 @@ final class CleanupSelectionTests: XCTestCase {
             item(path: "/tmp/one"),
             item(path: "/tmp/two")
         ]
-        var selection = CleanupSelection(items: items)
+        var selection = CleanupSelection(items: items.map { reviewItem($0) })
 
         selection.selectAll()
         XCTAssertEqual(selection.selectedIDs, Set(items.map(\.id)))
@@ -40,11 +43,35 @@ final class CleanupSelectionTests: XCTestCase {
 
     func testToggleIgnoresUnknownIdentifiers() {
         let candidate = item(path: "/tmp/candidate")
-        var selection = CleanupSelection(items: [candidate])
+        var selection = CleanupSelection(items: [reviewItem(candidate)])
 
         selection.toggle(UUID())
 
         XCTAssertTrue(selection.selectedIDs.isEmpty)
+    }
+
+    func testSelectAllIncludesOnlyOwnedReviewItems() {
+        var selection = CleanupSelection(items: [
+            reviewItem(item(path: "/tmp/owned"), ownership: .owned),
+            reviewItem(item(path: "/tmp/shared"), ownership: .shared),
+            reviewItem(item(path: "/tmp/possible"), ownership: .possible)
+        ])
+
+        selection.selectAll()
+
+        XCTAssertEqual(selection.selectedIDs, [selection.items[0].id])
+    }
+
+    func testSelectAllPreservesManuallySelectedSharedReviewItems() {
+        var selection = CleanupSelection(items: [
+            reviewItem(item(path: "/tmp/owned"), ownership: .owned),
+            reviewItem(item(path: "/tmp/shared"), ownership: .shared)
+        ])
+        selection.toggle(selection.items[1].id)
+
+        selection.selectAll()
+
+        XCTAssertEqual(selection.selectedIDs, Set(selection.items.map(\.id)))
     }
 
     private func item(
@@ -60,5 +87,12 @@ final class CleanupSelectionTests: XCTestCase {
             risk: risk,
             explanation: "Fixture"
         )
+    }
+
+    private func reviewItem(
+        _ item: ScannedItem,
+        ownership: AssociationOwnership = .owned
+    ) -> CleanupReviewItem {
+        CleanupReviewItem(item: item, ownership: ownership, evidence: nil)
     }
 }

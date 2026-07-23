@@ -2,7 +2,7 @@ import SpacePilotCore
 import SwiftUI
 
 struct CleanupConfirmationView: View {
-    let items: [ScannedItem]
+    let items: [CleanupReviewItem]
     let isExecuting: Bool
     let onConfirm: (Set<UUID>, Bool) -> Void
     let onCancel: () -> Void
@@ -11,7 +11,7 @@ struct CleanupConfirmationView: View {
     @State private var confirmsSensitive = false
 
     init(
-        items: [ScannedItem],
+        items: [CleanupReviewItem],
         isExecuting: Bool,
         onConfirm: @escaping (Set<UUID>, Bool) -> Void,
         onCancel: @escaping () -> Void
@@ -39,15 +39,16 @@ struct CleanupConfirmationView: View {
                 Button(L10n.text(.cleanupSelectAll)) {
                     selection.selectAll()
                 }
-                .disabled(isExecuting || selection.selectedIDs.count == items.count)
+                .disabled(isExecuting || !selection.hasUnselectedSelectAllItems)
                 Button(L10n.text(.cleanupClearSelection)) {
                     selection.clear()
                 }
                 .disabled(isExecuting || selection.selectedIDs.isEmpty)
             }
 
-            List(items) { item in
-                Toggle(isOn: binding(for: item)) {
+            List(items) { reviewItem in
+                let item = reviewItem.item
+                Toggle(isOn: binding(for: reviewItem)) {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text(item.url.lastPathComponent).fontWeight(.medium)
@@ -61,6 +62,11 @@ struct CleanupConfirmationView: View {
                         Text(verbatim: "\(L10n.name(for: item.risk)) · \(L10n.explanation(item.explanation))")
                             .font(.caption)
                             .foregroundStyle(item.risk == .sensitive ? .orange : .secondary)
+                        if let evidence = reviewItem.evidence {
+                            Text(verbatim: "\(reviewItem.ownership.rawValue.capitalized) · \(L10n.name(for: evidence))")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
                 .toggleStyle(.checkbox)
@@ -107,7 +113,7 @@ struct CleanupConfirmationView: View {
         selection.hasSelectedSensitiveItems
     }
 
-    private func binding(for item: ScannedItem) -> Binding<Bool> {
+    private func binding(for item: CleanupReviewItem) -> Binding<Bool> {
         Binding(
             get: { selection.selectedIDs.contains(item.id) },
             set: { isSelected in

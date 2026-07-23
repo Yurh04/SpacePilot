@@ -2,7 +2,7 @@ import XCTest
 @testable import SpacePilotCore
 
 final class ApplicationUninstallPlannerTests: XCTestCase {
-    func testCleanupUsesOnlyHighConfidenceProjectedAssociationsAndExcludesManagedItems() {
+    func testCleanupReviewsBundleAndEveryNonManagedProjectedAssociationIndependently() {
         let appID = UUID()
         let small = ScannedItem.fixture(id: UUID(), path: "/Users/test/Library/Caches/com.example.app", risk: .safe, allocatedSize: 20)
         let large = ScannedItem.fixture(id: UUID(), path: "/Users/test/Library/Logs/com.example.app", risk: .rebuildable, allocatedSize: 80)
@@ -39,13 +39,20 @@ final class ApplicationUninstallPlannerTests: XCTestCase {
 
         let cleanup = ApplicationUninstallPlanner().cleanupItems(for: projection)
 
-        XCTAssertEqual(cleanup.dropFirst().map(\.id), [large.id, small.id])
-        XCTAssertFalse(cleanup.contains { $0.id == managed.id || $0.id == medium.id || $0.id == unprojected.id })
-        XCTAssertEqual(cleanup.first?.url, app.url)
-        XCTAssertEqual(cleanup.first?.allocatedSize, app.allocatedSize)
-        XCTAssertEqual(cleanup.first?.category, .application)
-        XCTAssertEqual(cleanup.first?.risk, .rebuildable)
-        XCTAssertEqual(cleanup.first?.ownerID, app.id)
+        XCTAssertEqual(cleanup.dropFirst().map(\.item.id), [medium.id, large.id, small.id])
+        XCTAssertFalse(cleanup.contains { $0.item.id == managed.id || $0.item.id == unprojected.id })
+        XCTAssertEqual(cleanup.first?.item.url, app.url)
+        XCTAssertEqual(cleanup.first?.item.allocatedSize, app.allocatedSize)
+        XCTAssertEqual(cleanup.first?.item.category, .application)
+        XCTAssertEqual(cleanup.first?.item.risk, .rebuildable)
+        XCTAssertEqual(cleanup.first?.item.ownerID, app.id)
+        XCTAssertEqual(cleanup.first?.ownership, .owned)
+        XCTAssertNil(cleanup.first?.evidence)
+        XCTAssertEqual(cleanup.dropFirst().map(\.ownership), [.possible, .owned, .owned])
+        XCTAssertEqual(
+            cleanup.dropFirst().map(\.evidence),
+            [.vendorAndNameMatch, .exactBundleIdentifier, .exactBundleIdentifier]
+        )
     }
 
     func testResetUsesOnlyHighConfidenceSafeProjectedAssociationsSortedBySize() {
@@ -55,12 +62,14 @@ final class ApplicationUninstallPlannerTests: XCTestCase {
         let sensitive = ScannedItem.fixture(id: UUID(), path: "/Users/test/Library/Containers/com.example.app", risk: .sensitive, allocatedSize: 100)
         let managed = ScannedItem.fixture(id: UUID(), path: "/Users/test/Library/Managed/com.example.app", risk: .managed, allocatedSize: 200)
         let medium = ScannedItem.fixture(id: UUID(), path: "/Users/test/Library/Application Support/Example", risk: .rebuildable, allocatedSize: 300)
+        let shared = ScannedItem.fixture(id: UUID(), path: "/Users/test/Library/LaunchAgents/com.example.shared.plist", risk: .rebuildable, allocatedSize: 400)
         let associations = [
             ArtifactAssociation(itemID: small.id, applicationID: appID, evidence: .exactBundleIdentifier, confidence: .high, risk: .safe, ownership: .owned),
             ArtifactAssociation(itemID: large.id, applicationID: appID, evidence: .exactBundleIdentifier, confidence: .high, risk: .rebuildable, ownership: .owned),
             ArtifactAssociation(itemID: sensitive.id, applicationID: appID, evidence: .exactContainerIdentifier, confidence: .high, risk: .sensitive, ownership: .owned),
             ArtifactAssociation(itemID: managed.id, applicationID: appID, evidence: .exactBundleIdentifier, confidence: .high, risk: .managed, ownership: .owned),
-            ArtifactAssociation(itemID: medium.id, applicationID: appID, evidence: .vendorAndNameMatch, confidence: .medium, risk: .rebuildable, ownership: .possible)
+            ArtifactAssociation(itemID: medium.id, applicationID: appID, evidence: .vendorAndNameMatch, confidence: .high, risk: .rebuildable, ownership: .possible),
+            ArtifactAssociation(itemID: shared.id, applicationID: appID, evidence: .knownRule, confidence: .high, risk: .rebuildable, ownership: .shared)
         ]
         let app = ApplicationRecord(
             id: appID,
@@ -74,8 +83,8 @@ final class ApplicationUninstallPlannerTests: XCTestCase {
         )
         let projection = ApplicationProjection(
             application: app,
-            totalSize: 700,
-            associations: zip(associations, [small, large, sensitive, managed, medium]).map {
+            totalSize: 1_100,
+            associations: zip(associations, [small, large, sensitive, managed, medium, shared]).map {
                 ApplicationAssociationProjection(association: $0, item: $1)
             }
         )
@@ -130,7 +139,7 @@ final class ApplicationUninstallPlannerTests: XCTestCase {
 
         let cleanup = ApplicationUninstallPlanner().cleanupItems(for: projection)
 
-        XCTAssertEqual(cleanup.filter { $0.id == item.id }.count, 1)
+        XCTAssertEqual(cleanup.filter { $0.item.id == item.id }.count, 1)
     }
 
     func testPlannerSourceHasNoSnapshotAPIOrFullItemTraversal() throws {

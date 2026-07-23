@@ -2,19 +2,25 @@ import Foundation
 import SpacePilotCore
 
 struct CleanupSelection {
-    let items: [ScannedItem]
+    let items: [CleanupReviewItem]
     private(set) var selectedIDs: Set<UUID> = []
 
-    var selectedItems: [ScannedItem] {
+    var selectedItems: [CleanupReviewItem] {
         items.filter { selectedIDs.contains($0.id) }
     }
 
     var selectedBytes: Int64 {
-        selectedItems.reduce(0) { $0 + $1.allocatedSize }
+        selectedItems.reduce(0) { $0 + $1.item.allocatedSize }
     }
 
     var hasSelectedSensitiveItems: Bool {
-        selectedItems.contains { $0.risk == .sensitive }
+        selectedItems.contains { $0.item.risk == .sensitive }
+    }
+
+    var hasUnselectedSelectAllItems: Bool {
+        items.contains {
+            $0.isIncludedBySelectAll && !selectedIDs.contains($0.id)
+        }
     }
 
     mutating func toggle(_ id: UUID) {
@@ -25,7 +31,7 @@ struct CleanupSelection {
     }
 
     mutating func selectAll() {
-        selectedIDs = Set(items.map(\.id))
+        selectedIDs.formUnion(items.filter(\.isIncludedBySelectAll).map(\.id))
     }
 
     mutating func clear() {

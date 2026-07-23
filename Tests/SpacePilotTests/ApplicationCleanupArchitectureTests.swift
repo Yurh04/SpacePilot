@@ -56,6 +56,18 @@ final class ApplicationCleanupArchitectureTests: XCTestCase {
         )
     }
 
+    func testAppModelAdaptsReviewRowsWithoutBroadeningCleanupPlannerSelection() throws {
+        let source = try source(at: "Sources/SpacePilot/App/AppModel.swift")
+
+        XCTAssertTrue(source.contains("var cleanupCandidates: [CleanupReviewItem] = []"))
+        XCTAssertTrue(source.contains(
+            "CleanupReviewItem(item: $0, ownership: .owned, evidence: nil)"
+        ))
+        XCTAssertTrue(source.contains("let candidateItems = cleanupCandidates.map(\\.item)"))
+        XCTAssertTrue(source.contains("items: candidateItems"))
+        XCTAssertTrue(source.contains("selectedIDs: eligibleSelectedIDs"))
+    }
+
     private func assertNoFullSnapshotTraversal(
         in body: String,
         handler: String,
