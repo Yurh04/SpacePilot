@@ -88,35 +88,28 @@ public struct CleanupExecutor<Mover: TrashMoving>: CleanupExecuting {
     private func identityStillMatches(_ candidate: CleanupCandidate, at url: URL) -> Bool {
         guard let values = try? url.resourceValues(forKeys: [
             .isDirectoryKey,
+            .isRegularFileKey,
             .totalFileAllocatedSizeKey,
             .contentModificationDateKey,
             .fileResourceIdentifierKey
         ]) else { return false }
-        let currentAllocatedSize = values.isDirectory == true
-            ? recursiveAllocatedSize(of: url)
-            : Int64(values.totalFileAllocatedSize ?? 0)
-        if candidate.allocatedSize != currentAllocatedSize { return false }
+        let actualIdentifier = values.fileResourceIdentifier.map { String(describing: $0) }
         if let expected = candidate.expectedResourceIdentifier,
-           expected != values.fileResourceIdentifier.map({ String(describing: $0) }) { return false }
-        if let expected = candidate.expectedModificationDate {
-            guard let actual = values.contentModificationDate,
-                  abs(actual.timeIntervalSince(expected)) < 0.001 else { return false }
-        }
-        return true
-    }
+           expected != actualIdentifier { return false }
 
-    private func recursiveAllocatedSize(of root: URL) -> Int64 {
-        guard let enumerator = FileManager.default.enumerator(
-            at: root,
-            includingPropertiesForKeys: [.isRegularFileKey, .totalFileAllocatedSizeKey],
-            options: [.skipsPackageDescendants]
-        ) else { return 0 }
-        var total: Int64 = 0
-        for case let url as URL in enumerator {
-            guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .totalFileAllocatedSizeKey]),
-                  values.isRegularFile == true else { continue }
-            total += Int64(values.totalFileAllocatedSize ?? 0)
+        switch candidate.itemKind {
+        case .directory:
+            return values.isDirectory == true
+        case .regularFile:
+            guard values.isRegularFile == true,
+                  candidate.allocatedSize == Int64(values.totalFileAllocatedSize ?? 0)
+            else { return false }
+            if let expected = candidate.expectedModificationDate {
+                guard let actual = values.contentModificationDate,
+                      abs(actual.timeIntervalSince(expected)) < 0.001
+                else { return false }
+            }
+            return true
         }
-        return total
     }
 }

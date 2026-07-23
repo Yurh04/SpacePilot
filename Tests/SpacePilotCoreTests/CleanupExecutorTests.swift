@@ -81,31 +81,48 @@ final class CleanupExecutorTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
     }
 
-    func testDirectoryCandidateRevalidatesRecursiveAllocatedSize() async throws {
-        let tree = try TemporaryTree(files: [
-            "Library/Caches/app/one.bin": 16,
-            "Library/Caches/app/nested/two.bin": 16
-        ])
-        let directory = tree.url.appending(path: "Library/Caches/app")
-        let values = try directory.resourceValues(forKeys: [.contentModificationDateKey, .fileResourceIdentifierKey])
-        let candidate = CleanupCandidate(
-            itemID: UUID(),
+    func testDirectoryWithChangedContentsStillMovesWhenRootIdentityMatches() async throws {
+        let tree = try TemporaryTree(files: ["Library/Caches/live/old.bin": 16])
+        let directory = tree.url.appending(path: "Library/Caches/live")
+        let policy = PathSafetyPolicy(homeDirectory: tree.url, allowedVolumeRoot: tree.url)
+        let item = ScannedItem(
             url: directory,
-            allocatedSize: recursiveAllocatedSize(directory),
+            logicalSize: 16,
+            allocatedSize: 16,
+            category: .cache,
             risk: .safe,
-            expectedResourceIdentifier: values.fileResourceIdentifier.map { String(describing: $0) },
-            expectedModificationDate: values.contentModificationDate,
-            explanation: "Directory cache"
+            explanation: "Live cache"
         )
+        let candidate = try CleanupCandidateRefresher().refresh(item: item, policy: policy)
+        try Data(repeating: 2, count: 512).write(to: directory.appending(path: "new.bin"))
         let mover = try FixtureTrashMover(destination: tree.url.appending(path: "FixtureTrash"))
-        let executor = CleanupExecutor(
-            policy: PathSafetyPolicy(homeDirectory: tree.url, allowedVolumeRoot: tree.url),
-            mover: mover
-        )
 
-        let result = try await executor.execute(plan: CleanupPlan(snapshotID: UUID(), candidates: [candidate]))
+        let result = try await CleanupExecutor(policy: policy, mover: mover)
+            .execute(plan: CleanupPlan(snapshotID: UUID(), candidates: [candidate]))
 
         XCTAssertEqual(result.outcomes.first?.status, .movedToTrash)
+    }
+
+    func testReplacedDirectoryIsSkipped() async throws {
+        let tree = try TemporaryTree(files: ["Library/Caches/live/old.bin": 16])
+        let directory = tree.url.appending(path: "Library/Caches/live")
+        let policy = PathSafetyPolicy(homeDirectory: tree.url, allowedVolumeRoot: tree.url)
+        let item = ScannedItem(
+            url: directory,
+            logicalSize: 16,
+            allocatedSize: 16,
+            category: .cache,
+            risk: .safe,
+            explanation: "Live cache"
+        )
+        let candidate = try CleanupCandidateRefresher().refresh(item: item, policy: policy)
+        try FileManager.default.removeItem(at: directory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        let result = try await CleanupExecutor(policy: policy, mover: RecordingTrashMover())
+            .execute(plan: CleanupPlan(snapshotID: UUID(), candidates: [candidate]))
+
+        XCTAssertEqual(result.outcomes.first?.status, .skippedChanged)
     }
 
     private func candidate(for url: URL, expectedModificationDate: Date? = nil) -> CleanupCandidate {
@@ -119,19 +136,5 @@ final class CleanupExecutorTests: XCTestCase {
             expectedModificationDate: expectedModificationDate ?? values?.contentModificationDate,
             explanation: "Test cache"
         )
-    }
-
-    private func recursiveAllocatedSize(_ root: URL) -> Int64 {
-        guard let enumerator = FileManager.default.enumerator(
-            at: root,
-            includingPropertiesForKeys: [.isRegularFileKey, .totalFileAllocatedSizeKey]
-        ) else { return 0 }
-        var total: Int64 = 0
-        for case let url as URL in enumerator {
-            guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .totalFileAllocatedSizeKey]),
-                  values.isRegularFile == true else { continue }
-            total += Int64(values.totalFileAllocatedSize ?? 0)
-        }
-        return total
     }
 }
