@@ -5,17 +5,43 @@ public struct CleanupReviewItem: Identifiable, Sendable {
     public let item: ScannedItem
     public let ownership: AssociationOwnership
     public let evidence: AssociationEvidence?
+    public let effectiveRisk: RiskLevel
 
-    public var isIncludedBySelectAll: Bool { ownership == .owned }
+    public var isIncludedBySelectAll: Bool {
+        ownership == .owned && effectiveRisk != .managed
+    }
 
     public init(
         item: ScannedItem,
         ownership: AssociationOwnership,
-        evidence: AssociationEvidence?
+        evidence: AssociationEvidence?,
+        effectiveRisk: RiskLevel? = nil
     ) {
-        self.item = item
+        let risk = max(item.risk, effectiveRisk ?? item.risk)
+        self.item = Self.copy(item, replacingRiskWith: risk)
         self.ownership = ownership
         self.evidence = evidence
+        self.effectiveRisk = risk
+    }
+
+    private static func copy(
+        _ item: ScannedItem,
+        replacingRiskWith risk: RiskLevel
+    ) -> ScannedItem {
+        guard item.risk != risk else { return item }
+        return ScannedItem(
+            id: item.id,
+            url: item.url,
+            logicalSize: item.logicalSize,
+            allocatedSize: item.allocatedSize,
+            creationDate: item.creationDate,
+            modificationDate: item.modificationDate,
+            resourceIdentifier: item.resourceIdentifier,
+            category: item.category,
+            risk: risk,
+            ownerID: item.ownerID,
+            explanation: item.explanation
+        )
     }
 }
 
@@ -47,49 +73,100 @@ public struct ApplicationUninstallPlanner: Sendable {
             ownership: .owned,
             evidence: nil
         )
-        let related = uniqueReviewItems(in: projection.associations) {
-            $0.association.risk != .managed && $0.item.risk != .managed
-        }
+        let related = reviewItems(in: projection.associations)
         return [appReviewItem] + related.sorted {
-            $0.item.allocatedSize > $1.item.allocatedSize
+            if $0.item.allocatedSize != $1.item.allocatedSize {
+                return $0.item.allocatedSize > $1.item.allocatedSize
+            }
+            return $0.item.url.path < $1.item.url.path
         }
     }
 
     public func resetItems(for projection: ApplicationProjection) -> [ScannedItem] {
-        uniqueItems(in: projection.associations) {
-            $0.association.confidence == .high
-                && $0.association.ownership == .owned
-                && $0.association.risk != .sensitive
-                && $0.association.risk != .managed
-                && $0.item.risk != .sensitive
-                && $0.item.risk != .managed
+        groupedAssociations(in: projection.associations).compactMap { group in
+            let ownership = effectiveOwnership(in: group)
+            let risk = effectiveRisk(in: group)
+            guard ownership == .owned,
+                  risk < .sensitive,
+                  group.allSatisfy({ $0.association.confidence == .high }),
+                  let representative = representative(in: group) else {
+                return nil
+            }
+            return CleanupReviewItem(
+                item: representative.item,
+                ownership: ownership,
+                evidence: representative.association.evidence,
+                effectiveRisk: risk
+            ).item
         }
-            .sorted { $0.allocatedSize > $1.allocatedSize }
+        .sorted {
+            if $0.allocatedSize != $1.allocatedSize {
+                return $0.allocatedSize > $1.allocatedSize
+            }
+            return $0.url.path < $1.url.path
+        }
     }
 
-    private func uniqueReviewItems(
-        in associations: [ApplicationAssociationProjection],
-        matching predicate: (ApplicationAssociationProjection) -> Bool
+    private func reviewItems(
+        in associations: [ApplicationAssociationProjection]
     ) -> [CleanupReviewItem] {
-        var seenItemIDs: Set<UUID> = []
-        return associations.compactMap { pair in
-            guard predicate(pair), seenItemIDs.insert(pair.item.id).inserted else { return nil }
+        groupedAssociations(in: associations).compactMap { group in
+            let risk = effectiveRisk(in: group)
+            guard risk != .managed,
+                  let representative = representative(in: group) else {
+                return nil
+            }
             return CleanupReviewItem(
-                item: pair.item,
-                ownership: pair.association.ownership,
-                evidence: pair.association.evidence
+                item: representative.item,
+                ownership: effectiveOwnership(in: group),
+                evidence: representative.association.evidence,
+                effectiveRisk: risk
             )
         }
     }
 
-    private func uniqueItems(
-        in associations: [ApplicationAssociationProjection],
-        matching predicate: (ApplicationAssociationProjection) -> Bool
-    ) -> [ScannedItem] {
-        var seenItemIDs: Set<UUID> = []
-        return associations.compactMap { pair in
-            guard predicate(pair), seenItemIDs.insert(pair.item.id).inserted else { return nil }
-            return pair.item
+    private func groupedAssociations(
+        in associations: [ApplicationAssociationProjection]
+    ) -> [[ApplicationAssociationProjection]] {
+        Array(Dictionary(grouping: associations, by: { $0.item.id }).values)
+    }
+
+    private func effectiveOwnership(
+        in group: [ApplicationAssociationProjection]
+    ) -> AssociationOwnership {
+        if group.contains(where: { $0.association.ownership == .shared }) {
+            return .shared
         }
+        if group.contains(where: { $0.association.ownership == .possible }) {
+            return .possible
+        }
+        return .owned
+    }
+
+    private func effectiveRisk(
+        in group: [ApplicationAssociationProjection]
+    ) -> RiskLevel {
+        group.reduce(.safe) { risk, pair in
+            max(risk, pair.item.risk, pair.association.risk)
+        }
+    }
+
+    private func representative(
+        in group: [ApplicationAssociationProjection]
+    ) -> ApplicationAssociationProjection? {
+        let ownership = effectiveOwnership(in: group)
+        return group
+            .filter { $0.association.ownership == ownership }
+            .sorted {
+                if $0.association.confidence != $1.association.confidence {
+                    return $0.association.confidence > $1.association.confidence
+                }
+                if $0.association.evidence != $1.association.evidence {
+                    return $0.association.evidence.rawValue
+                        < $1.association.evidence.rawValue
+                }
+                return $0.association.id.uuidString < $1.association.id.uuidString
+            }
+            .first
     }
 }

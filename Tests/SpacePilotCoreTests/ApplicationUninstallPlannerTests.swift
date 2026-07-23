@@ -142,6 +142,145 @@ final class ApplicationUninstallPlannerTests: XCTestCase {
         XCTAssertEqual(cleanup.filter { $0.item.id == item.id }.count, 1)
     }
 
+    func testResetRejectsConflictingAssociationGroupRegardlessOfInputOrder() {
+        let item = ScannedItem.fixture(
+            path: "/Users/test/Library/Caches/com.example.app",
+            risk: .safe,
+            allocatedSize: 20
+        )
+        let appID = UUID()
+        let associations = [
+            ArtifactAssociation(
+                itemID: item.id,
+                applicationID: appID,
+                evidence: .exactBundleIdentifier,
+                confidence: .high,
+                risk: .safe,
+                ownership: .owned
+            ),
+            ArtifactAssociation(
+                itemID: item.id,
+                applicationID: appID,
+                evidence: .knownRule,
+                confidence: .high,
+                risk: .safe,
+                ownership: .shared
+            ),
+            ArtifactAssociation(
+                itemID: item.id,
+                applicationID: appID,
+                evidence: .vendorAndNameMatch,
+                confidence: .medium,
+                risk: .safe,
+                ownership: .possible
+            )
+        ]
+
+        for orderedAssociations in [associations, Array(associations.reversed())] {
+            let projection = projection(
+                appID: appID,
+                item: item,
+                associations: orderedAssociations
+            )
+
+            XCTAssertTrue(
+                ApplicationUninstallPlanner().resetItems(for: projection).isEmpty
+            )
+        }
+    }
+
+    func testCleanupExcludesConflictingOwnershipGroupFromSelectAllRegardlessOfInputOrder() {
+        let item = ScannedItem.fixture(
+            path: "/Users/test/Library/Caches/com.example.app",
+            risk: .safe,
+            allocatedSize: 20
+        )
+        let appID = UUID()
+        let associations = [
+            ArtifactAssociation(
+                itemID: item.id,
+                applicationID: appID,
+                evidence: .exactBundleIdentifier,
+                confidence: .high,
+                risk: .safe,
+                ownership: .owned
+            ),
+            ArtifactAssociation(
+                itemID: item.id,
+                applicationID: appID,
+                evidence: .knownRule,
+                confidence: .high,
+                risk: .safe,
+                ownership: .shared
+            )
+        ]
+
+        for orderedAssociations in [associations, Array(associations.reversed())] {
+            let review = ApplicationUninstallPlanner()
+                .cleanupItems(for: projection(
+                    appID: appID,
+                    item: item,
+                    associations: orderedAssociations
+                ))
+                .first { $0.item.id == item.id }
+
+            XCTAssertEqual(review?.ownership, .shared)
+            XCTAssertEqual(review?.isIncludedBySelectAll, false)
+        }
+    }
+
+    func testCleanupPromotesAssociationRiskAndPlannerRequiresSensitiveConfirmation() {
+        let item = ScannedItem.fixture(
+            path: "/Users/test/Library/Application Support/Example/state.db",
+            risk: .safe,
+            allocatedSize: 20
+        )
+        let appID = UUID()
+        let associations = [
+            ArtifactAssociation(
+                itemID: item.id,
+                applicationID: appID,
+                evidence: .exactBundleIdentifier,
+                confidence: .high,
+                risk: .safe,
+                ownership: .owned
+            ),
+            ArtifactAssociation(
+                itemID: item.id,
+                applicationID: appID,
+                evidence: .knownRule,
+                confidence: .high,
+                risk: .sensitive,
+                ownership: .owned
+            )
+        ]
+        let projection = projection(
+            appID: appID,
+            item: item,
+            associations: associations
+        )
+
+        let review = ApplicationUninstallPlanner()
+            .cleanupItems(for: projection)
+            .first { $0.item.id == item.id }
+
+        XCTAssertEqual(review?.item.risk, .sensitive)
+        XCTAssertThrowsError(try CleanupPlanner(policy: .init(
+            homeDirectory: URL(fileURLWithPath: "/Users/test"),
+            allowedVolumeRoot: URL(fileURLWithPath: "/")
+        )).makePlan(
+            snapshotID: UUID(),
+            items: [try XCTUnwrap(review?.item)],
+            selectedIDs: [item.id],
+            separatelyConfirmedSensitiveIDs: []
+        )) { error in
+            XCTAssertEqual(
+                error as? CleanupPlanningError,
+                .sensitiveConfirmationRequired(item.url)
+            )
+        }
+    }
+
     func testPlannerSourceHasNoSnapshotAPIOrFullItemTraversal() throws {
         let testFile = URL(fileURLWithPath: #filePath)
         let repositoryRoot = testFile
@@ -153,5 +292,29 @@ final class ApplicationUninstallPlannerTests: XCTestCase {
 
         XCTAssertFalse(source.contains("ScanSnapshot"))
         XCTAssertFalse(source.contains("snapshot.items"))
+    }
+
+    private func projection(
+        appID: UUID,
+        item: ScannedItem,
+        associations: [ArtifactAssociation]
+    ) -> ApplicationProjection {
+        let app = ApplicationRecord(
+            id: appID,
+            name: "Example",
+            bundleIdentifier: "com.example.app",
+            version: "1",
+            url: URL(fileURLWithPath: "/Applications/Example.app"),
+            executableURL: nil,
+            allocatedSize: 100,
+            associations: associations
+        )
+        return ApplicationProjection(
+            application: app,
+            totalSize: app.allocatedSize + item.allocatedSize,
+            associations: associations.map {
+                ApplicationAssociationProjection(association: $0, item: item)
+            }
+        )
     }
 }

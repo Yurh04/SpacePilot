@@ -74,6 +74,22 @@ final class CleanupSelectionTests: XCTestCase {
         XCTAssertEqual(selection.selectedIDs, Set(selection.items.map(\.id)))
     }
 
+    func testEffectiveSensitiveRiskRequiresSelectionConfirmation() {
+        let safeItem = item(path: "/tmp/association-sensitive", risk: .safe)
+        let review = CleanupReviewItem(
+            item: safeItem,
+            ownership: .owned,
+            evidence: .knownRule,
+            effectiveRisk: .sensitive
+        )
+        var selection = CleanupSelection(items: [review])
+
+        selection.toggle(review.id)
+
+        XCTAssertEqual(review.item.risk, .sensitive)
+        XCTAssertTrue(selection.hasSelectedSensitiveItems)
+    }
+
     private func item(
         path: String,
         risk: RiskLevel = .safe,

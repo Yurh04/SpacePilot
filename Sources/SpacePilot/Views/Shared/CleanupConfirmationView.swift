@@ -48,6 +48,7 @@ struct CleanupConfirmationView: View {
 
             List(items) { reviewItem in
                 let item = reviewItem.item
+                let risk = reviewItem.effectiveRisk
                 Toggle(isOn: binding(for: reviewItem)) {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
@@ -59,9 +60,9 @@ struct CleanupConfirmationView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .textSelection(.enabled)
-                        Text(verbatim: "\(L10n.name(for: item.risk)) · \(L10n.explanation(item.explanation))")
+                        Text(verbatim: "\(L10n.name(for: risk)) · \(L10n.explanation(item.explanation))")
                             .font(.caption)
-                            .foregroundStyle(item.risk == .sensitive ? .orange : .secondary)
+                            .foregroundStyle(risk == .sensitive ? .orange : .secondary)
                         if let evidence = reviewItem.evidence {
                             Text(verbatim: "\(reviewItem.ownership.rawValue.capitalized) · \(L10n.name(for: evidence))")
                                 .font(.caption)

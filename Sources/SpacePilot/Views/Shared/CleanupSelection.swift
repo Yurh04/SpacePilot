@@ -14,7 +14,7 @@ struct CleanupSelection {
     }
 
     var hasSelectedSensitiveItems: Bool {
-        selectedItems.contains { $0.item.risk == .sensitive }
+        selectedItems.contains { $0.effectiveRisk == .sensitive }
     }
 
     var hasUnselectedSelectAllItems: Bool {

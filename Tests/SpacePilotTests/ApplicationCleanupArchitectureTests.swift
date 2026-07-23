@@ -64,6 +64,8 @@ final class ApplicationCleanupArchitectureTests: XCTestCase {
             "CleanupReviewItem(item: $0, ownership: .owned, evidence: nil)"
         ))
         XCTAssertTrue(source.contains("let candidateItems = cleanupCandidates.map(\\.item)"))
+        XCTAssertTrue(source.contains("$0.effectiveRisk != .managed"))
+        XCTAssertTrue(source.contains("$0.effectiveRisk == .sensitive"))
         XCTAssertTrue(source.contains("items: candidateItems"))
         XCTAssertTrue(source.contains("selectedIDs: eligibleSelectedIDs"))
     }

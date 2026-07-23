@@ -98,7 +98,7 @@ final class AppModel {
     }
 
     private func prepareCleanup(reviewItems: [CleanupReviewItem]) {
-        let eligible = reviewItems.filter { $0.item.risk != .managed }
+        let eligible = reviewItems.filter { $0.effectiveRisk != .managed }
         guard !eligible.isEmpty else { return }
         cleanupCandidates = eligible
         latestCleanupTransaction = nil
@@ -131,15 +131,16 @@ final class AppModel {
         let candidateItems = cleanupCandidates.map(\.item)
         let candidateIDs = Set(candidateItems.map(\.id))
         let eligibleSelectedIDs = selectedIDs.intersection(candidateIDs)
+        let sensitiveCandidateIDs = Set(cleanupCandidates.filter {
+            $0.effectiveRisk == .sensitive
+        }.map(\.id))
         guard !eligibleSelectedIDs.isEmpty else { return }
         isCleaning = true
         errorMessage = nil
         cleanupTask = Task {
             do {
                 let sensitiveIDs = confirmSensitive
-                    ? Set(candidateItems.filter {
-                        eligibleSelectedIDs.contains($0.id) && $0.risk == .sensitive
-                    }.map(\.id))
+                    ? eligibleSelectedIDs.intersection(sensitiveCandidateIDs)
                     : []
                 let policy = PathSafetyPolicy(
                     homeDirectory: runtime.homeDirectory,
