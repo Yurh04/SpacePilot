@@ -69,6 +69,49 @@ final class ApplicationArtifactResolverTests: XCTestCase {
         XCTAssertNil(item.ownerID)
     }
 
+    func testSharedExactComponentIdentifierIsNotOwnedByEitherApplication() async throws {
+        let home = try TemporaryTree(files: [
+            "Library/Containers/com.example.shared.helper/state.db": 64
+        ])
+        let first = application(
+            name: "First",
+            bundleID: "com.example.first"
+        )
+        let second = application(
+            name: "Second",
+            bundleID: "com.example.second"
+        )
+        let sharedComponent = "com.example.shared.helper"
+        let identities = [first, second].map {
+            ApplicationIdentity(
+                applicationID: $0.id,
+                mainBundleIdentifier: $0.bundleIdentifier,
+                componentBundleIdentifiers: [sharedComponent],
+                teamIdentifier: "TEAM",
+                applicationGroups: []
+            )
+        }
+
+        let result = try await ApplicationArtifactResolver().resolve(
+            applications: [first, second],
+            identities: identities,
+            homeDirectory: home.url
+        )
+
+        let item = try XCTUnwrap(result.items.first)
+        let associations = result.resolutions.flatMap(\.associations)
+        XCTAssertEqual(result.items.count, 1)
+        XCTAssertEqual(associations.count, 2)
+        XCTAssertEqual(Set(associations.map(\.itemID)), [item.id])
+        XCTAssertTrue(
+            associations.allSatisfy {
+                $0.evidence == .exactBundleIdentifier
+                    && $0.ownership == .shared
+            }
+        )
+        XCTAssertNil(item.ownerID)
+    }
+
     func testDeepServiceRootsAndEmbeddedComponentsAreResolved() async throws {
         let home = try TemporaryTree(files: [
             "Library/HTTPStorages/com.example.Product/http.db": 11,

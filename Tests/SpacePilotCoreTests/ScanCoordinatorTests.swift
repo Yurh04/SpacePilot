@@ -147,6 +147,42 @@ final class ScanCoordinatorTests: XCTestCase {
             }?.ownership,
             .owned
         )
+        for aggregatePath in [sharedPath, chatGPTPath] {
+            XCTAssertEqual(
+                snapshot.items.filter {
+                    let path = $0.url.standardizedFileURL.path
+                    return path == aggregatePath
+                        || path.hasPrefix(aggregatePath + "/")
+                }.count,
+                1
+            )
+        }
+
+        let aggregateBytes = try XCTUnwrap(sharedItems.first).allocatedSize
+            + chatGPTItem.allocatedSize
+        let applicationBytes = snapshot.applications.reduce(Int64(0)) {
+            $0 + $1.allocatedSize
+        }
+        let overview = OverviewProjection(snapshot: snapshot)
+        let storage = StorageProjection(snapshot: snapshot)
+        XCTAssertEqual(
+            overview.analyzedBytes,
+            applicationBytes + aggregateBytes
+        )
+        XCTAssertEqual(
+            storage.categories.first {
+                $0.category == .application
+            }?.allocatedSize,
+            aggregateBytes
+        )
+        XCTAssertNil(
+            storage.categories.first { $0.category == .personal }
+        )
+        XCTAssertTrue(
+            snapshot.aiApplications
+                .flatMap(\.itemIDs)
+                .allSatisfy { snapshotItemIDs.contains($0) }
+        )
     }
 }
 

@@ -126,22 +126,13 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                 + claude.items
                 + basicAIScans.flatMap(\.items)
                 + applicationResolution.items
-            var itemsByPath: [String: ScannedItem] = [:]
-            for item in sourceItems {
-                itemsByPath[Self.canonicalPath(for: item.url)] = item
-            }
-            let items = itemsByPath.values.sorted { $0.url.path < $1.url.path }
-            let canonicalItemIDBySourceItemID = Dictionary(
-                sourceItems.compactMap { item -> (UUID, UUID)? in
-                    guard let canonicalItem = itemsByPath[
-                        Self.canonicalPath(for: item.url)
-                    ] else {
-                        return nil
-                    }
-                    return (item.id, canonicalItem.id)
-                },
-                uniquingKeysWith: { _, latest in latest }
+            let canonicalOwnership = try Self.canonicalOwnership(
+                sourceItems: sourceItems,
+                aggregateItems: applicationResolution.items
             )
+            let items = canonicalOwnership.items
+            let canonicalItemIDBySourceItemID =
+                canonicalOwnership.itemIDBySourceItemID
             let associationsByApplicationID = Dictionary(
                 applicationResolution.resolutions.map { resolution in
                     (
@@ -267,6 +258,113 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
         url.standardizedFileURL.resolvingSymlinksInPath().path
     }
 
+    private static func canonicalOwnership(
+        sourceItems: [ScannedItem],
+        aggregateItems: [ScannedItem]
+    ) throws -> CanonicalItemOwnership {
+        var checkpoint = ProjectionCancellationCheckpoint {
+            try Task.checkCancellation()
+        }
+        var exactItemByPath: [String: ScannedItem] = [:]
+        exactItemByPath.reserveCapacity(sourceItems.count)
+        for item in sourceItems {
+            try checkpoint.checkPeriodically()
+            exactItemByPath[canonicalPath(for: item.url)] = item
+        }
+
+        var aggregateItemByPath: [String: ScannedItem] = [:]
+        aggregateItemByPath.reserveCapacity(aggregateItems.count)
+        for aggregateItem in aggregateItems {
+            try checkpoint.checkPeriodically()
+            guard let values = try? aggregateItem.url.resourceValues(
+                forKeys: [.isDirectoryKey]
+            ), values.isDirectory == true
+            else {
+                continue
+            }
+            let path = canonicalPath(for: aggregateItem.url)
+            guard exactItemByPath[path] != nil else {
+                continue
+            }
+            aggregateItemByPath[path] = aggregateItem
+        }
+
+        let orderedAggregates = aggregateItemByPath.sorted {
+            let lhsDepth = URL(fileURLWithPath: $0.key).pathComponents.count
+            let rhsDepth = URL(fileURLWithPath: $1.key).pathComponents.count
+            if lhsDepth != rhsDepth {
+                return lhsDepth < rhsDepth
+            }
+            return $0.key < $1.key
+        }
+        var survivingAggregateByPath: [String: ScannedItem] = [:]
+        survivingAggregateByPath.reserveCapacity(orderedAggregates.count)
+        for (path, item) in orderedAggregates {
+            try checkpoint.checkPeriodically()
+            guard nearestAncestorItem(
+                of: path,
+                in: survivingAggregateByPath
+            ) == nil else {
+                continue
+            }
+            survivingAggregateByPath[path] = item
+        }
+
+        var items: [ScannedItem] = []
+        items.reserveCapacity(exactItemByPath.count)
+        var survivorItemIDByPath: [String: UUID] = [:]
+        survivorItemIDByPath.reserveCapacity(exactItemByPath.count)
+        for (path, item) in exactItemByPath {
+            try checkpoint.checkPeriodically()
+            if let aggregateItem = survivingAggregateByPath[path] {
+                items.append(aggregateItem)
+                survivorItemIDByPath[path] = aggregateItem.id
+            } else if let aggregateItem = nearestAncestorItem(
+                of: path,
+                in: survivingAggregateByPath
+            ) {
+                survivorItemIDByPath[path] = aggregateItem.id
+            } else {
+                items.append(item)
+                survivorItemIDByPath[path] = item.id
+            }
+        }
+
+        var itemIDBySourceItemID: [UUID: UUID] = [:]
+        itemIDBySourceItemID.reserveCapacity(sourceItems.count)
+        for item in sourceItems {
+            try checkpoint.checkPeriodically()
+            let path = canonicalPath(for: item.url)
+            guard let survivorID = survivorItemIDByPath[path] else {
+                continue
+            }
+            itemIDBySourceItemID[item.id] = survivorID
+        }
+        try Task.checkCancellation()
+        return CanonicalItemOwnership(
+            items: items.sorted { $0.url.path < $1.url.path },
+            itemIDBySourceItemID: itemIDBySourceItemID
+        )
+    }
+
+    private static func nearestAncestorItem(
+        of path: String,
+        in itemsByPath: [String: ScannedItem]
+    ) -> ScannedItem? {
+        var ancestor = URL(fileURLWithPath: path).deletingLastPathComponent()
+        while true {
+            let ancestorPath = ancestor.path
+            if let item = itemsByPath[ancestorPath] {
+                return item
+            }
+            let parent = ancestor.deletingLastPathComponent()
+            guard parent.path != ancestorPath else {
+                return nil
+            }
+            ancestor = parent
+        }
+    }
+
     private static func remap(
         association: ArtifactAssociation,
         itemIDs: [UUID: UUID]
@@ -308,6 +406,11 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
             applicationAllocatedSize: application.applicationAllocatedSize,
             supportLevel: application.supportLevel
         )
+    }
+
+    private struct CanonicalItemOwnership {
+        let items: [ScannedItem]
+        let itemIDBySourceItemID: [UUID: UUID]
     }
 }
 

@@ -127,8 +127,30 @@ public struct ApplicationArtifactResolver: Sendable {
                     .fileResourceIdentifierKey
                 ]
             )
-            let matches = candidate.matchesByApplicationID.sorted {
+            let collectedMatches = candidate.matchesByApplicationID.sorted {
                 $0.key.uuidString < $1.key.uuidString
+            }
+            let hasSharedExactIdentifier = collectedMatches.lazy.filter {
+                $0.value.evidence == .exactBundleIdentifier
+                    && $0.value.ownership == .owned
+            }.count > 1
+            let matches: [(key: UUID, value: Match)] = collectedMatches.map {
+                applicationID, match in
+                guard hasSharedExactIdentifier,
+                      match.evidence == .exactBundleIdentifier,
+                      match.ownership == .owned
+                else {
+                    return (key: applicationID, value: match)
+                }
+                return (
+                    key: applicationID,
+                    value: Match(
+                        evidence: match.evidence,
+                        confidence: match.confidence,
+                        ownership: .shared,
+                        explanation: match.explanation
+                    )
+                )
             }
             let ownerID: UUID?
             if matches.count == 1, matches[0].value.ownership == .owned {
