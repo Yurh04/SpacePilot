@@ -16,9 +16,11 @@ public enum CleanupPlanningError: Error, Equatable, LocalizedError, Sendable {
 
 public struct CleanupPlanner: Sendable {
     public let policy: PathSafetyPolicy
+    private let refresher: CleanupCandidateRefresher
 
-    public init(policy: PathSafetyPolicy) {
+    public init(policy: PathSafetyPolicy, refresher: CleanupCandidateRefresher = .init()) {
         self.policy = policy
+        self.refresher = refresher
     }
 
     public func makePlan(
@@ -41,16 +43,7 @@ public struct CleanupPlanner: Sendable {
                 throw CleanupPlanningError.sensitiveConfirmationRequired(item.url)
             }
 
-            let canonicalURL = try policy.validate(item.url)
-            candidates.append(CleanupCandidate(
-                itemID: item.id,
-                url: canonicalURL,
-                allocatedSize: item.allocatedSize,
-                risk: item.risk,
-                expectedResourceIdentifier: item.resourceIdentifier,
-                expectedModificationDate: item.modificationDate,
-                explanation: item.explanation
-            ))
+            candidates.append(try refresher.refresh(item: item, policy: policy))
         }
 
         return CleanupPlan(

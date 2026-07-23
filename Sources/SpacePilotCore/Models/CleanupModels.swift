@@ -1,5 +1,10 @@
 import Foundation
 
+public enum CleanupItemKind: String, Codable, Sendable {
+    case regularFile
+    case directory
+}
+
 public enum CleanupOutcomeStatus: String, Codable, Sendable {
     case movedToTrash
     case skippedChanged
@@ -13,6 +18,7 @@ public struct CleanupCandidate: Identifiable, Codable, Hashable, Sendable {
     public let url: URL
     public let allocatedSize: Int64
     public let risk: RiskLevel
+    public let itemKind: CleanupItemKind
     public let expectedResourceIdentifier: String?
     public let expectedModificationDate: Date?
     public let explanation: String
@@ -23,6 +29,7 @@ public struct CleanupCandidate: Identifiable, Codable, Hashable, Sendable {
         url: URL,
         allocatedSize: Int64,
         risk: RiskLevel,
+        itemKind: CleanupItemKind = .regularFile,
         expectedResourceIdentifier: String?,
         expectedModificationDate: Date?,
         explanation: String
@@ -32,6 +39,7 @@ public struct CleanupCandidate: Identifiable, Codable, Hashable, Sendable {
         self.url = url
         self.allocatedSize = allocatedSize
         self.risk = risk
+        self.itemKind = itemKind
         self.expectedResourceIdentifier = expectedResourceIdentifier
         self.expectedModificationDate = expectedModificationDate
         self.explanation = explanation
