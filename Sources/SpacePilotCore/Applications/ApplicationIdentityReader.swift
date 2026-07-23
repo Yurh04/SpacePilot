@@ -161,8 +161,14 @@ public struct ApplicationIdentityReader: ApplicationIdentityReading {
     }
 
     private func bundleIdentifier(at bundleURL: URL) -> String? {
+        let canonicalBundleURL = bundleURL.standardizedFileURL
+            .resolvingSymlinksInPath()
         let infoURL = bundleURL.appending(path: "Contents/Info.plist")
-        guard let data = try? Data(contentsOf: infoURL),
+        guard let canonicalInfoURL = safeRegularFile(
+            at: infoURL,
+            strictlyWithin: canonicalBundleURL
+        ),
+              let data = try? Data(contentsOf: canonicalInfoURL),
               let info = try? PropertyListSerialization.propertyList(
                 from: data,
                 format: nil
@@ -171,5 +177,23 @@ public struct ApplicationIdentityReader: ApplicationIdentityReading {
             return nil
         }
         return info["CFBundleIdentifier"] as? String
+    }
+
+    private func safeRegularFile(
+        at url: URL,
+        strictlyWithin root: URL
+    ) -> URL? {
+        guard let values = try? url.resourceValues(
+            forKeys: [.isRegularFileKey, .isSymbolicLinkKey]
+        ), values.isRegularFile == true, values.isSymbolicLink != true
+        else {
+            return nil
+        }
+
+        let canonicalURL = url.standardizedFileURL.resolvingSymlinksInPath()
+        guard isStrictDescendant(canonicalURL, of: root) else {
+            return nil
+        }
+        return canonicalURL
     }
 }

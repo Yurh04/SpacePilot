@@ -148,12 +148,96 @@ final class ApplicationIdentityReaderTests: XCTestCase {
         )
     }
 
+    func testRejectsInternalBundleSymlinksEscapingApplicationBundle() throws {
+        let outside = try TestAppBuilder(
+            name: "Outside",
+            bundleIdentifier: "com.example.external"
+        )
+        .build()
+        let app = try TestAppBuilder(
+            name: "Browser",
+            bundleIdentifier: "com.example.browser"
+        )
+        .withEmbeddedBundle(
+            relativePath: "Contents/PlugIns/Widget.appex",
+            bundleIdentifier: "com.example.browser.widget"
+        )
+        .withEmbeddedBundle(
+            relativePath: "Contents/PlugIns/EscapedInfo.appex",
+            bundleIdentifier: "com.example.browser.escaped-info"
+        )
+        .withEmbeddedBundle(
+            relativePath: "Contents/PlugIns/EscapedContents.appex",
+            bundleIdentifier: "com.example.browser.escaped-contents"
+        )
+        .build()
+        try replaceWithSymbolicLink(
+            app.record.url.appending(
+                path: "Contents/PlugIns/EscapedInfo.appex/Contents/Info.plist"
+            ),
+            destination: outside.record.url.appending(path: "Contents/Info.plist")
+        )
+        try replaceWithSymbolicLink(
+            app.record.url.appending(
+                path: "Contents/PlugIns/EscapedContents.appex/Contents"
+            ),
+            destination: outside.record.url.appending(path: "Contents")
+        )
+
+        let identity = try makeReader().read(application: app.record)
+
+        XCTAssertEqual(
+            identity.componentBundleIdentifiers,
+            ["com.example.browser.widget"]
+        )
+    }
+
+    func testRejectsMainBundleInfoSymlinkEscapingApplicationBundle() throws {
+        let outside = try TestAppBuilder(
+            name: "Outside",
+            bundleIdentifier: "com.example.external"
+        )
+        .build()
+        let app = try TestAppBuilder(
+            name: "Browser",
+            bundleIdentifier: "com.example.browser"
+        )
+        .withEmbeddedBundle(
+            relativePath: "Contents/PlugIns/Widget.appex",
+            bundleIdentifier: "com.example.browser.widget"
+        )
+        .build()
+        try replaceWithSymbolicLink(
+            app.record.url.appending(path: "Contents/Info.plist"),
+            destination: outside.record.url.appending(path: "Contents/Info.plist")
+        )
+
+        let identity = try makeReader().read(application: app.record)
+
+        XCTAssertNil(identity.mainBundleIdentifier)
+        XCTAssertEqual(
+            identity.componentBundleIdentifiers,
+            ["com.example.browser.widget"]
+        )
+    }
+
     private func makeReader() -> ApplicationIdentityReader {
         ApplicationIdentityReader(
             signingReader: StubSigningMetadata(
                 teamIdentifier: nil,
                 applicationGroups: []
             )
+        )
+    }
+
+    private func replaceWithSymbolicLink(
+        _ url: URL,
+        destination: URL
+    ) throws {
+        try FileManager.default.removeItem(at: url)
+        try FileManager.default.createSymbolicLink(
+            at: url,
+            withDestinationURL: destination
         )
     }
 }
