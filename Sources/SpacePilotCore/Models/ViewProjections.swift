@@ -137,9 +137,15 @@ public struct OverviewProjection: Sendable {
 
 public struct StorageProjection: Sendable {
     public static let itemDisplayLimit = 100
+    public let totalCapacity: Int64
+    public let usedBytes: Int64
+    public let availableBytes: Int64
+    public let analyzedBytes: Int64
     public let categories: [StorageCategorySummary]
     public let largestItems: [ScannedItem]
     public let oldItems: [ScannedItem]
+    public let largestItemsByCategory: [ItemCategory: [ScannedItem]]
+    public let oldItemsByCategory: [ItemCategory: [ScannedItem]]
 
     public init(snapshot: ScanSnapshot) {
         self = try! Self(snapshot: snapshot, checkCancellation: {})
@@ -161,14 +167,49 @@ public struct StorageProjection: Sendable {
             limit: Self.itemDisplayLimit,
             prefers: { ($0.modificationDate ?? .distantFuture) < ($1.modificationDate ?? .distantFuture) }
         )
+        var largestCategorySelections: [ItemCategory: BoundedScannedItemSelection] = [:]
+        var oldestCategorySelections: [ItemCategory: BoundedScannedItemSelection] = [:]
+        for category in ItemCategory.allCases {
+            largestCategorySelections[category] = BoundedScannedItemSelection(
+                limit: Self.itemDisplayLimit,
+                prefers: { $0.allocatedSize > $1.allocatedSize }
+            )
+            oldestCategorySelections[category] = BoundedScannedItemSelection(
+                limit: Self.itemDisplayLimit,
+                prefers: {
+                    ($0.modificationDate ?? .distantFuture)
+                        < ($1.modificationDate ?? .distantFuture)
+                }
+            )
+        }
+        var itemBytes: Int64 = 0
 
         for item in snapshot.items {
             try checkpoint.checkPeriodically()
+            itemBytes += item.allocatedSize
             categoryTotals[item.category, default: .init()].add(item.allocatedSize)
             largestSelection.insert(item)
+            largestCategorySelections[item.category]?.insert(item)
             if (item.modificationDate ?? .distantFuture) < cutoff {
                 oldestSelection.insert(item)
+                oldestCategorySelections[item.category]?.insert(item)
             }
+        }
+
+        var applicationBytes: Int64 = 0
+        for application in snapshot.applications {
+            try checkpoint.checkPeriodically()
+            applicationBytes += application.allocatedSize
+        }
+        analyzedBytes = itemBytes + applicationBytes
+        if let volume = snapshot.volume {
+            totalCapacity = volume.totalCapacity
+            availableBytes = volume.availableCapacity
+            usedBytes = max(0, volume.totalCapacity - volume.availableCapacity)
+        } else {
+            totalCapacity = analyzedBytes
+            usedBytes = analyzedBytes
+            availableBytes = 0
         }
 
         if let volume = snapshot.volume {
@@ -178,10 +219,7 @@ public struct StorageProjection: Sendable {
             for total in categoryTotals.values {
                 classified += total.allocatedSize
             }
-            for application in snapshot.applications {
-                try checkpoint.checkPeriodically()
-                classified += application.allocatedSize
-            }
+            classified += applicationBytes
             let other = max(0, used - classified)
             if other > 0 {
                 categoryTotals[.system, default: .init()].allocatedSize += other
@@ -205,7 +243,18 @@ public struct StorageProjection: Sendable {
         // Both heaps are strictly bounded by itemDisplayLimit (100).
         largestItems = largestSelection.sortedItems
         oldItems = oldestSelection.sortedItems
+        largestItemsByCategory = largestCategorySelections.mapValues(\.sortedItems)
+        oldItemsByCategory = oldestCategorySelections.mapValues(\.sortedItems)
         try checkCancellation()
+    }
+
+    public func items(category: ItemCategory?, oldOnly: Bool) -> [ScannedItem] {
+        guard let category else {
+            return oldOnly ? oldItems : largestItems
+        }
+        return oldOnly
+            ? oldItemsByCategory[category, default: []]
+            : largestItemsByCategory[category, default: []]
     }
 }
 

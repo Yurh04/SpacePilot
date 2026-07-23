@@ -66,6 +66,10 @@ final class ViewProjectionTests: XCTestCase {
         XCTAssertEqual(projection.overview.recommendations.map(\.allocatedSize), Array((492..<500).reversed()).map(Int64.init))
         XCTAssertEqual(projection.overview.reclaimableBytes, items.reduce(0) { $0 + $1.allocatedSize })
         XCTAssertEqual(projection.storage.largestItems.count, 100)
+        XCTAssertLessThanOrEqual(
+            projection.storage.largestItemsByCategory.values.flatMap { $0 }.count,
+            StorageProjection.itemDisplayLimit * ItemCategory.allCases.count
+        )
     }
 
     func testOverviewProjectionPreservesLimitedCoverageDetails() {
@@ -404,6 +408,59 @@ final class ViewProjectionTests: XCTestCase {
         let projection = StorageProjection(snapshot: snapshot)
 
         XCTAssertEqual(projection.categories.reduce(0) { $0 + $1.allocatedSize }, 256)
+    }
+
+    func testStorageProjectionPublishesDiskMetricsAndCategoryItems() {
+        let oldCache = ScannedItem.fixture(
+            path: "/Users/test/Library/Caches/old",
+            allocatedSize: 300,
+            modificationDate: .distantPast
+        )
+        let recentCache = ScannedItem.fixture(
+            path: "/Users/test/Library/Caches/recent",
+            allocatedSize: 200,
+            modificationDate: .now
+        )
+        let developer = ScannedItem(
+            url: URL(fileURLWithPath: "/Users/test/Library/Developer/build"),
+            logicalSize: 100,
+            allocatedSize: 100,
+            modificationDate: .distantPast,
+            category: .developer,
+            risk: .safe,
+            explanation: "Fixture"
+        )
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: VolumeRecord(
+                url: URL(fileURLWithPath: "/"),
+                name: "Macintosh HD",
+                totalCapacity: 2_000,
+                availableCapacity: 800
+            ),
+            items: [recentCache, developer, oldCache],
+            applications: [],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: .complete
+        )
+
+        let projection = StorageProjection(snapshot: snapshot)
+
+        XCTAssertEqual(projection.totalCapacity, 2_000)
+        XCTAssertEqual(projection.usedBytes, 1_200)
+        XCTAssertEqual(projection.availableBytes, 800)
+        XCTAssertEqual(projection.analyzedBytes, 600)
+        XCTAssertEqual(projection.items(category: .cache, oldOnly: false).map(\.id), [
+            oldCache.id, recentCache.id
+        ])
+        XCTAssertEqual(projection.items(category: .cache, oldOnly: true).map(\.id), [
+            oldCache.id
+        ])
+        XCTAssertEqual(projection.items(category: .developer, oldOnly: false).map(\.id), [
+            developer.id
+        ])
     }
 
     func testStorageProjectionMergesResidualVolumeBytesIntoExistingSystemCategory() {
