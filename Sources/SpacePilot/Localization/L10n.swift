@@ -99,6 +99,7 @@ enum L10n {
         "ai.skills-visible", "ai.total-indexed-space", "app.application", "app.association-confidence",
         "app.evidence.bundle-id", "app.evidence.container-id", "app.evidence.known-rule",
         "app.evidence.name", "app.evidence.signed-helper", "app.only-high-confidence",
+        "app.ownership.owned", "app.ownership.possible", "app.ownership.shared",
         "app.related", "app.reset", "app.review-reset", "app.review-uninstall", "app.total-space",
         "app.uninstall", "cleanup.clear-selection", "cleanup.confirm-sensitive", "cleanup.confirm-trash",
         "cleanup.history-empty", "cleanup.history-empty-description", "cleanup.move-selected-trash",
@@ -389,6 +390,17 @@ enum L10n {
         case .rebuildable: riskRebuildable(locale: locale)
         case .sensitive: riskSensitive(locale: locale)
         case .managed: riskManaged(locale: locale)
+        }
+    }
+
+    static func name(for ownership: AssociationOwnership, locale: Locale? = nil) -> String {
+        switch ownership {
+        case .owned:
+            value("app.ownership.owned", default: "Application-owned", locale: locale)
+        case .shared:
+            value("app.ownership.shared", default: "Shared component", locale: locale)
+        case .possible:
+            value("app.ownership.possible", default: "Possible association", locale: locale)
         }
     }
 

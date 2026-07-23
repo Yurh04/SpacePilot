@@ -6,6 +6,7 @@ struct StorageItemRow: View {
 
     var body: some View {
         HStack {
+            FileSystemItemIcon(url: item.url)
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.url.lastPathComponent)
                 Text(verbatim: L10n.explanation(item.explanation))

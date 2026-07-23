@@ -70,6 +70,54 @@ final class ApplicationCleanupArchitectureTests: XCTestCase {
         XCTAssertTrue(source.contains("selectedIDs: eligibleSelectedIDs"))
     }
 
+    func testNativeFileIconIsBoundedCachedAndUsedInEveryRequestedFileList() throws {
+        let icon = try source(
+            at: "Sources/SpacePilot/Views/Shared/FileSystemItemIcon.swift"
+        )
+        let applications = try source(
+            at: "Sources/SpacePilot/Views/Applications/ApplicationsView.swift"
+        )
+        let cleanup = try source(
+            at: "Sources/SpacePilot/Views/Shared/CleanupConfirmationView.swift"
+        )
+        let storage = try source(
+            at: "Sources/SpacePilot/Views/Shared/StorageItemRow.swift"
+        )
+
+        XCTAssertTrue(icon.contains("images.countLimit = 512"))
+        XCTAssertTrue(icon.contains("url.standardizedFileURL.path"))
+        XCTAssertTrue(icon.contains("NSWorkspace.shared.icon(forFile:"))
+        XCTAssertTrue(icon.contains(".accessibilityHidden(true)"))
+        XCTAssertFalse(icon.contains("FileManager"))
+        XCTAssertFalse(icon.contains("enumerator("))
+        XCTAssertFalse(icon.contains("contentsOfDirectory"))
+
+        XCTAssertGreaterThanOrEqual(
+            applications.components(separatedBy: "FileSystemItemIcon(url:").count - 1,
+            2,
+            "Both the application and its association rows must use native icons"
+        )
+        XCTAssertTrue(cleanup.contains("FileSystemItemIcon(url: item.url"))
+        XCTAssertTrue(storage.contains("FileSystemItemIcon(url: item.url"))
+    }
+
+    func testAssociationAndCleanupRowsPresentLocalizedOwnershipAndSharedWarnings() throws {
+        let applications = try source(
+            at: "Sources/SpacePilot/Views/Applications/ApplicationsView.swift"
+        )
+        let cleanup = try source(
+            at: "Sources/SpacePilot/Views/Shared/CleanupConfirmationView.swift"
+        )
+
+        for source in [applications, cleanup] {
+            XCTAssertTrue(source.contains("L10n.name(for:"))
+            XCTAssertTrue(source.contains("ownership"))
+            XCTAssertTrue(source.contains("exclamationmark.triangle"))
+        }
+        XCTAssertTrue(applications.contains("max(pair.item.risk, pair.association.risk)"))
+        XCTAssertTrue(cleanup.contains("reviewItem.effectiveRisk"))
+    }
+
     private func assertNoFullSnapshotTraversal(
         in body: String,
         handler: String,

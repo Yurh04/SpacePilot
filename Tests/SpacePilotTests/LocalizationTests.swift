@@ -42,6 +42,18 @@ final class LocalizationTests: XCTestCase {
         XCTAssertEqual(L10n.name(for: SkillManagementStatus.systemReadOnly, locale: chinese), "只读")
     }
 
+    func testApplicationOwnershipUsesEnglishAndSimplifiedChinese() {
+        let english = Locale(identifier: "en")
+        let chinese = Locale(identifier: "zh-Hans")
+
+        XCTAssertEqual(L10n.name(for: AssociationOwnership.owned, locale: english), "Application-owned")
+        XCTAssertEqual(L10n.name(for: AssociationOwnership.owned, locale: chinese), "应用程序专属")
+        XCTAssertEqual(L10n.name(for: AssociationOwnership.shared, locale: english), "Shared component")
+        XCTAssertEqual(L10n.name(for: AssociationOwnership.shared, locale: chinese), "共享组件")
+        XCTAssertEqual(L10n.name(for: AssociationOwnership.possible, locale: english), "Possible association")
+        XCTAssertEqual(L10n.name(for: AssociationOwnership.possible, locale: chinese), "可能关联")
+    }
+
     func testKnownScannerExplanationsAreLocalizedAtPresentationTime() {
         let chinese = Locale(identifier: "zh-Hans")
         XCTAssertEqual(L10n.explanation("Codex conversation history", locale: chinese), "Codex 对话历史")
@@ -230,7 +242,7 @@ final class LocalizationTests: XCTestCase {
         let english = try stringsTable(at: resources.appending(path: "en.lproj/Localizable.strings"))
         let chinese = try stringsTable(at: resources.appending(path: "zh-Hans.lproj/Localizable.strings"))
 
-        XCTAssertEqual(L10n.allKeys.count, 183)
+        XCTAssertEqual(L10n.allKeys.count, 186)
         XCTAssertEqual(Set(catalogStrings.keys), L10n.allKeys)
         XCTAssertEqual(Set(english.keys), L10n.allKeys)
         XCTAssertEqual(Set(chinese.keys), L10n.allKeys)

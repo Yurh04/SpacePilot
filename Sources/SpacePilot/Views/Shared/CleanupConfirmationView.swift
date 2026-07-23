@@ -50,23 +50,36 @@ struct CleanupConfirmationView: View {
                 let item = reviewItem.item
                 let risk = reviewItem.effectiveRisk
                 Toggle(isOn: binding(for: reviewItem)) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text(item.url.lastPathComponent).fontWeight(.medium)
-                            Spacer()
-                            Text(ByteCount.string(item.allocatedSize)).monospacedDigit()
-                        }
-                        Text(item.url.path(percentEncoded: false))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .textSelection(.enabled)
-                        Text(verbatim: "\(L10n.name(for: risk)) · \(L10n.explanation(item.explanation))")
-                            .font(.caption)
-                            .foregroundStyle(risk == .sensitive ? .orange : .secondary)
-                        if let evidence = reviewItem.evidence {
-                            Text(verbatim: "\(reviewItem.ownership.rawValue.capitalized) · \(L10n.name(for: evidence))")
+                    HStack(alignment: .top, spacing: 8) {
+                        FileSystemItemIcon(url: item.url)
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text(item.url.lastPathComponent).fontWeight(.medium)
+                                Spacer()
+                                Text(ByteCount.string(item.allocatedSize)).monospacedDigit()
+                            }
+                            Text(item.url.path(percentEncoded: false))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                            Text(verbatim: "\(L10n.name(for: risk)) · \(L10n.explanation(item.explanation))")
+                                .font(.caption)
+                                .foregroundStyle(risk == .sensitive ? .orange : .secondary)
+                            HStack(spacing: 4) {
+                                if reviewItem.ownership == .shared {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .accessibilityHidden(true)
+                                }
+                                Text(verbatim: L10n.name(for: reviewItem.ownership))
+                                if let evidence = reviewItem.evidence {
+                                    Text(verbatim: "·")
+                                    Text(verbatim: L10n.name(for: evidence))
+                                }
+                            }
+                            .font(.caption)
+                            .foregroundStyle(
+                                reviewItem.ownership == .shared ? .orange : .secondary
+                            )
                         }
                     }
                 }

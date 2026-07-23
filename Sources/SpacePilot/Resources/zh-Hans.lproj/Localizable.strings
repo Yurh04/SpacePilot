@@ -55,6 +55,9 @@
 "app.evidence.name" = "应用名称";
 "app.evidence.signed-helper" = "已签名辅助程序";
 "app.only-high-confidence" = "仅预选高置信度的关联文件。";
+"app.ownership.owned" = "应用程序专属";
+"app.ownership.possible" = "可能关联";
+"app.ownership.shared" = "共享组件";
 "app.related" = "关联项";
 "app.reset" = "重置…";
 "app.review-reset" = "检查重置项…";

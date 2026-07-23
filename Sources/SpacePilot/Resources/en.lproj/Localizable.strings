@@ -55,6 +55,9 @@
 "app.evidence.name" = "Application name";
 "app.evidence.signed-helper" = "Signed helper";
 "app.only-high-confidence" = "Only high-confidence related files are preselected.";
+"app.ownership.owned" = "Application-owned";
+"app.ownership.possible" = "Possible association";
+"app.ownership.shared" = "Shared component";
 "app.related" = "Related";
 "app.reset" = "Reset…";
 "app.review-reset" = "Review Reset…";

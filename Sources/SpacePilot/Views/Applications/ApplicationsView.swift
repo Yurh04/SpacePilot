@@ -18,9 +18,7 @@ struct ApplicationsView: View {
                     TableColumn(L10n.text(.application)) { projection in
                         let application = projection.application
                         HStack {
-                            Image(nsImage: NSWorkspace.shared.icon(forFile: application.url.path))
-                                .resizable()
-                                .frame(width: 24, height: 24)
+                            FileSystemItemIcon(url: application.url, size: 24)
                             VStack(alignment: .leading) {
                                 Text(application.name)
                                 Text(application.bundleIdentifier ?? application.url.path)
@@ -96,19 +94,36 @@ private struct ApplicationDetail: View {
             .padding(.horizontal)
 
             List(projection.associations) { pair in
-                HStack {
-                    VStack(alignment: .leading) {
-                        Text(pair.item.url.lastPathComponent)
-                        Text(pair.item.url.deletingLastPathComponent().path(percentEncoded: false))
+                let ownership = pair.association.ownership
+                let risk = max(pair.item.risk, pair.association.risk)
+                HStack(alignment: .top) {
+                    FileSystemItemIcon(url: pair.item.url)
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text(pair.item.url.lastPathComponent)
+                            Text(pair.item.url.deletingLastPathComponent().path(percentEncoded: false))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                            HStack(spacing: 4) {
+                                if ownership == .shared {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .accessibilityHidden(true)
+                                }
+                                Text(verbatim: L10n.name(for: ownership))
+                                Text(verbatim: "·")
+                                Text(verbatim: L10n.association(
+                                    pair.association.evidence,
+                                    confidence: pair.association.confidence
+                                ))
+                            }
                             .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                        Text(verbatim: L10n.association(pair.association.evidence, confidence: pair.association.confidence))
-                            .font(.caption).foregroundStyle(.secondary)
+                            .foregroundStyle(ownership == .shared ? .orange : .secondary)
+                        }
+                        Spacer()
+                        Text(verbatim: L10n.name(for: risk)).foregroundStyle(.secondary)
+                        Text(ByteCount.string(pair.item.allocatedSize)).monospacedDigit()
                     }
-                    Spacer()
-                    Text(verbatim: L10n.name(for: pair.association.risk)).foregroundStyle(.secondary)
-                    Text(ByteCount.string(pair.item.allocatedSize)).monospacedDigit()
                 }
                 .contextMenu { Button(L10n.text(.revealFinder)) { reveal(pair.item.url) } }
             }
