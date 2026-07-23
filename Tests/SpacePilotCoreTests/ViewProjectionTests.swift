@@ -95,6 +95,78 @@ final class ViewProjectionTests: XCTestCase {
         XCTAssertEqual(projection.coverage.notes, coverage.notes)
     }
 
+    func testOverviewProjectsDiskCapacityAndAnalyzedCategories() {
+        let personal = ScannedItem(
+            url: URL(fileURLWithPath: "/Users/test/Documents/archive"),
+            logicalSize: 200,
+            allocatedSize: 200,
+            category: .personal,
+            risk: .sensitive,
+            explanation: "Fixture"
+        )
+        let cache = ScannedItem(
+            url: URL(fileURLWithPath: "/Users/test/Library/Caches/example"),
+            logicalSize: 100,
+            allocatedSize: 100,
+            category: .cache,
+            risk: .safe,
+            explanation: "Fixture"
+        )
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: VolumeRecord(
+                url: URL(fileURLWithPath: "/"),
+                name: "Macintosh HD",
+                totalCapacity: 1_000,
+                availableCapacity: 250
+            ),
+            items: [personal, cache],
+            applications: [],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: .complete
+        )
+
+        let projection = OverviewProjection(snapshot: snapshot)
+
+        XCTAssertEqual(projection.totalCapacityBytes, 1_000)
+        XCTAssertEqual(projection.totalUsedBytes, 750)
+        XCTAssertEqual(projection.availableBytes, 250)
+        XCTAssertEqual(projection.categories.map(\.category), [.personal, .cache])
+        XCTAssertEqual(projection.categories.map(\.allocatedSize), [200, 100])
+        XCTAssertFalse(projection.categories.contains { $0.category == .system })
+        XCTAssertLessThanOrEqual(projection.categories.count, ItemCategory.allCases.count)
+    }
+
+    func testOverviewFallsBackToAnalyzedDiskMetricsWithoutVolumeMetadata() {
+        let item = ScannedItem.fixture(allocatedSize: 200)
+        let application = ApplicationRecord(
+            name: "Fixture",
+            bundleIdentifier: nil,
+            version: nil,
+            url: URL(fileURLWithPath: "/Applications/Fixture.app"),
+            executableURL: nil,
+            allocatedSize: 100
+        )
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: [item],
+            applications: [application],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: .complete
+        )
+
+        let projection = OverviewProjection(snapshot: snapshot)
+
+        XCTAssertEqual(projection.totalCapacityBytes, 300)
+        XCTAssertEqual(projection.totalUsedBytes, 300)
+        XCTAssertEqual(projection.availableBytes, 0)
+    }
+
     func testDeveloperAIProjectionAggregatesIndexedCollectionsWithoutDoubleCountingPluginSkills() throws {
         let pluginID = UUID()
         let childSkill = SkillRecord.fixture(allocatedSize: 40, parentPluginID: pluginID)

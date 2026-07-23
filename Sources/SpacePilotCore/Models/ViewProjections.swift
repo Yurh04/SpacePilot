@@ -83,9 +83,12 @@ public struct StorageCategorySummary: Identifiable, Sendable {
 
 public struct OverviewProjection: Sendable {
     public static let recommendationDisplayLimit = 8
+    public let totalCapacityBytes: Int64
     public let totalUsedBytes: Int64
+    public let availableBytes: Int64
     public let analyzedBytes: Int64
     public let reclaimableBytes: Int64
+    public let categories: [StorageCategorySummary]
     public let recommendations: [ScannedItem]
     public let coverage: ScanCoverage
 
@@ -102,6 +105,7 @@ public struct OverviewProjection: Sendable {
         try checkCancellation()
         var itemBytes: Int64 = 0
         var safeItemBytes: Int64 = 0
+        var categoryTotals: [ItemCategory: StorageCategoryAccumulator] = [:]
         var checkpoint = ProjectionCancellationCheckpoint(checkCancellation: checkCancellation)
         var recommendationSelection = BoundedScannedItemSelection(
             limit: Self.recommendationDisplayLimit,
@@ -110,24 +114,44 @@ public struct OverviewProjection: Sendable {
         for item in snapshot.items {
             try checkpoint.checkPeriodically()
             itemBytes += item.allocatedSize
+            categoryTotals[item.category, default: .init()].add(item.allocatedSize)
             if item.risk == .safe {
                 safeItemBytes += item.allocatedSize
                 recommendationSelection.insert(item)
             }
         }
 
-        if let volume = snapshot.volume {
-            totalUsedBytes = max(0, volume.totalCapacity - volume.availableCapacity)
-        } else {
-            totalUsedBytes = itemBytes
-        }
         var applicationBytes: Int64 = 0
         for application in snapshot.applications {
             try checkpoint.checkPeriodically()
             applicationBytes += application.allocatedSize
         }
         analyzedBytes = itemBytes + applicationBytes
+        if let volume = snapshot.volume {
+            totalCapacityBytes = volume.totalCapacity
+            totalUsedBytes = max(0, volume.totalCapacity - volume.availableCapacity)
+            availableBytes = volume.availableCapacity
+        } else {
+            totalCapacityBytes = analyzedBytes
+            totalUsedBytes = analyzedBytes
+            availableBytes = 0
+        }
         reclaimableBytes = safeItemBytes
+        var categoryValues: [StorageCategorySummary] = []
+        categoryValues.reserveCapacity(ItemCategory.allCases.count)
+        for (category, total) in categoryTotals {
+            try checkpoint.checkPeriodically()
+            categoryValues.append(StorageCategorySummary(
+                category: category,
+                allocatedSize: total.allocatedSize,
+                itemCount: total.itemCount
+            ))
+        }
+        categories = try ProjectionCancellationAwareOrdering.sorted(
+            categoryValues,
+            by: { $0.allocatedSize > $1.allocatedSize },
+            checkCancellation: checkCancellation
+        )
         // The heap is strictly bounded by recommendationDisplayLimit (8).
         recommendations = recommendationSelection.sortedItems
         coverage = snapshot.coverage
