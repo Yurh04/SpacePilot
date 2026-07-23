@@ -4,7 +4,9 @@ public struct CleanupCandidateRefresher: Sendable {
     public init() {}
 
     public func refresh(item: ScannedItem, policy: PathSafetyPolicy) throws -> CleanupCandidate {
+        try Task.checkCancellation()
         let url = try policy.validate(item.url)
+        try Task.checkCancellation()
         let values = try url.resourceValues(forKeys: [
             .isDirectoryKey,
             .isRegularFileKey,
@@ -16,7 +18,7 @@ public struct CleanupCandidateRefresher: Sendable {
         let size: Int64
         if values.isDirectory == true {
             kind = .directory
-            size = recursiveAllocatedSize(of: url)
+            size = try recursiveAllocatedSize(of: url)
         } else if values.isRegularFile == true {
             kind = .regularFile
             size = Int64(values.totalFileAllocatedSize ?? 0)
@@ -38,7 +40,8 @@ public struct CleanupCandidateRefresher: Sendable {
         )
     }
 
-    private func recursiveAllocatedSize(of root: URL) -> Int64 {
+    private func recursiveAllocatedSize(of root: URL) throws -> Int64 {
+        try Task.checkCancellation()
         guard let enumerator = FileManager.default.enumerator(
             at: root,
             includingPropertiesForKeys: [.isRegularFileKey, .totalFileAllocatedSizeKey],
@@ -46,6 +49,7 @@ public struct CleanupCandidateRefresher: Sendable {
         ) else { return 0 }
         var total: Int64 = 0
         for case let url as URL in enumerator {
+            try Task.checkCancellation()
             guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .totalFileAllocatedSizeKey]),
                   values.isRegularFile == true else { continue }
             total += Int64(values.totalFileAllocatedSize ?? 0)

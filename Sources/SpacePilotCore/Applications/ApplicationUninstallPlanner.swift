@@ -17,7 +17,8 @@ public struct CleanupReviewItem: Identifiable, Sendable {
         evidence: AssociationEvidence?,
         effectiveRisk: RiskLevel? = nil
     ) {
-        let risk = max(item.risk, effectiveRisk ?? item.risk)
+        let ownershipRisk: RiskLevel = ownership == .owned ? .safe : .sensitive
+        let risk = max(item.risk, effectiveRisk ?? item.risk, ownershipRisk)
         self.item = Self.copy(item, replacingRiskWith: risk)
         self.ownership = ownership
         self.evidence = evidence

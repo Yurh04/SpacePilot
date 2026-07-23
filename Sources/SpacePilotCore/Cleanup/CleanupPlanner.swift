@@ -29,10 +29,12 @@ public struct CleanupPlanner: Sendable {
         selectedIDs: Set<UUID>,
         separatelyConfirmedSensitiveIDs: Set<UUID>
     ) throws -> CleanupPlan {
+        try Task.checkCancellation()
         let byID = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
         var candidates: [CleanupCandidate] = []
 
         for id in selectedIDs {
+            try Task.checkCancellation()
             guard let item = byID[id] else {
                 throw CleanupPlanningError.unknownSelection(id)
             }

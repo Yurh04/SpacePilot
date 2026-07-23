@@ -229,6 +229,60 @@ final class ApplicationUninstallPlannerTests: XCTestCase {
         }
     }
 
+    func testCleanupNeverPresentsSharedOrPossibleSafeAssociationsAsSafe() throws {
+        let item = ScannedItem.fixture(
+            path: "/Users/test/Library/Caches/com.example.app",
+            risk: .safe,
+            allocatedSize: 20
+        )
+        let appID = UUID()
+
+        for ownership in [AssociationOwnership.shared, .possible] {
+            let association = ArtifactAssociation(
+                itemID: item.id,
+                applicationID: appID,
+                evidence: .knownRule,
+                confidence: .high,
+                risk: .safe,
+                ownership: ownership
+            )
+            let review = try XCTUnwrap(
+                ApplicationUninstallPlanner()
+                    .cleanupItems(for: projection(
+                        appID: appID,
+                        item: item,
+                        associations: [association]
+                    ))
+                    .first { $0.item.id == item.id }
+            )
+
+            XCTAssertEqual(review.ownership, ownership)
+            XCTAssertEqual(review.effectiveRisk, .sensitive)
+            XCTAssertEqual(review.item.risk, .sensitive)
+        }
+
+        let ownedAssociation = ArtifactAssociation(
+            itemID: item.id,
+            applicationID: appID,
+            evidence: .exactBundleIdentifier,
+            confidence: .high,
+            risk: .safe,
+            ownership: .owned
+        )
+        let ownedReview = try XCTUnwrap(
+            ApplicationUninstallPlanner()
+                .cleanupItems(for: projection(
+                    appID: appID,
+                    item: item,
+                    associations: [ownedAssociation]
+                ))
+                .first { $0.item.id == item.id }
+        )
+
+        XCTAssertEqual(ownedReview.effectiveRisk, .safe)
+        XCTAssertEqual(ownedReview.item.risk, .safe)
+    }
+
     func testCleanupPromotesAssociationRiskAndPlannerRequiresSensitiveConfirmation() {
         let item = ScannedItem.fixture(
             path: "/Users/test/Library/Application Support/Example/state.db",

@@ -43,6 +43,7 @@ final class AppModel {
 
     private var scanTask: Task<Void, Never>?
     private var cleanupTask: Task<Void, Never>?
+    private var cleanupOperationID: UUID?
     private var projectionWorker: Task<AppSnapshotProjection, Error>?
     private var projectionPublicationTask: Task<Void, Never>?
     private var aiQueryWorker: Task<AIApplicationQueryProjection, Error>?
@@ -135,6 +136,8 @@ final class AppModel {
             $0.effectiveRisk == .sensitive
         }.map(\.id))
         guard !eligibleSelectedIDs.isEmpty else { return }
+        let operationID = UUID()
+        cleanupOperationID = operationID
         isCleaning = true
         errorMessage = nil
         cleanupTask = Task {
@@ -146,28 +149,52 @@ final class AppModel {
                     homeDirectory: runtime.homeDirectory,
                     allowedVolumeRoot: URL(fileURLWithPath: "/", isDirectory: true)
                 )
-                let plan = try CleanupPlanner(policy: policy).makePlan(
-                    snapshotID: snapshot.id,
-                    items: candidateItems,
-                    selectedIDs: eligibleSelectedIDs,
-                    separatelyConfirmedSensitiveIDs: sensitiveIDs
-                )
+                let planningWorker = Task.detached(priority: .userInitiated) {
+                    try CleanupPlanner(policy: policy).makePlan(
+                        snapshotID: snapshot.id,
+                        items: candidateItems,
+                        selectedIDs: eligibleSelectedIDs,
+                        separatelyConfirmedSensitiveIDs: sensitiveIDs
+                    )
+                }
+                let plan = try await withTaskCancellationHandler {
+                    try await planningWorker.value
+                } onCancel: {
+                    planningWorker.cancel()
+                }
+                planningWorker.cancel()
+                guard !Task.isCancelled,
+                      cleanupOperationID == operationID,
+                      latestSnapshot?.id == snapshot.id else {
+                    throw CancellationError()
+                }
                 let transaction = try await CleanupExecutor(
                     policy: policy,
                     mover: FileManagerTrashMover(),
                     store: runtime.store
                 ).execute(plan: plan)
+                guard !Task.isCancelled,
+                      cleanupOperationID == operationID else {
+                    throw CancellationError()
+                }
                 latestCleanupTransaction = transaction
                 cleanupHistory = try await runtime.store.cleanupHistory()
                 Self.logger.info("Cleanup finished: \(transaction.summary.rawValue, privacy: .public)")
                 showingCleanupConfirmation = false
                 startScan()
+            } catch is CancellationError {
+                Self.logger.info("Cleanup cancelled")
             } catch {
-                errorMessage = error.localizedDescription
-                Self.logger.error("Cleanup failed: \(error.localizedDescription, privacy: .public)")
+                if cleanupOperationID == operationID {
+                    errorMessage = error.localizedDescription
+                    Self.logger.error("Cleanup failed: \(error.localizedDescription, privacy: .public)")
+                }
             }
-            isCleaning = false
-            cleanupTask = nil
+            if cleanupOperationID == operationID {
+                isCleaning = false
+                cleanupTask = nil
+                cleanupOperationID = nil
+            }
         }
     }
 

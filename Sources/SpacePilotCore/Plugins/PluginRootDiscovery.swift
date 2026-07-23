@@ -29,7 +29,8 @@ public struct PluginRootDiscovery<Access: FileSystemAccess>: Sendable {
     public func discover(homeDirectory: URL) -> PluginRootDiscoveryResult {
         let cache = homeDirectory.appending(path: ".codex/plugins/cache", directoryHint: .isDirectory)
         do {
-            guard try access.metadata(at: cache).isDirectory else {
+            let metadata = try access.metadata(at: cache)
+            guard metadata.isDirectory, !metadata.isSymbolicLink else {
                 return result(roots: [], diagnostics: [.cacheInaccessible])
             }
         } catch where isFileNotFound(error) {
@@ -92,7 +93,12 @@ public struct PluginRootDiscovery<Access: FileSystemAccess>: Sendable {
         diagnostics: inout Set<PluginDiscoveryDiagnostic>
     ) -> Bool {
         do {
-            return try access.metadata(at: url).isDirectory
+            let metadata = try access.metadata(at: url)
+            guard metadata.isDirectory, !metadata.isSymbolicLink else {
+                diagnostics.insert(failure)
+                return false
+            }
+            return true
         } catch {
             diagnostics.insert(failure)
             return false

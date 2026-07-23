@@ -67,6 +67,73 @@ final class PluginRootDiscoveryTests: XCTestCase {
         XCTAssertTrue(discovery.diagnostics.isEmpty)
         XCTAssertTrue(scan.diagnostics.contains { $0.hasPrefix("Missing Plugin manifest") })
     }
+
+    func testSymlinkCacheEscapeIsRejected() {
+        let home = URL(fileURLWithPath: "/fixture/home", isDirectory: true)
+        let cache = home.appending(path: ".codex/plugins/cache", directoryHint: .isDirectory)
+        let access = PluginDiscoveryFixtureAccess(
+            directories: [cache: []],
+            symbolicLinks: [cache]
+        )
+
+        let result = PluginRootDiscovery(access: access).discover(homeDirectory: home)
+
+        XCTAssertTrue(result.roots.isEmpty)
+        XCTAssertEqual(result.diagnostics, [.cacheInaccessible])
+    }
+
+    func testSymlinkSourceEscapeIsRejected() {
+        let home = URL(fileURLWithPath: "/fixture/home", isDirectory: true)
+        let cache = home.appending(path: ".codex/plugins/cache", directoryHint: .isDirectory)
+        let source = cache.appending(path: "curated", directoryHint: .isDirectory)
+        let access = PluginDiscoveryFixtureAccess(
+            directories: [cache: [source], source: []],
+            symbolicLinks: [source]
+        )
+
+        let result = PluginRootDiscovery(access: access).discover(homeDirectory: home)
+
+        XCTAssertTrue(result.roots.isEmpty)
+        XCTAssertEqual(result.diagnostics, [.sourceInaccessible])
+    }
+
+    func testSymlinkPluginDirectoryEscapeIsRejected() {
+        let home = URL(fileURLWithPath: "/fixture/home", isDirectory: true)
+        let cache = home.appending(path: ".codex/plugins/cache", directoryHint: .isDirectory)
+        let source = cache.appending(path: "curated", directoryHint: .isDirectory)
+        let plugin = source.appending(path: "product-design", directoryHint: .isDirectory)
+        let access = PluginDiscoveryFixtureAccess(
+            directories: [cache: [source], source: [plugin], plugin: []],
+            symbolicLinks: [plugin]
+        )
+
+        let result = PluginRootDiscovery(access: access).discover(homeDirectory: home)
+
+        XCTAssertTrue(result.roots.isEmpty)
+        XCTAssertEqual(result.diagnostics, [.pluginDirectoryInaccessible])
+    }
+
+    func testSymlinkVersionEscapeIsRejected() {
+        let home = URL(fileURLWithPath: "/fixture/home", isDirectory: true)
+        let cache = home.appending(path: ".codex/plugins/cache", directoryHint: .isDirectory)
+        let source = cache.appending(path: "curated", directoryHint: .isDirectory)
+        let plugin = source.appending(path: "product-design", directoryHint: .isDirectory)
+        let version = plugin.appending(path: "1.0.0", directoryHint: .isDirectory)
+        let access = PluginDiscoveryFixtureAccess(
+            directories: [
+                cache: [source],
+                source: [plugin],
+                plugin: [version],
+                version: []
+            ],
+            symbolicLinks: [version]
+        )
+
+        let result = PluginRootDiscovery(access: access).discover(homeDirectory: home)
+
+        XCTAssertTrue(result.roots.isEmpty)
+        XCTAssertEqual(result.diagnostics, [.installationInaccessible])
+    }
 }
 
 private struct PluginDiscoveryFixtureAccess: FileSystemAccess {
@@ -74,12 +141,14 @@ private struct PluginDiscoveryFixtureAccess: FileSystemAccess {
     let missing: Set<URL>
     let unreadableMetadata: Set<URL>
     let unreadableListings: Set<URL>
+    let symbolicLinks: Set<URL>
 
     init(
         directories: [URL: [URL]] = [:],
         missing: Set<URL> = [],
         unreadableMetadata: Set<URL> = [],
-        unreadableListings: Set<URL> = []
+        unreadableListings: Set<URL> = [],
+        symbolicLinks: Set<URL> = []
     ) {
         self.directories = Dictionary(uniqueKeysWithValues: directories.map {
             ($0.key.standardizedFileURL, $0.value)
@@ -87,6 +156,7 @@ private struct PluginDiscoveryFixtureAccess: FileSystemAccess {
         self.missing = Set(missing.map(\.standardizedFileURL))
         self.unreadableMetadata = Set(unreadableMetadata.map(\.standardizedFileURL))
         self.unreadableListings = Set(unreadableListings.map(\.standardizedFileURL))
+        self.symbolicLinks = Set(symbolicLinks.map(\.standardizedFileURL))
     }
 
     func metadata(at url: URL) throws -> FileMetadata {
@@ -96,7 +166,7 @@ private struct PluginDiscoveryFixtureAccess: FileSystemAccess {
         return FileMetadata(
             isDirectory: true,
             isRegularFile: false,
-            isSymbolicLink: false,
+            isSymbolicLink: symbolicLinks.contains(url),
             isPackage: false,
             logicalSize: 0,
             allocatedSize: 0,

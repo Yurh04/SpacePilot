@@ -88,4 +88,43 @@ final class CleanupPlannerTests: XCTestCase {
         XCTAssertEqual(plan.candidates.first?.itemKind, .regularFile)
         XCTAssertGreaterThan(plan.candidates.first?.allocatedSize ?? 0, stale.allocatedSize)
     }
+
+    func testCancelledTaskStopsDirectoryRefreshBeforeProducingAPlan() async throws {
+        let tree = try TemporaryTree(files: [
+            "Library/Caches/live/one.bin": 16,
+            "Library/Caches/live/two.bin": 16
+        ])
+        let directory = tree.url.appending(path: "Library/Caches/live")
+        let item = ScannedItem(
+            url: directory,
+            logicalSize: 32,
+            allocatedSize: 32,
+            category: .cache,
+            risk: .safe,
+            explanation: "Live cache"
+        )
+        let planner = CleanupPlanner(policy: .init(
+            homeDirectory: tree.url,
+            allowedVolumeRoot: tree.url
+        ))
+
+        let task = Task.detached {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try planner.makePlan(
+                snapshotID: UUID(),
+                items: [item],
+                selectedIDs: [item.id],
+                separatelyConfirmedSensitiveIDs: []
+            )
+        }
+
+        do {
+            _ = try await task.value
+            XCTFail("Cancelled planning must not publish a cleanup plan")
+        } catch is CancellationError {
+            // Expected.
+        } catch {
+            XCTFail("Expected CancellationError, got \(error)")
+        }
+    }
 }

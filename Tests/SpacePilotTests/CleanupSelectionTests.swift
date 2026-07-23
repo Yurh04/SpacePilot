@@ -90,6 +90,29 @@ final class CleanupSelectionTests: XCTestCase {
         XCTAssertTrue(selection.hasSelectedSensitiveItems)
     }
 
+    func testSharedAndPossibleReviewRowsCannotPresentSafeRisk() {
+        let safeItem = item(path: "/tmp/shared-safe", risk: .safe)
+
+        for ownership in [AssociationOwnership.shared, .possible] {
+            let review = CleanupReviewItem(
+                item: safeItem,
+                ownership: ownership,
+                evidence: .knownRule
+            )
+
+            XCTAssertEqual(review.effectiveRisk, .sensitive)
+            XCTAssertEqual(review.item.risk, .sensitive)
+        }
+
+        let owned = CleanupReviewItem(
+            item: safeItem,
+            ownership: .owned,
+            evidence: .exactBundleIdentifier
+        )
+        XCTAssertEqual(owned.effectiveRisk, .safe)
+        XCTAssertEqual(owned.item.risk, .safe)
+    }
+
     private func item(
         path: String,
         risk: RiskLevel = .safe,
