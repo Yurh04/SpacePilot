@@ -88,6 +88,74 @@ final class ApplicationIdentityReaderTests: XCTestCase {
             ]
         )
     }
+
+    func testRejectsAllowedDirectorySymlinkEscapingApplicationBundle() throws {
+        let outside = try TestAppBuilder(
+            name: "Outside",
+            bundleIdentifier: "com.example.outside"
+        )
+        .withEmbeddedBundle(
+            relativePath: "Contents/PlugIns/External.appex",
+            bundleIdentifier: "com.example.external"
+        )
+        .build()
+        let app = try TestAppBuilder(
+            name: "Browser",
+            bundleIdentifier: "com.example.browser"
+        )
+        .build()
+        try FileManager.default.createSymbolicLink(
+            at: app.record.url.appending(path: "Contents/PlugIns"),
+            withDestinationURL: outside.record.url.appending(path: "Contents/PlugIns")
+        )
+
+        let identity = try makeReader().read(application: app.record)
+
+        XCTAssertEqual(identity.componentBundleIdentifiers, [])
+    }
+
+    func testRejectsEmbeddedBundleSymlinkEscapingApplicationBundle() throws {
+        let outside = try TestAppBuilder(
+            name: "Outside",
+            bundleIdentifier: "com.example.outside"
+        )
+        .withEmbeddedBundle(
+            relativePath: "Contents/PlugIns/External.appex",
+            bundleIdentifier: "com.example.external"
+        )
+        .build()
+        let app = try TestAppBuilder(
+            name: "Browser",
+            bundleIdentifier: "com.example.browser"
+        )
+        .withEmbeddedBundle(
+            relativePath: "Contents/PlugIns/Widget.appex",
+            bundleIdentifier: "com.example.browser.widget"
+        )
+        .build()
+        try FileManager.default.createSymbolicLink(
+            at: app.record.url.appending(path: "Contents/PlugIns/Escaped.appex"),
+            withDestinationURL: outside.record.url.appending(
+                path: "Contents/PlugIns/External.appex"
+            )
+        )
+
+        let identity = try makeReader().read(application: app.record)
+
+        XCTAssertEqual(
+            identity.componentBundleIdentifiers,
+            ["com.example.browser.widget"]
+        )
+    }
+
+    private func makeReader() -> ApplicationIdentityReader {
+        ApplicationIdentityReader(
+            signingReader: StubSigningMetadata(
+                teamIdentifier: nil,
+                applicationGroups: []
+            )
+        )
+    }
 }
 
 private struct StubSigningMetadata: ApplicationSigningMetadataReading {

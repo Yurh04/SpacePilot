@@ -90,6 +90,8 @@ public struct ApplicationIdentityReader: ApplicationIdentityReading {
             "Contents/Library/LoginItems",
             "Contents/Helpers"
         ]
+        let canonicalApplicationURL = applicationURL.standardizedFileURL
+            .resolvingSymlinksInPath()
         var identifiers = Set<String>()
 
         for relativePath in embeddedBundleDirectories {
@@ -97,9 +99,15 @@ public struct ApplicationIdentityReader: ApplicationIdentityReading {
                 path: relativePath,
                 directoryHint: .isDirectory
             )
-            guard let children = try? FileManager.default.contentsOfDirectory(
+            guard let canonicalDirectoryURL = safeDirectory(
                 at: directoryURL,
-                includingPropertiesForKeys: [.isDirectoryKey],
+                strictlyWithin: canonicalApplicationURL
+            ) else {
+                continue
+            }
+            guard let children = try? FileManager.default.contentsOfDirectory(
+                at: canonicalDirectoryURL,
+                includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
                 options: [.skipsHiddenFiles]
             ) else {
                 continue
@@ -111,13 +119,45 @@ public struct ApplicationIdentityReader: ApplicationIdentityReading {
                 ) else {
                     continue
                 }
-                if let identifier = bundleIdentifier(at: child) {
+                guard let canonicalChild = safeDirectory(
+                    at: child,
+                    strictlyWithin: canonicalDirectoryURL
+                ), canonicalChild.deletingLastPathComponent() == canonicalDirectoryURL
+                else {
+                    continue
+                }
+                if let identifier = bundleIdentifier(at: canonicalChild) {
                     identifiers.insert(identifier)
                 }
             }
         }
 
         return identifiers
+    }
+
+    private func safeDirectory(
+        at url: URL,
+        strictlyWithin root: URL
+    ) -> URL? {
+        guard let values = try? url.resourceValues(
+            forKeys: [.isDirectoryKey, .isSymbolicLinkKey]
+        ), values.isDirectory == true, values.isSymbolicLink != true
+        else {
+            return nil
+        }
+
+        let canonicalURL = url.standardizedFileURL.resolvingSymlinksInPath()
+        guard isStrictDescendant(canonicalURL, of: root) else {
+            return nil
+        }
+        return canonicalURL
+    }
+
+    private func isStrictDescendant(_ candidate: URL, of root: URL) -> Bool {
+        let rootComponents = root.pathComponents
+        let candidateComponents = candidate.pathComponents
+        return candidateComponents.count > rootComponents.count
+            && candidateComponents.starts(with: rootComponents)
     }
 
     private func bundleIdentifier(at bundleURL: URL) -> String? {
