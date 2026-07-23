@@ -1,7 +1,9 @@
 # Selective Cleanup and Storage Workbench Design
 
-**Date:** 2026-07-23  
-**Status:** Approved for implementation  
+**Date:** 2026-07-23
+
+**Status:** Approved for implementation
+
 **Product:** SpacePilot for macOS 15+, Apple Silicon only
 
 ## Goal
