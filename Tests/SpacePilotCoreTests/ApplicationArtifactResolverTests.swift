@@ -461,6 +461,104 @@ final class ApplicationArtifactResolverTests: XCTestCase {
         XCTAssertNil(
             result.items.first { $0.id == launchItemID }?.ownerID
         )
+        let supportPaths = Set([
+            firstHelperURL.deletingLastPathComponent().standardizedFileURL.path,
+            secondHelperURL.deletingLastPathComponent().standardizedFileURL.path
+        ])
+        let supportItemIDs = Set(result.items.compactMap {
+            supportPaths.contains($0.url.standardizedFileURL.path)
+                ? $0.id
+                : nil
+        })
+        let supportAssociations = result.resolutions
+            .flatMap(\.associations)
+            .filter { supportItemIDs.contains($0.itemID) }
+        XCTAssertEqual(supportItemIDs.count, 2)
+        XCTAssertEqual(supportAssociations.count, 2)
+        XCTAssertTrue(supportAssociations.allSatisfy {
+            $0.evidence == .signedHelperRelationship
+                && $0.ownership == .owned
+        })
+    }
+
+    func testLaunchAgentTargetsSharingSupportDirectoryAreShared() async throws {
+        let home = try TemporaryTree(files: [
+            "Library/Application Support/Vendor/SharedUpdater/com.vendor.first.helper.app/Contents/MacOS/Helper": 39,
+            "Library/Application Support/Vendor/SharedUpdater/com.vendor.second.helper.app/Contents/MacOS/Helper": 40
+        ])
+        let supportURL = home.url.appending(
+            path: "Library/Application Support/Vendor/SharedUpdater",
+            directoryHint: .isDirectory
+        )
+        let firstHelperURL = supportURL.appending(
+            path: "com.vendor.first.helper.app",
+            directoryHint: .isDirectory
+        )
+        let secondHelperURL = supportURL.appending(
+            path: "com.vendor.second.helper.app",
+            directoryHint: .isDirectory
+        )
+        let launchAgentURL = home.url.appending(
+            path: "Library/LaunchAgents/com.vendor.shared-helper.plist"
+        )
+        try FileManager.default.createDirectory(
+            at: launchAgentURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let plistData = try PropertyListSerialization.data(
+            fromPropertyList: [
+                "Program": firstHelperURL.path,
+                "ProgramArguments": [secondHelperURL.path]
+            ],
+            format: .xml,
+            options: 0
+        )
+        try plistData.write(to: launchAgentURL)
+        let first = application(
+            name: "Alpha",
+            bundleID: "com.vendor.first"
+        )
+        let second = application(
+            name: "Beta",
+            bundleID: "com.vendor.second"
+        )
+        let identities = [
+            ApplicationIdentity(
+                applicationID: first.id,
+                mainBundleIdentifier: first.bundleIdentifier,
+                componentBundleIdentifiers: ["com.vendor.first.helper"],
+                teamIdentifier: "TEAM",
+                applicationGroups: []
+            ),
+            ApplicationIdentity(
+                applicationID: second.id,
+                mainBundleIdentifier: second.bundleIdentifier,
+                componentBundleIdentifiers: ["com.vendor.second.helper"],
+                teamIdentifier: "TEAM",
+                applicationGroups: []
+            )
+        ]
+
+        let result = try await ApplicationArtifactResolver().resolve(
+            applications: [first, second],
+            identities: identities,
+            homeDirectory: home.url
+        )
+
+        let supportItem = try XCTUnwrap(
+            result.items.first {
+                $0.url.standardizedFileURL == supportURL.standardizedFileURL
+            }
+        )
+        let supportAssociations = result.resolutions
+            .flatMap(\.associations)
+            .filter { $0.itemID == supportItem.id }
+        XCTAssertEqual(supportAssociations.count, 2)
+        XCTAssertTrue(supportAssociations.allSatisfy {
+            $0.evidence == .signedHelperRelationship
+                && $0.ownership == .shared
+        })
+        XCTAssertNil(supportItem.ownerID)
     }
 
     func testExactLaunchTargetIdentityPreservesPunctuation() async throws {

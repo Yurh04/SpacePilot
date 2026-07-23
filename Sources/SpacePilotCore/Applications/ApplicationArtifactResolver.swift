@@ -136,14 +136,12 @@ public struct ApplicationArtifactResolver: Sendable {
             let collectedMatches = candidate.matchesByApplicationID.sorted {
                 $0.key.uuidString < $1.key.uuidString
             }
-            let hasSharedExactIdentifier = collectedMatches.lazy.filter {
-                $0.value.evidence == .exactBundleIdentifier
-                    && $0.value.ownership == .owned
+            let hasMultipleOwnedApplications = collectedMatches.lazy.filter {
+                $0.value.ownership == .owned
             }.count > 1
             let matches: [(key: UUID, value: Match)] = collectedMatches.map {
                 applicationID, match in
-                guard hasSharedExactIdentifier,
-                      match.evidence == .exactBundleIdentifier,
+                guard hasMultipleOwnedApplications,
                       match.ownership == .owned
                 else {
                     return (key: applicationID, value: match)
