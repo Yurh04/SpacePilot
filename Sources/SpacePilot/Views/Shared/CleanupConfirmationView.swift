@@ -24,6 +24,8 @@ struct CleanupConfirmationView: View {
     }
 
     var body: some View {
+        let selectedSpace = selection.selectedBytes == 0 ? "0 KB" : ByteCount.string(selection.selectedBytes)
+
         VStack(alignment: .leading, spacing: 16) {
             Text(verbatim: L10n.text(.cleanupReview))
                 .font(.title2.weight(.semibold))
@@ -68,7 +70,7 @@ struct CleanupConfirmationView: View {
 
             Text(verbatim: L10n.selectedItems(
                 selection.selectedIDs.count,
-                space: ByteCount.string(selection.selectedBytes)
+                space: selectedSpace
             ))
             .font(.headline)
             .monospacedDigit()

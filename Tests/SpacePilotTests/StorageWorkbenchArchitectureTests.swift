@@ -23,6 +23,14 @@ final class StorageWorkbenchArchitectureTests: XCTestCase {
         XCTAssertTrue(source.contains("reviewCleanup(safeSelectedItems)"))
     }
 
+    func testStorageWorkbenchFitsTheMinimumSupportedWindowWidth() throws {
+        let source = try storageViewSource()
+
+        XCTAssertTrue(source.contains("maxWidth: 280"))
+        XCTAssertFalse(source.contains("minWidth: 620"))
+        XCTAssertFalse(source.contains(".frame(width: 260)"))
+    }
+
     private func storageViewSource() throws -> String {
         try String(
             contentsOf: repositoryRoot.appending(

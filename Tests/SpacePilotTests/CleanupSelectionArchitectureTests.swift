@@ -23,6 +23,16 @@ final class CleanupSelectionArchitectureTests: XCTestCase {
         XCTAssertTrue(view.contains("onConfirm(selection.selectedIDs, confirmsSensitive)"))
     }
 
+    func testCleanupConfirmationUsesNumericZeroSpace() throws {
+        let view = try source(
+            at: "Sources/SpacePilot/Views/Shared/CleanupConfirmationView.swift"
+        )
+
+        XCTAssertTrue(view.contains(
+            "selection.selectedBytes == 0 ? \"0 KB\" : ByteCount.string(selection.selectedBytes)"
+        ))
+    }
+
     private func source(at relativePath: String) throws -> String {
         try String(
             contentsOf: repositoryRoot.appending(path: relativePath),

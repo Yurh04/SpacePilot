@@ -70,4 +70,8 @@ final class ModelAggregationTests: XCTestCase {
         XCTAssertTrue(output.contains("1"))
         XCTAssertTrue(output.localizedCaseInsensitiveContains("KB"))
     }
+
+    func testByteCountUsesNumericZeroForLocalizedSummaries() {
+        XCTAssertEqual(ByteCount.string(0), "0 KB")
+    }
 }

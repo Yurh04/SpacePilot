@@ -20,10 +20,10 @@ struct StorageView: View {
 
                 HSplitView {
                     categoryBrowser(projection)
-                        .frame(minWidth: 230, idealWidth: 270, maxWidth: 330)
+                        .frame(minWidth: 210, idealWidth: 240, maxWidth: 280)
 
                     itemsWorkspace(projection)
-                        .frame(minWidth: 620)
+                        .frame(minWidth: 420)
                 }
             }
             .onChange(of: categorySelection) {
@@ -108,7 +108,7 @@ struct StorageView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                .frame(width: 260)
+                .frame(width: 200)
 
                 Button(L10n.text(.storageReviewSafeCleanup)) {
                     reviewCleanup(safeSelectedItems)
@@ -146,11 +146,13 @@ struct StorageView: View {
                                 }
                             }
                     }
+                    .width(min: 140, ideal: 200)
                     TableColumn(L10n.location()) { item in
                         Text(item.url.deletingLastPathComponent().path(percentEncoded: false))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
+                    .width(min: 150, ideal: 240)
                     TableColumn(L10n.risk()) { item in
                         Text(verbatim: L10n.name(for: item.risk))
                     }
