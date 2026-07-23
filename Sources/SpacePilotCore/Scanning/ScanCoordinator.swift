@@ -18,7 +18,11 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
         try SpacePilotRuntime.live().coordinator
     }
 
-    public init(homeDirectory: URL, store: any SnapshotStoring) {
+    public init(
+        homeDirectory: URL,
+        store: any SnapshotStoring,
+        identityReader: any ApplicationIdentityReading = ApplicationIdentityReader()
+    ) {
         self.operation = { emit in
             let volume = try VolumeScanner().scan()
             let appLocations = [
@@ -27,6 +31,22 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
             ].filter { FileManager.default.fileExists(atPath: $0.path) }
             let applicationScanner = ApplicationScanner()
             let baseApplications = try await applicationScanner.scan(locations: appLocations)
+            var identities: [ApplicationIdentity] = []
+            identities.reserveCapacity(baseApplications.count)
+            for application in baseApplications {
+                try Task.checkCancellation()
+                do {
+                    identities.append(try identityReader.read(application: application))
+                } catch {
+                    identities.append(ApplicationIdentity(
+                        applicationID: application.id,
+                        mainBundleIdentifier: application.bundleIdentifier,
+                        componentBundleIdentifiers: [],
+                        teamIdentifier: nil,
+                        applicationGroups: []
+                    ))
+                }
+            }
             let quickSnapshot = ScanSnapshot(
                 completedAt: .now,
                 volume: volume,
@@ -93,14 +113,51 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
             let pluginResult = try await PluginScanner(skillScanner: SkillScanner()).scan(roots: pluginDiscovery.roots)
             let indexedSkills = SkillConflictDetector().detect(in: standaloneSkills + pluginResult.skills)
 
-            var applicationItems: [ScannedItem] = []
-            var applications: [ApplicationRecord] = []
             let resolver = ApplicationArtifactResolver()
-            for application in baseApplications {
-                try Task.checkCancellation()
-                let resolution = try await resolver.resolve(application: application, homeDirectory: homeDirectory)
-                applicationItems.append(contentsOf: resolution.items)
-                applications.append(ApplicationRecord(
+            let applicationResolution = try await resolver.resolve(
+                applications: baseApplications,
+                identities: identities,
+                homeDirectory: homeDirectory
+            )
+
+            let sourceItems = homeResult.items
+                + developer.items
+                + codex.items
+                + claude.items
+                + basicAIScans.flatMap(\.items)
+                + applicationResolution.items
+            var itemsByPath: [String: ScannedItem] = [:]
+            for item in sourceItems {
+                itemsByPath[Self.canonicalPath(for: item.url)] = item
+            }
+            let items = itemsByPath.values.sorted { $0.url.path < $1.url.path }
+            let canonicalItemIDBySourceItemID = Dictionary(
+                sourceItems.compactMap { item -> (UUID, UUID)? in
+                    guard let canonicalItem = itemsByPath[
+                        Self.canonicalPath(for: item.url)
+                    ] else {
+                        return nil
+                    }
+                    return (item.id, canonicalItem.id)
+                },
+                uniquingKeysWith: { _, latest in latest }
+            )
+            let associationsByApplicationID = Dictionary(
+                applicationResolution.resolutions.map { resolution in
+                    (
+                        resolution.applicationID,
+                        resolution.associations.map {
+                            Self.remap(
+                                association: $0,
+                                itemIDs: canonicalItemIDBySourceItemID
+                            )
+                        }
+                    )
+                },
+                uniquingKeysWith: { first, _ in first }
+            )
+            let applications = baseApplications.map { application in
+                ApplicationRecord(
                     id: application.id,
                     name: application.name,
                     bundleIdentifier: application.bundleIdentifier,
@@ -109,15 +166,12 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                     executableURL: application.executableURL,
                     allocatedSize: application.allocatedSize,
                     lastUsedDate: application.lastUsedDate,
-                    associations: resolution.associations
-                ))
+                    associations: associationsByApplicationID[
+                        application.id,
+                        default: []
+                    ]
+                )
             }
-
-            var itemsByPath = Dictionary(uniqueKeysWithValues: homeResult.items.map { ($0.url.path, $0) })
-            for item in applicationItems + developer.items + codex.items + claude.items + basicAIScans.flatMap(\.items) {
-                itemsByPath[item.url.path] = item
-            }
-            let items = itemsByPath.values.sorted { $0.url.path < $1.url.path }
             let codexSkills = Set(indexedSkills.filter { $0.visibleAgents.contains("Codex") }.map(\.id))
             let claudeSkills = Set(indexedSkills.filter { $0.visibleAgents.contains("Claude") }.map(\.id))
             let codexBundle = baseApplications.first {
@@ -134,7 +188,10 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                 bundleIdentifier: codex.application.bundleIdentifier,
                 applicationURL: codexBundle?.url,
                 rootURLs: codex.application.rootURLs,
-                itemIDs: codex.application.itemIDs,
+                itemIDs: Self.remap(
+                    itemIDs: codex.application.itemIDs,
+                    using: canonicalItemIDBySourceItemID
+                ),
                 pluginIDs: Set(pluginResult.plugins.map(\.id)),
                 skillIDs: codexSkills,
                 applicationAllocatedSize: codexBundle?.allocatedSize ?? codex.application.applicationAllocatedSize,
@@ -146,13 +203,23 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                 bundleIdentifier: claude.application.bundleIdentifier,
                 applicationURL: claudeBundle?.url,
                 rootURLs: claude.application.rootURLs,
-                itemIDs: claude.application.itemIDs,
+                itemIDs: Self.remap(
+                    itemIDs: claude.application.itemIDs,
+                    using: canonicalItemIDBySourceItemID
+                ),
                 pluginIDs: [],
                 skillIDs: claudeSkills,
                 applicationAllocatedSize: claudeBundle?.allocatedSize ?? claude.application.applicationAllocatedSize,
                 supportLevel: claude.application.supportLevel
             )
-            let aiApplications = [codexApplication, claudeApplication] + basicAIScans.map(\.application)
+            let basicAIApplications = basicAIScans.map {
+                Self.remap(
+                    application: $0.application,
+                    itemIDs: canonicalItemIDBySourceItemID
+                )
+            }
+            let aiApplications = [codexApplication, claudeApplication]
+                + basicAIApplications
             emit(ScanEvent(stage: .indexing, progress: 0.88, message: "Saving local metadata index"))
             try Task.checkCancellation()
 
@@ -194,6 +261,53 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
         }
         guard let completed else { throw CancellationError() }
         return completed
+    }
+
+    private static func canonicalPath(for url: URL) -> String {
+        url.standardizedFileURL.resolvingSymlinksInPath().path
+    }
+
+    private static func remap(
+        association: ArtifactAssociation,
+        itemIDs: [UUID: UUID]
+    ) -> ArtifactAssociation {
+        ArtifactAssociation(
+            id: association.id,
+            itemID: itemIDs[association.itemID] ?? association.itemID,
+            applicationID: association.applicationID,
+            evidence: association.evidence,
+            confidence: association.confidence,
+            risk: association.risk,
+            ownership: association.ownership
+        )
+    }
+
+    private static func remap(
+        itemIDs: Set<UUID>,
+        using replacements: [UUID: UUID]
+    ) -> Set<UUID> {
+        Set(itemIDs.map { replacements[$0] ?? $0 })
+    }
+
+    private static func remap(
+        application: AIApplicationRecord,
+        itemIDs: [UUID: UUID]
+    ) -> AIApplicationRecord {
+        AIApplicationRecord(
+            id: application.id,
+            name: application.name,
+            bundleIdentifier: application.bundleIdentifier,
+            applicationURL: application.applicationURL,
+            rootURLs: application.rootURLs,
+            itemIDs: remap(
+                itemIDs: application.itemIDs,
+                using: itemIDs
+            ),
+            pluginIDs: application.pluginIDs,
+            skillIDs: application.skillIDs,
+            applicationAllocatedSize: application.applicationAllocatedSize,
+            supportLevel: application.supportLevel
+        )
     }
 }
 
