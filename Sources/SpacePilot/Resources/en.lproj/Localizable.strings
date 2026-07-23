@@ -101,9 +101,11 @@
 "overview.analyze-mac" = "Analyze this Mac";
 "overview.analyzed-categories-chart" = "Locally analyzed categories";
 "overview.analyzed-categories-description" = "These bars cover locally analyzed data, not the whole disk.";
+"overview.analyzed-categories-empty" = "No locally analyzed categories are available yet.";
 "overview.analyzed-locally" = "Analyzed locally";
 "overview.disk-available" = "Available";
 "overview.disk-capacity-chart" = "Internal disk capacity";
+"overview.disk-capacity-unavailable-description" = "Whole-disk capacity is unavailable. Only locally analyzed data is shown.";
 "overview.disk-total" = "Total capacity";
 "overview.disk-used" = "Used";
 "overview.internal-disk-used" = "Internal disk used";

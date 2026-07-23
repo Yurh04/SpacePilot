@@ -1,6 +1,38 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "overview.analyzed-categories-empty": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No locally analyzed categories are available yet."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂无本地已分析类别。"
+          }
+        }
+      }
+    },
+    "overview.disk-capacity-unavailable-description": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Whole-disk capacity is unavailable. Only locally analyzed data is shown."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法获取整个磁盘的容量。当前仅显示本地已分析的数据。"
+          }
+        }
+      }
+    },
     "overview.analyzed-categories-chart": {
       "localizations": {
         "en": {

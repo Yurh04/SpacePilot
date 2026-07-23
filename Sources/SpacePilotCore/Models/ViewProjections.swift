@@ -86,6 +86,7 @@ public struct OverviewProjection: Sendable {
     public let totalCapacityBytes: Int64
     public let totalUsedBytes: Int64
     public let availableBytes: Int64
+    public let hasWholeDiskCapacity: Bool
     public let analyzedBytes: Int64
     public let reclaimableBytes: Int64
     public let categories: [StorageCategorySummary]
@@ -128,10 +129,12 @@ public struct OverviewProjection: Sendable {
         }
         analyzedBytes = itemBytes + applicationBytes
         if let volume = snapshot.volume {
+            hasWholeDiskCapacity = true
             totalCapacityBytes = volume.totalCapacity
             totalUsedBytes = max(0, volume.totalCapacity - volume.availableCapacity)
             availableBytes = volume.availableCapacity
         } else {
+            hasWholeDiskCapacity = false
             totalCapacityBytes = analyzedBytes
             totalUsedBytes = analyzedBytes
             availableBytes = 0

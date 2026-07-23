@@ -133,6 +133,7 @@ final class ViewProjectionTests: XCTestCase {
         XCTAssertEqual(projection.totalCapacityBytes, 1_000)
         XCTAssertEqual(projection.totalUsedBytes, 750)
         XCTAssertEqual(projection.availableBytes, 250)
+        XCTAssertTrue(projection.hasWholeDiskCapacity)
         XCTAssertEqual(projection.categories.map(\.category), [.personal, .cache])
         XCTAssertEqual(projection.categories.map(\.allocatedSize), [200, 100])
         XCTAssertFalse(projection.categories.contains { $0.category == .system })
@@ -202,6 +203,7 @@ final class ViewProjectionTests: XCTestCase {
         XCTAssertEqual(projection.totalCapacityBytes, 300)
         XCTAssertEqual(projection.totalUsedBytes, 300)
         XCTAssertEqual(projection.availableBytes, 0)
+        XCTAssertFalse(projection.hasWholeDiskCapacity)
     }
 
     func testDeveloperAIProjectionAggregatesIndexedCollectionsWithoutDoubleCountingPluginSkills() throws {

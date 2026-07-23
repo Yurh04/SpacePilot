@@ -14,12 +14,8 @@ struct OverviewView: View {
                     Section {
                         ViewThatFits(in: .horizontal) {
                             HStack(alignment: .top, spacing: 24) {
-                                DiskCapacityChart(
-                                    usedBytes: projection.totalUsedBytes,
-                                    availableBytes: projection.availableBytes,
-                                    totalCapacityBytes: projection.totalCapacityBytes
-                                )
-                                .frame(maxWidth: .infinity)
+                                diskCapacitySummary(projection)
+                                    .frame(maxWidth: .infinity)
 
                                 AnalyzedCategoryChart(categories: projection.categories)
                                     .frame(maxWidth: .infinity)
@@ -27,11 +23,7 @@ struct OverviewView: View {
                             .frame(minWidth: 900)
 
                             VStack(alignment: .leading, spacing: 24) {
-                                DiskCapacityChart(
-                                    usedBytes: projection.totalUsedBytes,
-                                    availableBytes: projection.availableBytes,
-                                    totalCapacityBytes: projection.totalCapacityBytes
-                                )
+                                diskCapacitySummary(projection)
 
                                 AnalyzedCategoryChart(categories: projection.categories)
                             }
@@ -79,6 +71,29 @@ struct OverviewView: View {
                         .buttonStyle(.borderedProminent)
                 }
                 .navigationTitle(L10n.overview())
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func diskCapacitySummary(_ projection: OverviewProjection) -> some View {
+        if projection.hasWholeDiskCapacity {
+            DiskCapacityChart(
+                usedBytes: projection.totalUsedBytes,
+                availableBytes: projection.availableBytes,
+                totalCapacityBytes: projection.totalCapacityBytes
+            )
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(verbatim: L10n.text(.overviewDiskCapacityChart))
+                    .font(.headline)
+                Label(
+                    L10n.text(.overviewDiskCapacityUnavailableDescription),
+                    systemImage: "internaldrive"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

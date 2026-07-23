@@ -9,20 +9,33 @@ struct AnalyzedCategoryChart: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(verbatim: L10n.text(.overviewAnalyzedCategoriesChart))
                 .font(.headline)
-            Text(verbatim: L10n.text(.overviewAnalyzedCategoriesDescription))
+                .accessibilityHidden(true)
+
+            if categories.isEmpty {
+                Label(
+                    L10n.text(.overviewAnalyzedCategoriesEmpty),
+                    systemImage: "chart.bar.xaxis"
+                )
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text(verbatim: L10n.text(.overviewAnalyzedCategoriesDescription))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
 
-            Chart(categories) { summary in
-                BarMark(
-                    x: .value(L10n.space(), summary.allocatedSize),
-                    y: .value(L10n.text(.category), L10n.name(for: summary.category))
-                )
-                .foregroundStyle(Color.accentColor)
-            }
-            .frame(height: 220)
-            .accessibilityRepresentation {
-                categoryValues
+                Chart(categories) { summary in
+                    BarMark(
+                        x: .value(L10n.space(), summary.allocatedSize),
+                        y: .value(L10n.text(.category), L10n.name(for: summary.category))
+                    )
+                    .foregroundStyle(Color.accentColor)
+                }
+                .frame(height: 220)
+                .accessibilityRepresentation {
+                    categoryValues
+                }
             }
         }
     }

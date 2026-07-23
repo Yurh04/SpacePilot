@@ -11,6 +11,13 @@ final class OverviewChartArchitectureTests: XCTestCase {
         XCTAssertTrue(source.contains("minWidth: 900"))
     }
 
+    func testOverviewOnlyRendersWholeDiskChartWhenCapacityIsProven() throws {
+        let source = try source(at: "Sources/SpacePilot/Views/Overview/OverviewView.swift")
+
+        XCTAssertTrue(source.contains("if projection.hasWholeDiskCapacity"))
+        XCTAssertTrue(source.contains("overviewDiskCapacityUnavailableDescription"))
+    }
+
     func testDiskCapacityChartUsesAnAccessibleNativeDonut() throws {
         let source = try source(at: "Sources/SpacePilot/Views/Overview/DiskCapacityChart.swift")
 
@@ -21,6 +28,23 @@ final class OverviewChartArchitectureTests: XCTestCase {
         XCTAssertTrue(source.contains("overviewDiskUsed"))
         XCTAssertTrue(source.contains("overviewDiskAvailable"))
         XCTAssertTrue(source.contains("height: 220"))
+    }
+
+    func testDiskSectorsHaveVisibleNonColorLabels() throws {
+        let source = try source(at: "Sources/SpacePilot/Views/Overview/DiskCapacityChart.swift")
+
+        XCTAssertTrue(source.contains(".annotation(position: .overlay)"))
+        XCTAssertTrue(source.contains("if segment.bytes > 0"))
+        XCTAssertTrue(source.contains("Text(verbatim: segment.name)"))
+    }
+
+    func testVisibleDiskCopiesAreHiddenBehindOneAccessibilityReplacement() throws {
+        let source = try source(at: "Sources/SpacePilot/Views/Overview/DiskCapacityChart.swift")
+
+        XCTAssertTrue(source.contains("visibleCapacityValues"))
+        XCTAssertTrue(source.contains("accessibleCapacityValues"))
+        XCTAssertTrue(source.contains(".accessibilityHidden(true)"))
+        XCTAssertTrue(source.contains(".accessibilityRepresentation"))
     }
 
     func testAnalyzedCategoryChartUsesAccessibleHorizontalBars() throws {
@@ -34,9 +58,24 @@ final class OverviewChartArchitectureTests: XCTestCase {
         XCTAssertTrue(source.contains("height: 220"))
     }
 
+    func testAnalyzedCategoryChartHasACompactLocalizedEmptyState() throws {
+        let source = try source(at: "Sources/SpacePilot/Views/Overview/AnalyzedCategoryChart.swift")
+
+        XCTAssertTrue(source.contains("if categories.isEmpty"))
+        XCTAssertTrue(source.contains("overviewAnalyzedCategoriesEmpty"))
+        XCTAssertTrue(source.contains("chart.bar.xaxis"))
+    }
+
+    func testVisibleCategoryCopiesAreHiddenBehindOneAccessibilityReplacement() throws {
+        let source = try source(at: "Sources/SpacePilot/Views/Overview/AnalyzedCategoryChart.swift")
+
+        XCTAssertTrue(source.contains(".accessibilityHidden(true)"))
+        XCTAssertTrue(source.contains(".accessibilityRepresentation"))
+    }
+
     func testRecommendationsRemainAfterTheChartSection() throws {
         let source = try source(at: "Sources/SpacePilot/Views/Overview/OverviewView.swift")
-        let chart = try XCTUnwrap(source.range(of: "DiskCapacityChart("))
+        let chart = try XCTUnwrap(source.range(of: "ViewThatFits(in: .horizontal)"))
         let recommendations = try XCTUnwrap(
             source.range(of: "Section(L10n.text(.overviewSafeRecommendations))")
         )

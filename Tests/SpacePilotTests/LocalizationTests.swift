@@ -194,6 +194,14 @@ final class LocalizationTests: XCTestCase {
             "overview.analyzed-categories-description": (
                 "These bars cover locally analyzed data, not the whole disk.",
                 "这些条形图涵盖本地已分析的数据，而不是整个磁盘。"
+            ),
+            "overview.analyzed-categories-empty": (
+                "No locally analyzed categories are available yet.",
+                "暂无本地已分析类别。"
+            ),
+            "overview.disk-capacity-unavailable-description": (
+                "Whole-disk capacity is unavailable. Only locally analyzed data is shown.",
+                "无法获取整个磁盘的容量。当前仅显示本地已分析的数据。"
             )
         ]
 
@@ -262,7 +270,7 @@ final class LocalizationTests: XCTestCase {
         let english = try stringsTable(at: resources.appending(path: "en.lproj/Localizable.strings"))
         let chinese = try stringsTable(at: resources.appending(path: "zh-Hans.lproj/Localizable.strings"))
 
-        XCTAssertEqual(L10n.allKeys.count, 192)
+        XCTAssertEqual(L10n.allKeys.count, 194)
         XCTAssertEqual(Set(catalogStrings.keys), L10n.allKeys)
         XCTAssertEqual(Set(english.keys), L10n.allKeys)
         XCTAssertEqual(Set(chinese.keys), L10n.allKeys)

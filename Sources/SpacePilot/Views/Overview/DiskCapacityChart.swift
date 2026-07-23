@@ -38,6 +38,7 @@ struct DiskCapacityChart: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(verbatim: L10n.text(.overviewDiskCapacityChart))
                 .font(.headline)
+                .accessibilityHidden(true)
 
             Chart(segments) { segment in
                 SectorMark(
@@ -50,17 +51,29 @@ struct DiskCapacityChart: View {
                         ? Color.accentColor
                         : Color.secondary.opacity(0.28)
                 )
+                .annotation(position: .overlay) {
+                    if segment.bytes > 0 {
+                        Text(verbatim: segment.name)
+                            .font(.caption2.weight(.semibold))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(.regularMaterial, in: Capsule())
+                    }
+                }
             }
             .frame(height: 220)
             .accessibilityRepresentation {
-                capacityValues
+                accessibleCapacityValues
             }
 
-            capacityValues
+            visibleCapacityValues
+                .accessibilityHidden(true)
         }
     }
 
-    private var capacityValues: some View {
+    private var visibleCapacityValues: some View {
         VStack(alignment: .leading, spacing: 4) {
             LabeledContent(
                 L10n.text(.overviewDiskUsed),
@@ -75,7 +88,12 @@ struct DiskCapacityChart: View {
                 value: ByteCount.string(totalCapacityBytes)
             )
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(L10n.text(.overviewDiskCapacityChart))
+    }
+
+    private var accessibleCapacityValues: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(verbatim: L10n.text(.overviewDiskCapacityChart))
+            visibleCapacityValues
+        }
     }
 }

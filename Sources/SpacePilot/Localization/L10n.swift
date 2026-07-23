@@ -48,9 +48,11 @@ enum L10n {
         static let overviewAnalyzeMac = Self(key: "overview.analyze-mac", english: "Analyze this Mac")
         static let overviewAnalyzedCategoriesChart = Self(key: "overview.analyzed-categories-chart", english: "Locally analyzed categories")
         static let overviewAnalyzedCategoriesDescription = Self(key: "overview.analyzed-categories-description", english: "These bars cover locally analyzed data, not the whole disk.")
+        static let overviewAnalyzedCategoriesEmpty = Self(key: "overview.analyzed-categories-empty", english: "No locally analyzed categories are available yet.")
         static let overviewAnalyzedLocally = Self(key: "overview.analyzed-locally", english: "Analyzed locally")
         static let overviewDiskAvailable = Self(key: "overview.disk-available", english: "Available")
         static let overviewDiskCapacityChart = Self(key: "overview.disk-capacity-chart", english: "Internal disk capacity")
+        static let overviewDiskCapacityUnavailableDescription = Self(key: "overview.disk-capacity-unavailable-description", english: "Whole-disk capacity is unavailable. Only locally analyzed data is shown.")
         static let overviewDiskTotal = Self(key: "overview.disk-total", english: "Total capacity")
         static let overviewDiskUsed = Self(key: "overview.disk-used", english: "Used")
         static let overviewInternalDiskUsed = Self(key: "overview.internal-disk-used", english: "Internal disk used")
@@ -118,7 +120,8 @@ enum L10n {
         "common.skill", "common.source", "confidence.high", "confidence.low", "confidence.medium",
         "error.quit-before-uninstall", "error.reset-unavailable", "overview.analyze-mac",
         "overview.analyzed-categories-chart", "overview.analyzed-categories-description",
-        "overview.analyzed-locally", "overview.disk-available", "overview.disk-capacity-chart",
+        "overview.analyzed-categories-empty", "overview.analyzed-locally", "overview.disk-available",
+        "overview.disk-capacity-chart", "overview.disk-capacity-unavailable-description",
         "overview.disk-total", "overview.disk-used", "overview.internal-disk-used", "overview.limited-coverage",
         "overview.limited-coverage-description", "overview.no-recommendations", "overview.review-cleanup",
         "overview.safe-recommendations", "overview.start-scan", "overview.storage-glance",
