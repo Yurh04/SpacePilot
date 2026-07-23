@@ -49,7 +49,7 @@ struct StorageView: View {
     private func categoryBrowser(_ projection: StorageProjection) -> some View {
         List(selection: $categorySelection) {
             StorageCategoryRow(
-                title: "All Analyzed Items",
+                title: L10n.text(.storageAllAnalyzed),
                 itemCount: projection.categories.reduce(0) { $0 + $1.itemCount },
                 allocatedSize: projection.analyzedBytes,
                 comparisonSize: projection.usedBytes
@@ -69,7 +69,7 @@ struct StorageView: View {
         .listStyle(.sidebar)
         .safeAreaInset(edge: .top) {
             HStack {
-                Text("Categories")
+                Text(verbatim: L10n.text(.storageCategories))
                     .font(.headline)
                 Spacer()
             }
@@ -90,7 +90,7 @@ struct StorageView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(categoryTitle)
                         .font(.headline)
-                    Text("\(visibleItems.count.formatted()) visible items")
+                    Text(verbatim: L10n.visibleItems(visibleItems.count))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -110,7 +110,7 @@ struct StorageView: View {
                 .labelsHidden()
                 .frame(width: 260)
 
-                Button("Review Safe Cleanup") {
+                Button(L10n.text(.storageReviewSafeCleanup)) {
                     reviewCleanup(safeSelectedItems)
                 }
                 .buttonStyle(.borderedProminent)
@@ -122,9 +122,9 @@ struct StorageView: View {
 
             if visibleItems.isEmpty {
                 ContentUnavailableView(
-                    "No Matching Items",
+                    L10n.text(.storageNoMatching),
                     systemImage: "internaldrive",
-                    description: Text("Choose another category or display mode.")
+                    description: Text(verbatim: L10n.text(.storageNoMatchingDescription))
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -182,7 +182,8 @@ struct StorageView: View {
     }
 
     private var categoryTitle: String {
-        selectedCategory.map { L10n.name(for: $0) } ?? "All Analyzed Items"
+        selectedCategory.map { L10n.name(for: $0) }
+            ?? L10n.text(.storageAllAnalyzed)
     }
 
     private func filteredItems(in projection: StorageProjection) -> [ScannedItem] {
@@ -201,13 +202,13 @@ private struct StorageCapacityHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
-                Text("Internal Disk")
+                Text(verbatim: L10n.text(.storageInternalDisk))
                     .font(.title3.weight(.semibold))
                 Spacer()
-                Text(
-                    "\(ByteCount.string(projection.usedBytes)) of "
-                        + ByteCount.string(projection.totalCapacity)
-                )
+                Text(verbatim: L10n.usedSpace(
+                    ByteCount.string(projection.usedBytes),
+                    total: ByteCount.string(projection.totalCapacity)
+                ))
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
             }
@@ -218,10 +219,10 @@ private struct StorageCapacityHeader: View {
             )
 
             HStack(spacing: 28) {
-                metric("Total Capacity", bytes: projection.totalCapacity)
-                metric("Used", bytes: projection.usedBytes)
-                metric("Available", bytes: projection.availableBytes)
-                metric("Analyzed Locally", bytes: projection.analyzedBytes)
+                metric(L10n.text(.storageTotalCapacity), bytes: projection.totalCapacity)
+                metric(L10n.text(.storageUsed), bytes: projection.usedBytes)
+                metric(L10n.text(.storageAvailable), bytes: projection.availableBytes)
+                metric(L10n.text(.overviewAnalyzedLocally), bytes: projection.analyzedBytes)
             }
         }
         .padding(16)
@@ -261,7 +262,7 @@ private struct StorageCategoryRow: View {
                 value: Double(allocatedSize),
                 total: Double(max(comparisonSize, 1))
             )
-            Text("\(itemCount.formatted()) \(L10n.text(.items))")
+            Text(verbatim: L10n.itemCount(itemCount))
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }

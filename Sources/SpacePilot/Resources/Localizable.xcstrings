@@ -1,6 +1,102 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "cleanup.clear-selection": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Clear" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "清除" } }
+      }
+    },
+    "cleanup.move-selected-trash": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Move Selected to Trash" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "将所选项目移到废纸篓" } }
+      }
+    },
+    "cleanup.select-all": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Select All" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "全选" } }
+      }
+    },
+    "cleanup.selected-summary": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%lld selected · %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已选 %lld 项，共 %@" } }
+      }
+    },
+    "common.item-count": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%lld items" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "%lld 项" } }
+      }
+    },
+    "storage.all-analyzed": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "All Analyzed Items" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "全部已分析项目" } }
+      }
+    },
+    "storage.available": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Available" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "可用" } }
+      }
+    },
+    "storage.categories": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Categories" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "类别" } }
+      }
+    },
+    "storage.internal-disk": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Internal Disk" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "内置磁盘" } }
+      }
+    },
+    "storage.no-matching": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No Matching Items" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "没有匹配的项目" } }
+      }
+    },
+    "storage.no-matching-description": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Choose another category or display mode." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请选择其他类别或显示方式。" } }
+      }
+    },
+    "storage.review-safe-cleanup": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Review Safe Cleanup" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "检查安全清理" } }
+      }
+    },
+    "storage.total-capacity": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Total Capacity" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "总容量" } }
+      }
+    },
+    "storage.used": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Used" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已使用" } }
+      }
+    },
+    "storage.used-of": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%@ of %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已使用 %@，共 %@" } }
+      }
+    },
+    "storage.visible-items": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%lld visible items" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "显示 %lld 项" } }
+      }
+    },
     "common.search-current": {
       "localizations": {
         "en": {

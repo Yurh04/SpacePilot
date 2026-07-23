@@ -118,6 +118,32 @@ final class LocalizationTests: XCTestCase {
         XCTAssertEqual(L10n.noPluginsInstalled(locale: Locale(identifier: "zh-Hans")), "未安装插件")
     }
 
+    func testSelectiveCleanupAndStorageWorkbenchUseBothLanguages() {
+        let english = Locale(identifier: "en")
+        let chinese = Locale(identifier: "zh-Hans")
+
+        XCTAssertEqual(L10n.text(.cleanupSelectAll, locale: english), "Select All")
+        XCTAssertEqual(L10n.text(.cleanupSelectAll, locale: chinese), "全选")
+        XCTAssertEqual(
+            L10n.text(.storageAllAnalyzed, locale: english),
+            "All Analyzed Items"
+        )
+        XCTAssertEqual(
+            L10n.text(.storageAllAnalyzed, locale: chinese),
+            "全部已分析项目"
+        )
+        XCTAssertEqual(
+            L10n.selectedItems(2, space: "3 GB", locale: chinese),
+            "已选 2 项，共 3 GB"
+        )
+        XCTAssertEqual(
+            L10n.usedSpace("420 GB", total: "500 GB", locale: english),
+            "420 GB of 500 GB"
+        )
+        XCTAssertEqual(L10n.itemCount(8, locale: chinese), "8 项")
+        XCTAssertEqual(L10n.visibleItems(5, locale: chinese), "显示 5 项")
+    }
+
     func testPluginDiagnosticsAreSpecificLocalizedAndSanitizedForPresentation() {
         let privatePath = "/Users/private/.codex/plugins/cache/source/plugin/1.0.0"
         let diagnostics = [
@@ -176,7 +202,7 @@ final class LocalizationTests: XCTestCase {
         let english = try stringsTable(at: resources.appending(path: "en.lproj/Localizable.strings"))
         let chinese = try stringsTable(at: resources.appending(path: "zh-Hans.lproj/Localizable.strings"))
 
-        XCTAssertEqual(L10n.allKeys.count, 161)
+        XCTAssertEqual(L10n.allKeys.count, 177)
         XCTAssertEqual(Set(catalogStrings.keys), L10n.allKeys)
         XCTAssertEqual(Set(english.keys), L10n.allKeys)
         XCTAssertEqual(Set(chinese.keys), L10n.allKeys)

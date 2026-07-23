@@ -31,14 +31,14 @@ struct CleanupConfirmationView: View {
                 .foregroundStyle(.secondary)
 
             HStack {
-                Text("\(items.count.formatted()) \(L10n.text(.items))")
+                Text(verbatim: L10n.itemCount(items.count))
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("Select All") {
+                Button(L10n.text(.cleanupSelectAll)) {
                     selection.selectAll()
                 }
                 .disabled(isExecuting || selection.selectedIDs.count == items.count)
-                Button("Clear") {
+                Button(L10n.text(.cleanupClearSelection)) {
                     selection.clear()
                 }
                 .disabled(isExecuting || selection.selectedIDs.isEmpty)
@@ -66,10 +66,10 @@ struct CleanupConfirmationView: View {
             }
             .frame(minHeight: 220)
 
-            Text(
-                "\(selection.selectedIDs.count.formatted()) selected · "
-                    + ByteCount.string(selection.selectedBytes)
-            )
+            Text(verbatim: L10n.selectedItems(
+                selection.selectedIDs.count,
+                space: ByteCount.string(selection.selectedBytes)
+            ))
             .font(.headline)
             .monospacedDigit()
 
@@ -82,7 +82,10 @@ struct CleanupConfirmationView: View {
                 Spacer()
                 Button(L10n.cancel(), action: onCancel)
                     .keyboardShortcut(.cancelAction)
-                Button(isExecuting ? L10n.text(.cleanupMoving) : L10n.text(.cleanupMoveTrash)) {
+                Button(isExecuting
+                    ? L10n.text(.cleanupMoving)
+                    : L10n.text(.cleanupMoveSelectedTrash)
+                ) {
                     onConfirm(selection.selectedIDs, confirmsSensitive)
                 }
                 .buttonStyle(.borderedProminent)

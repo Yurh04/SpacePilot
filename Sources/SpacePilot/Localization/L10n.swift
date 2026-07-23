@@ -28,12 +28,15 @@ enum L10n {
         static let applicationUninstall = Self(key: "app.uninstall", english: "Uninstall…")
         static let cleanupConfirmSensitive = Self(key: "cleanup.confirm-sensitive", english: "Also move the sensitive conversation, project, or settings data listed above")
         static let cleanupConfirmTrash = Self(key: "cleanup.confirm-trash", english: "I understand these items will be moved to the Trash")
+        static let cleanupClearSelection = Self(key: "cleanup.clear-selection", english: "Clear")
         static let cleanupHistoryEmpty = Self(key: "cleanup.history-empty", english: "No cleanup history")
         static let cleanupHistoryEmptyDescription = Self(key: "cleanup.history-empty-description", english: "Verified cleanup operations will appear here.")
+        static let cleanupMoveSelectedTrash = Self(key: "cleanup.move-selected-trash", english: "Move Selected to Trash")
         static let cleanupMoveTrash = Self(key: "cleanup.move-trash", english: "Move to Trash")
         static let cleanupMoving = Self(key: "cleanup.moving", english: "Moving…")
         static let cleanupReview = Self(key: "cleanup.review", english: "Review Cleanup")
         static let cleanupReviewDescription = Self(key: "cleanup.review-description", english: "These exact items will be moved to the Trash. You can restore them from the Trash until it is emptied.")
+        static let cleanupSelectAll = Self(key: "cleanup.select-all", english: "Select All")
         static let category = Self(key: "common.category", english: "Category")
         static let items = Self(key: "common.items", english: "Items")
         static let name = Self(key: "common.name", english: "Name")
@@ -66,10 +69,19 @@ enum L10n {
         static let settingsOpenDiskAccess = Self(key: "settings.open-disk-access", english: "Open Full Disk Access Settings")
         static let settingsPrivacy = Self(key: "settings.privacy", english: "Privacy")
         static let settingsPrivacyDescription = Self(key: "settings.privacy-description", english: "All analysis stays on this Mac. SpacePilot stores metadata, not conversation or log contents.")
+        static let storageAllAnalyzed = Self(key: "storage.all-analyzed", english: "All Analyzed Items")
+        static let storageAvailable = Self(key: "storage.available", english: "Available")
+        static let storageCategories = Self(key: "storage.categories", english: "Categories")
+        static let storageInternalDisk = Self(key: "storage.internal-disk", english: "Internal Disk")
         static let storageLargest = Self(key: "storage.largest", english: "Largest")
         static let storageLargestItems = Self(key: "storage.largest-items", english: "Largest analyzed items")
+        static let storageNoMatching = Self(key: "storage.no-matching", english: "No Matching Items")
+        static let storageNoMatchingDescription = Self(key: "storage.no-matching-description", english: "Choose another category or display mode.")
         static let storageOldItems = Self(key: "storage.old-items", english: "Not modified in 180+ days")
         static let storageOlder180 = Self(key: "storage.older-180", english: "Older than 180 days")
+        static let storageReviewSafeCleanup = Self(key: "storage.review-safe-cleanup", english: "Review Safe Cleanup")
+        static let storageTotalCapacity = Self(key: "storage.total-capacity", english: "Total Capacity")
+        static let storageUsed = Self(key: "storage.used", english: "Used")
     }
     static let allKeys: Set<String> = [
         "category.ai-data", "category.application", "category.cache", "category.conversation",
@@ -88,11 +100,13 @@ enum L10n {
         "app.evidence.bundle-id", "app.evidence.container-id", "app.evidence.known-rule",
         "app.evidence.name", "app.evidence.signed-helper", "app.only-high-confidence",
         "app.related", "app.reset", "app.review-reset", "app.review-uninstall", "app.total-space",
-        "app.uninstall", "cleanup.confirm-sensitive", "cleanup.confirm-trash", "cleanup.history-empty",
-        "cleanup.history-empty-description", "cleanup.move-trash", "cleanup.moved-count",
-        "cleanup.moving", "cleanup.review", "cleanup.review-description", "cleanup.summary.failed",
+        "app.uninstall", "cleanup.clear-selection", "cleanup.confirm-sensitive", "cleanup.confirm-trash",
+        "cleanup.history-empty", "cleanup.history-empty-description", "cleanup.move-selected-trash",
+        "cleanup.move-trash", "cleanup.moved-count", "cleanup.moving", "cleanup.review",
+        "cleanup.review-description", "cleanup.select-all", "cleanup.selected-summary", "cleanup.summary.failed",
         "cleanup.summary.partial", "cleanup.summary.success", "cleanup.verified-space",
-        "common.application-name", "common.category", "common.data", "common.items", "common.name",
+        "common.application-name", "common.category", "common.data", "common.item-count",
+        "common.items", "common.name",
         "common.plugin", "common.related", "common.reveal-finder", "common.search-current",
         "common.skill", "common.source", "confidence.high", "confidence.low", "confidence.medium",
         "error.quit-before-uninstall", "error.reset-unavailable", "overview.analyze-mac",
@@ -107,8 +121,12 @@ enum L10n {
         "settings.disk-access", "settings.disk-access-description", "settings.export-diagnostics",
         "settings.open-disk-access", "settings.privacy", "settings.privacy-description",
         "skill.scope.plugin", "skill.scope.shared", "skill.scope.system", "skill.status.parent-managed",
-        "skill.status.read-only", "skill.status.standalone", "storage.largest", "storage.largest-items",
-        "storage.old-items", "storage.older-180", "cleanup.outcome.failed", "cleanup.outcome.moved",
+        "skill.status.read-only", "skill.status.standalone", "storage.all-analyzed",
+        "storage.available", "storage.categories", "storage.internal-disk", "storage.largest",
+        "storage.largest-items", "storage.no-matching", "storage.no-matching-description",
+        "storage.old-items", "storage.older-180", "storage.review-safe-cleanup",
+        "storage.total-capacity", "storage.used", "storage.used-of", "storage.visible-items",
+        "cleanup.outcome.failed", "cleanup.outcome.moved",
         "cleanup.outcome.skipped-changed", "cleanup.outcome.skipped-protected",
         "explanation.application-bundle", "explanation.application-name-match",
         "explanation.claude-cache", "explanation.claude-conversation", "explanation.claude-logs",
@@ -457,6 +475,28 @@ enum L10n {
 
     static func reviewCleanup(_ space: String, locale: Locale? = nil) -> String {
         format("overview.review-cleanup", default: "Review %@ Cleanup", locale: locale, space)
+    }
+
+    static func itemCount(_ count: Int, locale: Locale? = nil) -> String {
+        format("common.item-count", default: "%lld items", locale: locale, Int64(count))
+    }
+
+    static func selectedItems(_ count: Int, space: String, locale: Locale? = nil) -> String {
+        format(
+            "cleanup.selected-summary",
+            default: "%lld selected · %@",
+            locale: locale,
+            Int64(count),
+            space
+        )
+    }
+
+    static func visibleItems(_ count: Int, locale: Locale? = nil) -> String {
+        format("storage.visible-items", default: "%lld visible items", locale: locale, Int64(count))
+    }
+
+    static func usedSpace(_ used: String, total: String, locale: Locale? = nil) -> String {
+        format("storage.used-of", default: "%@ of %@", locale: locale, used, total)
     }
 
     static func quitBeforeUninstall(_ application: String, locale: Locale? = nil) -> String {
