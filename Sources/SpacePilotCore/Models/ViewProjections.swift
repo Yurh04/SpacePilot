@@ -128,7 +128,9 @@ public struct OverviewProjection: Sendable {
             applicationBytes += application.allocatedSize
         }
         analyzedBytes = itemBytes + applicationBytes
-        if let volume = snapshot.volume {
+        if let volume = snapshot.volume,
+           volume.totalCapacity > 0,
+           (0...volume.totalCapacity).contains(volume.availableCapacity) {
             hasWholeDiskCapacity = true
             totalCapacityBytes = volume.totalCapacity
             totalUsedBytes = max(0, volume.totalCapacity - volume.availableCapacity)
@@ -144,6 +146,7 @@ public struct OverviewProjection: Sendable {
         categoryValues.reserveCapacity(ItemCategory.allCases.count)
         for (category, total) in categoryTotals {
             try checkpoint.checkPeriodically()
+            guard total.allocatedSize > 0 else { continue }
             categoryValues.append(StorageCategorySummary(
                 category: category,
                 allocatedSize: total.allocatedSize,

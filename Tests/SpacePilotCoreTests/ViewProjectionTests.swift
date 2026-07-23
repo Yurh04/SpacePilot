@@ -206,6 +206,76 @@ final class ViewProjectionTests: XCTestCase {
         XCTAssertFalse(projection.hasWholeDiskCapacity)
     }
 
+    func testOverviewOmitsCategoriesWhoseItemsAllocateNoSpace() {
+        let items = [
+            ScannedItem(
+                url: URL(fileURLWithPath: "/tmp/empty-cache"),
+                logicalSize: 0,
+                allocatedSize: 0,
+                category: .cache,
+                risk: .safe,
+                explanation: "Fixture"
+            ),
+            ScannedItem(
+                url: URL(fileURLWithPath: "/tmp/empty-log"),
+                logicalSize: 0,
+                allocatedSize: 0,
+                category: .log,
+                risk: .safe,
+                explanation: "Fixture"
+            )
+        ]
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: items,
+            applications: [],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: .complete
+        )
+
+        XCTAssertTrue(OverviewProjection(snapshot: snapshot).categories.isEmpty)
+    }
+
+    func testOverviewRejectsInvalidWholeDiskCapacityMetadata() {
+        let item = ScannedItem.fixture(allocatedSize: 200)
+        let invalidCapacities: [(total: Int64, available: Int64)] = [
+            (0, 0),
+            (-1, 0),
+            (1_000, -1),
+            (1_000, 1_001)
+        ]
+
+        for capacity in invalidCapacities {
+            let snapshot = ScanSnapshot(
+                completedAt: .now,
+                volume: VolumeRecord(
+                    url: URL(fileURLWithPath: "/"),
+                    name: "Invalid",
+                    totalCapacity: capacity.total,
+                    availableCapacity: capacity.available
+                ),
+                items: [item],
+                applications: [],
+                aiApplications: [],
+                plugins: [],
+                skills: [],
+                coverage: .complete
+            )
+            let projection = OverviewProjection(snapshot: snapshot)
+
+            XCTAssertFalse(
+                projection.hasWholeDiskCapacity,
+                "Accepted total \(capacity.total), available \(capacity.available)"
+            )
+            XCTAssertEqual(projection.totalCapacityBytes, 200)
+            XCTAssertEqual(projection.totalUsedBytes, 200)
+            XCTAssertEqual(projection.availableBytes, 0)
+        }
+    }
+
     func testDeveloperAIProjectionAggregatesIndexedCollectionsWithoutDoubleCountingPluginSkills() throws {
         let pluginID = UUID()
         let childSkill = SkillRecord.fixture(allocatedSize: 40, parentPluginID: pluginID)

@@ -66,6 +66,16 @@ final class OverviewChartArchitectureTests: XCTestCase {
         XCTAssertTrue(source.contains("chart.bar.xaxis"))
     }
 
+    func testProjectionFiltersZeroByteCategoriesIntoTheCompactEmptyState() throws {
+        let projection = try source(at: "Sources/SpacePilotCore/Models/ViewProjections.swift")
+        let overview = try source(at: "Sources/SpacePilot/Views/Overview/OverviewView.swift")
+        let chart = try source(at: "Sources/SpacePilot/Views/Overview/AnalyzedCategoryChart.swift")
+
+        XCTAssertTrue(projection.contains("guard total.allocatedSize > 0 else"))
+        XCTAssertTrue(overview.contains("AnalyzedCategoryChart(categories: projection.categories)"))
+        XCTAssertTrue(chart.contains("if categories.isEmpty"))
+    }
+
     func testVisibleCategoryCopiesAreHiddenBehindOneAccessibilityReplacement() throws {
         let source = try source(at: "Sources/SpacePilot/Views/Overview/AnalyzedCategoryChart.swift")
 
