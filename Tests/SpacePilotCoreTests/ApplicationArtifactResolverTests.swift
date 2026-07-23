@@ -385,6 +385,121 @@ final class ApplicationArtifactResolverTests: XCTestCase {
         XCTAssertEqual(launchAssociation.ownership, .owned)
     }
 
+    func testLaunchAgentWithExactTargetsForTwoApplicationsIsShared() async throws {
+        let home = try TemporaryTree(files: [
+            "Library/Application Support/Vendor/FirstUpdater/com.vendor.first.helper.app/Contents/MacOS/Helper": 36,
+            "Library/Application Support/Vendor/SecondUpdater/com.vendor.second.helper.app/Contents/MacOS/Helper": 37
+        ])
+        let firstHelperURL = home.url.appending(
+            path: "Library/Application Support/Vendor/FirstUpdater/com.vendor.first.helper.app",
+            directoryHint: .isDirectory
+        )
+        let secondHelperURL = home.url.appending(
+            path: "Library/Application Support/Vendor/SecondUpdater/com.vendor.second.helper.app",
+            directoryHint: .isDirectory
+        )
+        let launchAgentURL = home.url.appending(
+            path: "Library/LaunchAgents/com.vendor.dual-helper.plist"
+        )
+        try FileManager.default.createDirectory(
+            at: launchAgentURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let plistData = try PropertyListSerialization.data(
+            fromPropertyList: [
+                "Program": firstHelperURL.path,
+                "ProgramArguments": [secondHelperURL.path]
+            ],
+            format: .xml,
+            options: 0
+        )
+        try plistData.write(to: launchAgentURL)
+        let first = application(
+            name: "Alpha",
+            bundleID: "com.vendor.first"
+        )
+        let second = application(
+            name: "Beta",
+            bundleID: "com.vendor.second"
+        )
+        let identities = [
+            ApplicationIdentity(
+                applicationID: first.id,
+                mainBundleIdentifier: first.bundleIdentifier,
+                componentBundleIdentifiers: ["com.vendor.first.helper"],
+                teamIdentifier: "TEAM",
+                applicationGroups: []
+            ),
+            ApplicationIdentity(
+                applicationID: second.id,
+                mainBundleIdentifier: second.bundleIdentifier,
+                componentBundleIdentifiers: ["com.vendor.second.helper"],
+                teamIdentifier: "TEAM",
+                applicationGroups: []
+            )
+        ]
+
+        let result = try await ApplicationArtifactResolver().resolve(
+            applications: [first, second],
+            identities: identities,
+            homeDirectory: home.url
+        )
+
+        let launchItemID = try XCTUnwrap(
+            result.items.first {
+                $0.url.standardizedFileURL == launchAgentURL.standardizedFileURL
+            }?.id
+        )
+        let launchAssociations = result.resolutions
+            .flatMap(\.associations)
+            .filter { $0.itemID == launchItemID }
+        XCTAssertEqual(launchAssociations.count, 2)
+        XCTAssertTrue(launchAssociations.allSatisfy {
+            $0.evidence == .signedHelperRelationship
+                && $0.ownership == .shared
+        })
+        XCTAssertNil(
+            result.items.first { $0.id == launchItemID }?.ownerID
+        )
+    }
+
+    func testExactLaunchTargetIdentityPreservesPunctuation() async throws {
+        let home = try TemporaryTree(files: [
+            "Library/Application Support/Vendor/com.vendor.foobar.app/Contents/MacOS/Helper": 38
+        ])
+        let targetURL = home.url.appending(
+            path: "Library/Application Support/Vendor/com.vendor.foobar.app",
+            directoryHint: .isDirectory
+        )
+        let launchAgentURL = home.url.appending(
+            path: "Library/LaunchAgents/com.vendor.punctuation.plist"
+        )
+        try EdgeAssociationFixture.writeLaunchAgent(
+            at: launchAgentURL,
+            target: targetURL
+        )
+        let application = application(
+            name: "Voyager",
+            bundleID: "com.vendor.voyager"
+        )
+        let applicationIdentity = ApplicationIdentity(
+            applicationID: application.id,
+            mainBundleIdentifier: application.bundleIdentifier,
+            componentBundleIdentifiers: ["com.vendor.foo-bar"],
+            teamIdentifier: "TEAM",
+            applicationGroups: []
+        )
+
+        let result = try await ApplicationArtifactResolver().resolve(
+            applications: [application],
+            identities: [applicationIdentity],
+            homeDirectory: home.url
+        )
+
+        XCTAssertTrue(result.items.isEmpty)
+        XCTAssertTrue(result.resolutions.flatMap(\.associations).isEmpty)
+    }
+
     func testLaunchItemReaderExtractsProgramAndFirstProgramArgument() throws {
         let home = try TemporaryTree(files: [:])
         let plistURL = home.url.appending(

@@ -350,6 +350,7 @@ public struct ApplicationArtifactResolver: Sendable {
                     continue
                 }
 
+                var launchMatchesByApplicationID: [UUID: Match] = [:]
                 for targetURL in reader.targetURLs(in: launchItem.url) {
                     try Task.checkCancellation()
                     guard let supportTarget = supportTarget(
@@ -391,13 +392,14 @@ public struct ApplicationArtifactResolver: Sendable {
                     } else {
                         adjustedMatches = matches
                     }
-                    merge(
-                        url: launchItem.url,
-                        rule: launchItemRoot.rule,
-                        rootDepth: launchItemRoot.canonicalURL.pathComponents.count,
-                        matches: adjustedMatches,
-                        into: &candidatesByPath
-                    )
+                    for (applicationID, match) in adjustedMatches {
+                        if let current = launchMatchesByApplicationID[
+                            applicationID
+                        ], current.confidence >= match.confidence {
+                            continue
+                        }
+                        launchMatchesByApplicationID[applicationID] = match
+                    }
                     merge(
                         url: supportTarget.directoryURL,
                         rule: supportTarget.root.rule,
@@ -406,6 +408,39 @@ public struct ApplicationArtifactResolver: Sendable {
                         into: &candidatesByPath
                     )
                 }
+
+                let exactMatchIDs = launchMatchesByApplicationID.compactMap {
+                    applicationID, match in
+                    match.evidence == .signedHelperRelationship
+                        && match.confidence == .high
+                        ? applicationID
+                        : nil
+                }
+                if exactMatchIDs.count > 1 {
+                    for applicationID in exactMatchIDs {
+                        guard let match = launchMatchesByApplicationID[
+                            applicationID
+                        ] else {
+                            continue
+                        }
+                        launchMatchesByApplicationID[applicationID] = Match(
+                            evidence: match.evidence,
+                            confidence: match.confidence,
+                            ownership: .shared,
+                            explanation: match.explanation
+                        )
+                    }
+                }
+                guard !launchMatchesByApplicationID.isEmpty else { continue }
+                merge(
+                    url: launchItem.url,
+                    rule: launchItemRoot.rule,
+                    rootDepth: launchItemRoot.canonicalURL.pathComponents.count,
+                    matches: launchMatchesByApplicationID.map {
+                        ($0.key, $0.value)
+                    },
+                    into: &candidatesByPath
+                )
             }
         }
     }
@@ -485,22 +520,20 @@ public struct ApplicationArtifactResolver: Sendable {
             )
         )
         let normalizedComponents = relativeComponents.map(normalize)
-        let normalizedIdentityComponents = relativeComponents.flatMap {
+        let identityComponents = Set(relativeComponents.flatMap {
             [
-                normalize($0),
-                normalize(
+                $0.lowercased(),
+                (
                     URL(fileURLWithPath: $0)
                         .deletingPathExtension()
                         .lastPathComponent
-                )
+                ).lowercased()
             ]
-        }
-        let normalizedIdentifiers = Set(
-            identity.allBundleIdentifiers.map(normalize)
+        })
+        let exactIdentifiers = Set(
+            identity.allBundleIdentifiers.map { $0.lowercased() }
         )
-        if normalizedIdentityComponents.contains(
-            where: normalizedIdentifiers.contains
-        ) {
+        if !identityComponents.isDisjoint(with: exactIdentifiers) {
             return Match(
                 evidence: .signedHelperRelationship,
                 confidence: .high,
