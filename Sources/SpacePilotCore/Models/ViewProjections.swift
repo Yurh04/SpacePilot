@@ -326,6 +326,7 @@ private struct BoundedScannedItemSelection {
 
 public struct ApplicationAssociationProjection: Identifiable, Sendable {
     public var id: UUID { association.id }
+    public var ownership: AssociationOwnership { association.ownership }
     public let association: ArtifactAssociation
     public let item: ScannedItem
 }

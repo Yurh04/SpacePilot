@@ -10,11 +10,11 @@ final class ApplicationUninstallPlannerTests: XCTestCase {
         let medium = ScannedItem.fixture(id: UUID(), path: "/Users/test/Library/Application Support/Example", risk: .rebuildable, allocatedSize: 200)
         let unprojected = ScannedItem.fixture(id: UUID(), path: "/Users/test/Library/Caches/unprojected", risk: .safe, allocatedSize: 1_000)
         let associations = [
-            ArtifactAssociation(itemID: small.id, applicationID: appID, evidence: .exactBundleIdentifier, confidence: .high, risk: .safe),
-            ArtifactAssociation(itemID: large.id, applicationID: appID, evidence: .exactBundleIdentifier, confidence: .high, risk: .rebuildable),
-            ArtifactAssociation(itemID: managed.id, applicationID: appID, evidence: .exactBundleIdentifier, confidence: .high, risk: .managed),
-            ArtifactAssociation(itemID: medium.id, applicationID: appID, evidence: .vendorAndNameMatch, confidence: .medium, risk: .rebuildable),
-            ArtifactAssociation(itemID: unprojected.id, applicationID: appID, evidence: .exactBundleIdentifier, confidence: .high, risk: .safe)
+            ArtifactAssociation(itemID: small.id, applicationID: appID, evidence: .exactBundleIdentifier, confidence: .high, risk: .safe, ownership: .owned),
+            ArtifactAssociation(itemID: large.id, applicationID: appID, evidence: .exactBundleIdentifier, confidence: .high, risk: .rebuildable, ownership: .owned),
+            ArtifactAssociation(itemID: managed.id, applicationID: appID, evidence: .exactBundleIdentifier, confidence: .high, risk: .managed, ownership: .owned),
+            ArtifactAssociation(itemID: medium.id, applicationID: appID, evidence: .vendorAndNameMatch, confidence: .medium, risk: .rebuildable, ownership: .possible),
+            ArtifactAssociation(itemID: unprojected.id, applicationID: appID, evidence: .exactBundleIdentifier, confidence: .high, risk: .safe, ownership: .owned)
         ]
         let app = ApplicationRecord(
             id: appID,
@@ -56,11 +56,11 @@ final class ApplicationUninstallPlannerTests: XCTestCase {
         let managed = ScannedItem.fixture(id: UUID(), path: "/Users/test/Library/Managed/com.example.app", risk: .managed, allocatedSize: 200)
         let medium = ScannedItem.fixture(id: UUID(), path: "/Users/test/Library/Application Support/Example", risk: .rebuildable, allocatedSize: 300)
         let associations = [
-            ArtifactAssociation(itemID: small.id, applicationID: appID, evidence: .exactBundleIdentifier, confidence: .high, risk: .safe),
-            ArtifactAssociation(itemID: large.id, applicationID: appID, evidence: .exactBundleIdentifier, confidence: .high, risk: .rebuildable),
-            ArtifactAssociation(itemID: sensitive.id, applicationID: appID, evidence: .exactContainerIdentifier, confidence: .high, risk: .sensitive),
-            ArtifactAssociation(itemID: managed.id, applicationID: appID, evidence: .exactBundleIdentifier, confidence: .high, risk: .managed),
-            ArtifactAssociation(itemID: medium.id, applicationID: appID, evidence: .vendorAndNameMatch, confidence: .medium, risk: .rebuildable)
+            ArtifactAssociation(itemID: small.id, applicationID: appID, evidence: .exactBundleIdentifier, confidence: .high, risk: .safe, ownership: .owned),
+            ArtifactAssociation(itemID: large.id, applicationID: appID, evidence: .exactBundleIdentifier, confidence: .high, risk: .rebuildable, ownership: .owned),
+            ArtifactAssociation(itemID: sensitive.id, applicationID: appID, evidence: .exactContainerIdentifier, confidence: .high, risk: .sensitive, ownership: .owned),
+            ArtifactAssociation(itemID: managed.id, applicationID: appID, evidence: .exactBundleIdentifier, confidence: .high, risk: .managed, ownership: .owned),
+            ArtifactAssociation(itemID: medium.id, applicationID: appID, evidence: .vendorAndNameMatch, confidence: .medium, risk: .rebuildable, ownership: .possible)
         ]
         let app = ApplicationRecord(
             id: appID,
@@ -98,14 +98,16 @@ final class ApplicationUninstallPlannerTests: XCTestCase {
             applicationID: appID,
             evidence: .exactBundleIdentifier,
             confidence: .high,
-            risk: .safe
+            risk: .safe,
+            ownership: .owned
         )
         let second = ArtifactAssociation(
             itemID: item.id,
             applicationID: appID,
             evidence: .knownRule,
             confidence: .high,
-            risk: .safe
+            risk: .safe,
+            ownership: .owned
         )
         let app = ApplicationRecord(
             id: appID,

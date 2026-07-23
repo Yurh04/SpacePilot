@@ -18,6 +18,12 @@ public enum AssociationConfidence: Int, Codable, Comparable, Sendable {
     }
 }
 
+public enum AssociationOwnership: String, Codable, Sendable {
+    case owned
+    case shared
+    case possible
+}
+
 public struct ArtifactAssociation: Identifiable, Codable, Hashable, Sendable {
     public let id: UUID
     public let itemID: UUID
@@ -25,6 +31,7 @@ public struct ArtifactAssociation: Identifiable, Codable, Hashable, Sendable {
     public let evidence: AssociationEvidence
     public let confidence: AssociationConfidence
     public let risk: RiskLevel
+    public let ownership: AssociationOwnership
 
     public init(
         id: UUID = UUID(),
@@ -32,7 +39,8 @@ public struct ArtifactAssociation: Identifiable, Codable, Hashable, Sendable {
         applicationID: UUID,
         evidence: AssociationEvidence,
         confidence: AssociationConfidence,
-        risk: RiskLevel
+        risk: RiskLevel,
+        ownership: AssociationOwnership
     ) {
         self.id = id
         self.itemID = itemID
@@ -40,6 +48,42 @@ public struct ArtifactAssociation: Identifiable, Codable, Hashable, Sendable {
         self.evidence = evidence
         self.confidence = confidence
         self.risk = risk
+        self.ownership = ownership
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case itemID
+        case applicationID
+        case evidence
+        case confidence
+        case risk
+        case ownership
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        itemID = try container.decode(UUID.self, forKey: .itemID)
+        applicationID = try container.decode(UUID.self, forKey: .applicationID)
+        evidence = try container.decode(AssociationEvidence.self, forKey: .evidence)
+        confidence = try container.decode(AssociationConfidence.self, forKey: .confidence)
+        risk = try container.decode(RiskLevel.self, forKey: .risk)
+        ownership = try container.decodeIfPresent(
+            AssociationOwnership.self,
+            forKey: .ownership
+        ) ?? .possible
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(itemID, forKey: .itemID)
+        try container.encode(applicationID, forKey: .applicationID)
+        try container.encode(evidence, forKey: .evidence)
+        try container.encode(confidence, forKey: .confidence)
+        try container.encode(risk, forKey: .risk)
+        try container.encode(ownership, forKey: .ownership)
     }
 }
 

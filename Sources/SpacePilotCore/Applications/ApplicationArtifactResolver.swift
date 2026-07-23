@@ -52,7 +52,8 @@ public struct ApplicationArtifactResolver: Sendable {
                     applicationID: application.id,
                     evidence: match.evidence,
                     confidence: match.confidence,
-                    risk: rootRule.risk
+                    risk: rootRule.risk,
+                    ownership: .possible
                 ))
             }
         }

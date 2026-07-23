@@ -746,14 +746,16 @@ final class ViewProjectionTests: XCTestCase {
             applicationID: applicationID,
             evidence: .exactBundleIdentifier,
             confidence: .high,
-            risk: .safe
+            risk: .safe,
+            ownership: .owned
         )
         let missingAssociation = ArtifactAssociation(
             itemID: UUID(),
             applicationID: applicationID,
             evidence: .vendorAndNameMatch,
             confidence: .low,
-            risk: .sensitive
+            risk: .sensitive,
+            ownership: .possible
         )
         let application = ApplicationRecord(
             id: applicationID,
