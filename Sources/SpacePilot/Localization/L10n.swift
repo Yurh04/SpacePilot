@@ -128,6 +128,9 @@ enum L10n {
         "storage.total-capacity", "storage.used", "storage.used-of", "storage.visible-items",
         "cleanup.outcome.failed", "cleanup.outcome.moved",
         "cleanup.outcome.skipped-changed", "cleanup.outcome.skipped-protected",
+        "cleanup.reason.changed-identity", "cleanup.reason.missing-source",
+        "cleanup.reason.move-failed", "cleanup.reason.permission-denied",
+        "cleanup.reason.protected-path", "cleanup.source-path",
         "explanation.application-bundle", "explanation.application-name-match",
         "explanation.claude-cache", "explanation.claude-conversation", "explanation.claude-logs",
         "explanation.claude-settings", "explanation.codex-cache", "explanation.codex-configuration",
@@ -515,6 +518,10 @@ enum L10n {
         format("cleanup.verified-space", default: "%@ verified", locale: locale, space)
     }
 
+    static func cleanupSourcePath(locale: Locale? = nil) -> String {
+        value("cleanup.source-path", default: "Source path", locale: locale)
+    }
+
     static func explanation(_ source: String, locale: Locale? = nil) -> String {
         let exact: [String: (String, String)] = [
             "Application bundle": ("explanation.application-bundle", "Application bundle"),
@@ -583,5 +590,48 @@ enum L10n {
             )
         }
         return message
+    }
+
+    static func cleanupOutcomeMessage(
+        _ outcome: CleanupOutcome,
+        locale: Locale? = nil
+    ) -> String {
+        guard let reason = outcome.reason else {
+            return cleanupOutcomeMessage(outcome.message, status: outcome.status, locale: locale)
+        }
+        return switch reason {
+        case .moved:
+            value("cleanup.message.moved", default: "Moved to Trash", locale: locale)
+        case .changedIdentity:
+            value(
+                "cleanup.reason.changed-identity",
+                default: "The item changed after the scan and was not moved.",
+                locale: locale
+            )
+        case .missingSource:
+            value(
+                "cleanup.reason.missing-source",
+                default: "The item no longer exists at the source path.",
+                locale: locale
+            )
+        case .protectedPath:
+            value(
+                "cleanup.reason.protected-path",
+                default: "The source path is protected and was not moved.",
+                locale: locale
+            )
+        case .permissionDenied:
+            value(
+                "cleanup.reason.permission-denied",
+                default: "Permission was denied while moving the item to Trash.",
+                locale: locale
+            )
+        case .moveFailed:
+            value(
+                "cleanup.reason.move-failed",
+                default: "The item could not be moved to Trash.",
+                locale: locale
+            )
+        }
     }
 }

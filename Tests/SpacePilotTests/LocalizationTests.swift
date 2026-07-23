@@ -77,6 +77,34 @@ final class LocalizationTests: XCTestCase {
         )
     }
 
+    func testCleanupOutcomeContextAndReasonsUseEnglishAndSimplifiedChinese() {
+        let english = Locale(identifier: "en")
+        let chinese = Locale(identifier: "zh-Hans")
+
+        XCTAssertEqual(L10n.cleanupSourcePath(locale: english), "Source path")
+        XCTAssertEqual(L10n.cleanupSourcePath(locale: chinese), "源路径")
+
+        let expected: [(CleanupOutcomeReason, String, String)] = [
+            (.changedIdentity, "The item changed after the scan and was not moved.", "项目在扫描后发生变化，因此未移动。"),
+            (.missingSource, "The item no longer exists at the source path.", "源路径中的项目已不存在。"),
+            (.protectedPath, "The source path is protected and was not moved.", "源路径受保护，因此未移动。"),
+            (.permissionDenied, "Permission was denied while moving the item to Trash.", "将项目移到废纸篓时权限被拒绝。"),
+            (.moveFailed, "The item could not be moved to Trash.", "无法将项目移到废纸篓。")
+        ]
+
+        for (reason, englishMessage, chineseMessage) in expected {
+            let outcome = CleanupOutcome(
+                candidateID: UUID(),
+                status: reason == .changedIdentity || reason == .missingSource ? .skippedChanged : .failed,
+                resultingURL: nil,
+                message: "Raw implementation error",
+                reason: reason
+            )
+            XCTAssertEqual(L10n.cleanupOutcomeMessage(outcome, locale: english), englishMessage)
+            XCTAssertEqual(L10n.cleanupOutcomeMessage(outcome, locale: chinese), chineseMessage)
+        }
+    }
+
     func testEveryDisplayMappingHasEnglishAndSimplifiedChineseText() {
         let locales = [Locale(identifier: "en"), Locale(identifier: "zh-Hans")]
         let scopes: [SkillScope] = [
@@ -202,7 +230,7 @@ final class LocalizationTests: XCTestCase {
         let english = try stringsTable(at: resources.appending(path: "en.lproj/Localizable.strings"))
         let chinese = try stringsTable(at: resources.appending(path: "zh-Hans.lproj/Localizable.strings"))
 
-        XCTAssertEqual(L10n.allKeys.count, 177)
+        XCTAssertEqual(L10n.allKeys.count, 183)
         XCTAssertEqual(Set(catalogStrings.keys), L10n.allKeys)
         XCTAssertEqual(Set(english.keys), L10n.allKeys)
         XCTAssertEqual(Set(chinese.keys), L10n.allKeys)

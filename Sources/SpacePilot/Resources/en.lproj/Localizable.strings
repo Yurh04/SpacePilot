@@ -175,3 +175,9 @@
 "cleanup.message.outside-volume" = "Path is outside the allowed internal volume: %@";
 "cleanup.message.refusing-broad" = "Refusing broad path: %@";
 "cleanup.message.refusing-system" = "Refusing protected system path: %@";
+"cleanup.reason.changed-identity" = "The item changed after the scan and was not moved.";
+"cleanup.reason.missing-source" = "The item no longer exists at the source path.";
+"cleanup.reason.move-failed" = "The item could not be moved to Trash.";
+"cleanup.reason.permission-denied" = "Permission was denied while moving the item to Trash.";
+"cleanup.reason.protected-path" = "The source path is protected and was not moved.";
+"cleanup.source-path" = "Source path";

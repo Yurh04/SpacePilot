@@ -16,10 +16,37 @@ struct CleanupHistoryView: View {
             List(transactions) { transaction in
                 DisclosureGroup {
                     ForEach(transaction.outcomes) { outcome in
-                        LabeledContent(
-                            L10n.cleanupOutcomeMessage(outcome.message, status: outcome.status),
-                            value: L10n.name(for: outcome.status)
-                        )
+                        if let sourceURL = outcome.sourceURL {
+                            HStack(alignment: .top, spacing: 12) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(sourceURL.lastPathComponent)
+                                    let parentPath = sourceURL.deletingLastPathComponent()
+                                        .path(percentEncoded: false)
+                                    Text(parentPath)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .accessibilityLabel(
+                                            "\(L10n.cleanupSourcePath()): \(parentPath)"
+                                        )
+                                    Text(verbatim: L10n.cleanupOutcomeMessage(outcome))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    if let bytes = outcome.sourceAllocatedSize {
+                                        Text(ByteCount.string(bytes))
+                                            .monospacedDigit()
+                                    }
+                                    Text(verbatim: L10n.name(for: outcome.status))
+                                }
+                            }
+                        } else {
+                            LabeledContent(
+                                L10n.cleanupOutcomeMessage(outcome.message, status: outcome.status),
+                                value: L10n.name(for: outcome.status)
+                            )
+                        }
                     }
                 } label: {
                     HStack {

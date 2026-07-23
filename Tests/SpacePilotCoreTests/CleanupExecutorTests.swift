@@ -18,6 +18,26 @@ final class CleanupExecutorTests: XCTestCase {
         let result = try await executor.execute(plan: plan)
 
         XCTAssertEqual(result.outcomes.first?.status, .skippedChanged)
+        XCTAssertEqual(result.outcomes.first?.reason, .changedIdentity)
+        XCTAssertEqual(result.outcomes.first?.sourceURL, file)
+        XCTAssertEqual(result.outcomes.first?.sourceExplanation, "Test cache")
+        XCTAssertTrue(mover.movedURLs.isEmpty)
+    }
+
+    func testMissingSourceIsDistinguishedFromChangedIdentity() async throws {
+        let tree = try TemporaryTree(files: [:])
+        let file = tree.url.appending(path: "Library/Caches/app/missing.bin")
+        let mover = RecordingTrashMover()
+        let executor = CleanupExecutor(
+            policy: PathSafetyPolicy(homeDirectory: tree.url, allowedVolumeRoot: tree.url),
+            mover: mover
+        )
+        let plan = CleanupPlan(snapshotID: UUID(), candidates: [candidate(for: file)])
+
+        let result = try await executor.execute(plan: plan)
+
+        XCTAssertEqual(result.outcomes.first?.status, .skippedChanged)
+        XCTAssertEqual(result.outcomes.first?.reason, .missingSource)
         XCTAssertTrue(mover.movedURLs.isEmpty)
     }
 
@@ -38,6 +58,23 @@ final class CleanupExecutorTests: XCTestCase {
 
         XCTAssertEqual(result.summary, .partialFailure)
         XCTAssertEqual(result.outcomes.map(\.status), [.movedToTrash, .failed])
+        XCTAssertEqual(result.outcomes.map(\.reason), [.moved, .moveFailed])
+    }
+
+    func testPermissionFailureHasSpecificReason() async throws {
+        let tree = try TemporaryTree(files: ["Library/Caches/app/file": 8])
+        let file = tree.url.appending(path: "Library/Caches/app/file")
+        let executor = CleanupExecutor(
+            policy: PathSafetyPolicy(homeDirectory: tree.url, allowedVolumeRoot: tree.url),
+            mover: FailingTrashMover(error: CocoaError(.fileWriteNoPermission))
+        )
+
+        let result = try await executor.execute(
+            plan: CleanupPlan(snapshotID: UUID(), candidates: [candidate(for: file)])
+        )
+
+        XCTAssertEqual(result.outcomes.first?.status, .failed)
+        XCTAssertEqual(result.outcomes.first?.reason, .permissionDenied)
     }
 
     func testProtectedPathIsSkippedEvenIfItAppearsInPlan() async throws {
@@ -60,6 +97,7 @@ final class CleanupExecutorTests: XCTestCase {
         let result = try await executor.execute(plan: CleanupPlan(snapshotID: UUID(), candidates: [candidate]))
 
         XCTAssertEqual(result.outcomes.first?.status, .skippedProtected)
+        XCTAssertEqual(result.outcomes.first?.reason, .protectedPath)
         XCTAssertTrue(mover.movedURLs.isEmpty)
     }
 
@@ -78,6 +116,8 @@ final class CleanupExecutorTests: XCTestCase {
         )
 
         XCTAssertEqual(transaction.verifiedFreedBytes, candidate.allocatedSize)
+        XCTAssertEqual(transaction.outcomes.first?.reason, .moved)
+        XCTAssertEqual(transaction.outcomes.first?.sourceAllocatedSize, candidate.allocatedSize)
         XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
     }
 
@@ -136,5 +176,13 @@ final class CleanupExecutorTests: XCTestCase {
             expectedModificationDate: expectedModificationDate ?? values?.contentModificationDate,
             explanation: "Test cache"
         )
+    }
+}
+
+private struct FailingTrashMover: TrashMoving {
+    let error: CocoaError
+
+    func moveToTrash(_ url: URL) throws -> URL {
+        throw error
     }
 }

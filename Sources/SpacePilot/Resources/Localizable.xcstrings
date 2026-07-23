@@ -25,6 +25,42 @@
         "zh-Hans": { "stringUnit": { "state": "translated", "value": "已选 %lld 项，共 %@" } }
       }
     },
+    "cleanup.reason.changed-identity": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The item changed after the scan and was not moved." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "项目在扫描后发生变化，因此未移动。" } }
+      }
+    },
+    "cleanup.reason.missing-source": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The item no longer exists at the source path." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "源路径中的项目已不存在。" } }
+      }
+    },
+    "cleanup.reason.move-failed": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The item could not be moved to Trash." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法将项目移到废纸篓。" } }
+      }
+    },
+    "cleanup.reason.permission-denied": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Permission was denied while moving the item to Trash." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "将项目移到废纸篓时权限被拒绝。" } }
+      }
+    },
+    "cleanup.reason.protected-path": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The source path is protected and was not moved." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "源路径受保护，因此未移动。" } }
+      }
+    },
+    "cleanup.source-path": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Source path" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "源路径" } }
+      }
+    },
     "common.item-count": {
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "%lld items" } },

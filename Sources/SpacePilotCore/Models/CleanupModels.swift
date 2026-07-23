@@ -12,6 +12,15 @@ public enum CleanupOutcomeStatus: String, Codable, Sendable {
     case failed
 }
 
+public enum CleanupOutcomeReason: String, Codable, Sendable {
+    case moved
+    case changedIdentity
+    case missingSource
+    case protectedPath
+    case permissionDenied
+    case moveFailed
+}
+
 public struct CleanupCandidate: Identifiable, Codable, Hashable, Sendable {
     public let id: UUID
     public let itemID: UUID
@@ -66,13 +75,31 @@ public struct CleanupOutcome: Identifiable, Codable, Sendable {
     public let status: CleanupOutcomeStatus
     public let resultingURL: URL?
     public let message: String
+    public let reason: CleanupOutcomeReason?
+    public let sourceURL: URL?
+    public let sourceAllocatedSize: Int64?
+    public let sourceExplanation: String?
 
-    public init(id: UUID = UUID(), candidateID: UUID, status: CleanupOutcomeStatus, resultingURL: URL?, message: String) {
+    public init(
+        id: UUID = UUID(),
+        candidateID: UUID,
+        status: CleanupOutcomeStatus,
+        resultingURL: URL?,
+        message: String,
+        reason: CleanupOutcomeReason? = nil,
+        sourceURL: URL? = nil,
+        sourceAllocatedSize: Int64? = nil,
+        sourceExplanation: String? = nil
+    ) {
         self.id = id
         self.candidateID = candidateID
         self.status = status
         self.resultingURL = resultingURL
         self.message = message
+        self.reason = reason
+        self.sourceURL = sourceURL
+        self.sourceAllocatedSize = sourceAllocatedSize
+        self.sourceExplanation = sourceExplanation
     }
 }
 

@@ -103,13 +103,15 @@ final class SQLiteIndexStoreTests: XCTestCase {
 
     func testCleanupHistoryRoundTrips() async throws {
         let store = try SQLiteIndexStore(url: temporaryDatabaseURL())
+        let sourceURL = URL(fileURLWithPath: "/Users/test/Library/Caches/app/file")
         let transaction = CleanupTransaction(
             planID: UUID(),
             outcomes: [CleanupOutcome(
                 candidateID: UUID(),
                 status: .movedToTrash,
                 resultingURL: URL(fileURLWithPath: "/Users/test/.Trash/file"),
-                message: "Moved"
+                message: "Moved",
+                sourceURL: sourceURL
             )],
             verifiedFreedBytes: 512
         )
@@ -119,6 +121,23 @@ final class SQLiteIndexStoreTests: XCTestCase {
         let history = try await store.cleanupHistory()
         XCTAssertEqual(history.first?.id, transaction.id)
         XCTAssertEqual(history.first?.verifiedFreedBytes, 512)
+        XCTAssertEqual(history.first?.outcomes.first?.sourceURL, sourceURL)
+    }
+
+    func testCleanupOutcomeDecodesLegacyPayloadWithoutSourceContext() throws {
+        let json = """
+        {"id":"00000000-0000-0000-0000-000000000001",
+         "candidateID":"00000000-0000-0000-0000-000000000002",
+         "status":"skippedChanged",
+         "resultingURL":null,
+         "message":"File changed after the scan and was not moved"}
+        """.data(using: .utf8)!
+
+        let outcome = try JSONDecoder().decode(CleanupOutcome.self, from: json)
+
+        XCTAssertNil(outcome.sourceURL)
+        XCTAssertNil(outcome.sourceAllocatedSize)
+        XCTAssertNil(outcome.reason)
     }
 
     func testInvalidDatabaseIsMovedAsideAndFreshStoreIsCreated() async throws {

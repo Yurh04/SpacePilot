@@ -39,20 +39,30 @@ public struct CleanupExecutor<Mover: TrashMoving>: CleanupExecuting {
             do {
                 canonicalURL = try policy.validate(candidate.url)
             } catch {
-                outcomes.append(CleanupOutcome(
-                    candidateID: candidate.id,
+                outcomes.append(outcome(
+                    for: candidate,
                     status: .skippedProtected,
-                    resultingURL: nil,
+                    reason: .protectedPath,
                     message: error.localizedDescription
                 ))
                 continue
             }
 
-            guard identityStillMatches(candidate, at: canonicalURL) else {
-                outcomes.append(CleanupOutcome(
-                    candidateID: candidate.id,
+            guard FileManager.default.fileExists(atPath: canonicalURL.path) else {
+                outcomes.append(outcome(
+                    for: candidate,
                     status: .skippedChanged,
-                    resultingURL: nil,
+                    reason: .missingSource,
+                    message: "Source no longer exists"
+                ))
+                continue
+            }
+
+            guard identityStillMatches(candidate, at: canonicalURL) else {
+                outcomes.append(outcome(
+                    for: candidate,
+                    status: .skippedChanged,
+                    reason: .changedIdentity,
                     message: "File changed after the scan and was not moved"
                 ))
                 continue
@@ -60,17 +70,24 @@ public struct CleanupExecutor<Mover: TrashMoving>: CleanupExecuting {
 
             do {
                 let destination = try mover.moveToTrash(canonicalURL)
-                outcomes.append(CleanupOutcome(
-                    candidateID: candidate.id,
+                outcomes.append(outcome(
+                    for: candidate,
                     status: .movedToTrash,
+                    reason: .moved,
                     resultingURL: destination,
                     message: "Moved to Trash"
                 ))
             } catch {
-                outcomes.append(CleanupOutcome(
-                    candidateID: candidate.id,
+                let reason: CleanupOutcomeReason = if let cocoaError = error as? CocoaError,
+                                                      cocoaError.code == .fileWriteNoPermission {
+                    .permissionDenied
+                } else {
+                    .moveFailed
+                }
+                outcomes.append(outcome(
+                    for: candidate,
                     status: .failed,
-                    resultingURL: nil,
+                    reason: reason,
                     message: error.localizedDescription
                 ))
             }
@@ -83,6 +100,25 @@ public struct CleanupExecutor<Mover: TrashMoving>: CleanupExecuting {
         )
         if let store { try await store.save(transaction: transaction) }
         return transaction
+    }
+
+    private func outcome(
+        for candidate: CleanupCandidate,
+        status: CleanupOutcomeStatus,
+        reason: CleanupOutcomeReason,
+        resultingURL: URL? = nil,
+        message: String
+    ) -> CleanupOutcome {
+        CleanupOutcome(
+            candidateID: candidate.id,
+            status: status,
+            resultingURL: resultingURL,
+            message: message,
+            reason: reason,
+            sourceURL: candidate.url,
+            sourceAllocatedSize: candidate.allocatedSize,
+            sourceExplanation: candidate.explanation
+        )
     }
 
     private func identityStillMatches(_ candidate: CleanupCandidate, at url: URL) -> Bool {
