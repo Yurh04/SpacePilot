@@ -1,7 +1,11 @@
 import Foundation
 
 public struct CodexAdapter: AIApplicationAdapting {
-    public init() {}
+    private let cache: (any ScanResultCaching)?
+
+    public init(cache: (any ScanResultCaching)? = nil) {
+        self.cache = cache
+    }
 
     public func scan(homeDirectory: URL) async throws -> AIApplicationScanResult {
         try await RuleBasedAIAdapter(
@@ -15,7 +19,9 @@ public struct CodexAdapter: AIApplicationAdapting {
                 .init(relativePathPrefix: "plugins", category: .plugin, risk: .managed, explanation: "Codex managed plugins"),
                 .init(relativePathPrefix: "skills", category: .skill, risk: .managed, explanation: "Codex-specific skills"),
                 .init(relativePathPrefix: "config.toml", category: .aiData, risk: .sensitive, explanation: "Codex configuration")
-            ]
+            ],
+            cacheKey: "codex-v1",
+            cache: cache
         ).scan(homeDirectory: homeDirectory)
     }
 }

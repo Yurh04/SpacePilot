@@ -19,7 +19,7 @@ public struct AIAssetRule: Sendable {
     }
 }
 
-public struct AIApplicationScanResult: Sendable {
+public struct AIApplicationScanResult: Codable, Sendable {
     public let application: AIApplicationRecord
     public let items: [ScannedItem]
     public let cleanupRecommendedItemIDs: Set<UUID>

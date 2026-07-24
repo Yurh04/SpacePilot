@@ -38,6 +38,7 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
     ) {
         self.operation = { scope, emit in
             let directoryStats = store as? any DirectoryStatProviding
+            let scanCache = store as? any ScanResultCaching
             let previousSnapshot = scope == .full
                 ? nil
                 : try await store.latestSnapshot()
@@ -46,14 +47,34 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                 URL(fileURLWithPath: "/Applications", isDirectory: true),
                 homeDirectory.appending(path: "Applications", directoryHint: .isDirectory)
             ].filter { FileManager.default.fileExists(atPath: $0.path) }
-            let applicationScanner = ApplicationScanner()
+            let applicationScanner = ApplicationScanner(cache: scanCache)
             let baseApplications = try await applicationScanner.scan(locations: appLocations)
             var identities: [ApplicationIdentity] = []
             identities.reserveCapacity(baseApplications.count)
             for application in baseApplications {
                 try Task.checkCancellation()
+                let cachedIdentity: ApplicationIdentity?
+                if let scanCache {
+                    cachedIdentity = try? await scanCache
+                        .cachedApplicationIdentity(for: application)
+                } else {
+                    cachedIdentity = nil
+                }
+                if let cachedIdentity {
+                    identities.append(cachedIdentity)
+                    continue
+                }
                 do {
-                    identities.append(try identityReader.read(application: application))
+                    let identity = try identityReader.read(
+                        application: application
+                    )
+                    identities.append(identity)
+                    if let scanCache {
+                        try? await scanCache.save(
+                            applicationIdentity: identity,
+                            for: application
+                        )
+                    }
                 } catch {
                     identities.append(ApplicationIdentity(
                         applicationID: application.id,
@@ -159,8 +180,12 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                 return snapshot
             }
 
-            async let codexScan = CodexAdapter().scan(homeDirectory: homeDirectory)
-            async let claudeScan = ClaudeAdapter().scan(homeDirectory: homeDirectory)
+            async let codexScan = CodexAdapter(
+                cache: scanCache
+            ).scan(homeDirectory: homeDirectory)
+            async let claudeScan = ClaudeAdapter(
+                cache: scanCache
+            ).scan(homeDirectory: homeDirectory)
             async let standaloneSkillScan = SkillScanner().scan(roots: SkillRoot.production(homeDirectory: homeDirectory))
 
             let homeResult: DirectoryScanResult

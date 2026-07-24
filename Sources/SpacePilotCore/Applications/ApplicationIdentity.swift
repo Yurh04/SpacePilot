@@ -1,6 +1,6 @@
 import Foundation
 
-public struct ApplicationIdentity: Sendable {
+public struct ApplicationIdentity: Codable, Sendable {
     public let applicationID: UUID
     public let mainBundleIdentifier: String?
     public let componentBundleIdentifiers: Set<String>

@@ -34,4 +34,32 @@ final class ApplicationScannerTests: XCTestCase {
 
         XCTAssertEqual(records.count, 1)
     }
+
+    func testCachedInventoryDetectsAnApplicationAddedToTheLocation() async throws {
+        let fixture = try TestAppBuilder.make(
+            name: "First",
+            bundleID: "com.example.first",
+            version: "1.0",
+            executableBytes: 16
+        )
+        let location = fixture.appURL.deletingLastPathComponent()
+        let store = try SQLiteIndexStore(
+            url: location.appending(path: "index.sqlite")
+        )
+        let scanner = ApplicationScanner(cache: store)
+        let first = try await scanner.scan(locations: [location])
+        let secondFixture = try TestAppBuilder.make(
+            in: location,
+            name: "Second",
+            bundleID: "com.example.second",
+            version: "1.0",
+            executableBytes: 16
+        )
+        _ = secondFixture
+
+        let refreshed = try await scanner.scan(locations: [location])
+
+        XCTAssertEqual(first.map(\.name), ["First"])
+        XCTAssertEqual(Set(refreshed.map(\.name)), ["First", "Second"])
+    }
 }

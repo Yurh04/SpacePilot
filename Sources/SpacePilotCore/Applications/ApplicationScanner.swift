@@ -2,29 +2,65 @@ import CoreServices
 import Foundation
 
 public struct ApplicationScanner: Sendable {
-    public init() {}
+    private let cache: (any ScanResultCaching)?
+
+    public init(cache: (any ScanResultCaching)? = nil) {
+        self.cache = cache
+    }
 
     public func scan(locations: [URL]) async throws -> [ApplicationRecord] {
         var seen = Set<String>()
         var records: [ApplicationRecord] = []
 
         for location in locations {
-            let candidates = try FileManager.default.contentsOfDirectory(
-                at: location,
-                includingPropertiesForKeys: [.isApplicationKey, .isDirectoryKey],
-                options: [.skipsHiddenFiles]
-            )
-            for candidate in candidates where candidate.pathExtension.lowercased() == "app" {
-                try Task.checkCancellation()
-                let canonical = candidate.standardizedFileURL.resolvingSymlinksInPath()
-                guard seen.insert(canonical.path).inserted else { continue }
-                if let record = try makeRecord(at: canonical) {
-                    records.append(record)
+            let locationRecords: [ApplicationRecord]
+            let cached: [ApplicationRecord]?
+            if let cache {
+                cached = try? await cache.cachedApplicationInventory(
+                    at: location
+                )
+            } else {
+                cached = nil
+            }
+            if let cached {
+                locationRecords = cached.map(refreshVolatileMetadata)
+            } else {
+                locationRecords = try scan(location: location)
+                if let cache {
+                    try? await cache.save(
+                        applicationInventory: locationRecords,
+                        at: location
+                    )
                 }
+            }
+            for record in locationRecords {
+                let canonical = record.url.standardizedFileURL
+                    .resolvingSymlinksInPath()
+                guard seen.insert(canonical.path).inserted else { continue }
+                records.append(record)
             }
         }
 
         return records.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    private func scan(location: URL) throws -> [ApplicationRecord] {
+        let candidates = try FileManager.default.contentsOfDirectory(
+            at: location,
+            includingPropertiesForKeys: [.isApplicationKey, .isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        )
+        var records: [ApplicationRecord] = []
+        for candidate in candidates
+            where candidate.pathExtension.lowercased() == "app" {
+            try Task.checkCancellation()
+            let canonical = candidate.standardizedFileURL
+                .resolvingSymlinksInPath()
+            if let record = try makeRecord(at: canonical) {
+                records.append(record)
+            }
+        }
+        return records
     }
 
     private func makeRecord(at appURL: URL) throws -> ApplicationRecord? {
@@ -48,6 +84,25 @@ public struct ApplicationScanner: Sendable {
             executableURL: executableURL,
             allocatedSize: allocatedSize(of: appURL),
             lastUsedDate: lastUsedDate
+        )
+    }
+
+    private func refreshVolatileMetadata(
+        _ record: ApplicationRecord
+    ) -> ApplicationRecord {
+        let lastUsedDate = (try? record.url.resourceValues(
+            forKeys: [.contentAccessDateKey]
+        ))?.contentAccessDate ?? record.lastUsedDate
+        return ApplicationRecord(
+            id: record.id,
+            name: record.name,
+            bundleIdentifier: record.bundleIdentifier,
+            version: record.version,
+            url: record.url,
+            executableURL: record.executableURL,
+            allocatedSize: record.allocatedSize,
+            lastUsedDate: lastUsedDate,
+            associations: record.associations
         )
     }
 

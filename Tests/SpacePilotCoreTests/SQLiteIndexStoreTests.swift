@@ -386,6 +386,114 @@ final class SQLiteIndexStoreTests: XCTestCase {
         XCTAssertEqual(cursor?.lastReconciledAt, newerDate)
     }
 
+    func testApplicationIdentityCacheRebindsCurrentApplicationIDAndInvalidates() async throws {
+        let tree = try TemporaryTree(files: [
+            "Example.app/Contents/Info.plist": 16
+        ])
+        let store = try SQLiteIndexStore(
+            url: tree.url.appending(path: "index.sqlite")
+        )
+        let firstApplication = ApplicationRecord(
+            name: "Example",
+            bundleIdentifier: "com.example.app",
+            version: "1",
+            url: tree.url.appending(
+                path: "Example.app",
+                directoryHint: .isDirectory
+            ),
+            executableURL: nil,
+            allocatedSize: 1_024
+        )
+        let identity = ApplicationIdentity(
+            applicationID: firstApplication.id,
+            mainBundleIdentifier: "com.example.app",
+            componentBundleIdentifiers: ["com.example.helper"],
+            teamIdentifier: "TEAM",
+            applicationGroups: ["TEAM.shared"]
+        )
+        try await store.save(
+            applicationIdentity: identity,
+            for: firstApplication
+        )
+        let currentApplication = ApplicationRecord(
+            name: firstApplication.name,
+            bundleIdentifier: firstApplication.bundleIdentifier,
+            version: firstApplication.version,
+            url: firstApplication.url,
+            executableURL: nil,
+            allocatedSize: firstApplication.allocatedSize
+        )
+
+        let cached = try await store.cachedApplicationIdentity(
+            for: currentApplication
+        )
+
+        XCTAssertEqual(cached?.applicationID, currentApplication.id)
+        XCTAssertEqual(cached?.teamIdentifier, "TEAM")
+        try await store.markDirectoryStatsDirty(changedPaths: [
+            firstApplication.url.appending(path: "Contents/new-helper")
+        ])
+        let invalidatedIdentity = try await store.cachedApplicationIdentity(
+            for: currentApplication
+        )
+        XCTAssertNil(invalidatedIdentity)
+    }
+
+    func testAIApplicationCacheInvalidatesWhenAChildChanges() async throws {
+        let tree = try TemporaryTree(files: [
+            ".codex/sessions/one.jsonl": 32
+        ])
+        let store = try SQLiteIndexStore(
+            url: tree.url.appending(path: "index.sqlite")
+        )
+        let root = tree.url.appending(
+            path: ".codex",
+            directoryHint: .isDirectory
+        )
+        let item = ScannedItem(
+            url: root.appending(path: "sessions"),
+            logicalSize: 32,
+            allocatedSize: 4_096,
+            category: .conversation,
+            risk: .sensitive,
+            explanation: "Cached conversation aggregate"
+        )
+        let result = AIApplicationScanResult(
+            application: AIApplicationRecord(
+                name: "Codex",
+                bundleIdentifier: "com.openai.codex",
+                applicationURL: nil,
+                rootURLs: [root],
+                itemIDs: [item.id],
+                pluginIDs: [],
+                skillIDs: [],
+                applicationAllocatedSize: 0,
+                supportLevel: .deep
+            ),
+            items: [item]
+        )
+        try await store.save(
+            aiApplicationScan: result,
+            key: "codex-v1",
+            root: root
+        )
+
+        let cached = try await store.cachedAIApplicationScan(
+            key: "codex-v1",
+            root: root
+        )
+
+        XCTAssertEqual(cached?.items.first?.allocatedSize, 4_096)
+        try await store.markDirectoryStatsDirty(changedPaths: [
+            root.appending(path: "sessions/two.jsonl")
+        ])
+        let invalidatedScan = try await store.cachedAIApplicationScan(
+            key: "codex-v1",
+            root: root
+        )
+        XCTAssertNil(invalidatedScan)
+    }
+
     func testPruneFailureRollsBackNewSnapshotAndPreservesPreviousLatest() async throws {
         let url = temporaryDatabaseURL()
         let store = try SQLiteIndexStore(url: url)

@@ -331,6 +331,7 @@ public actor SQLiteIndexStore: SnapshotStoring {
                     try connection.reset(statement)
                 }
             }
+            try markScanCachesDirty(paths: paths)
             try connection.execute("COMMIT;")
         } catch {
             try? connection.execute("ROLLBACK;")
@@ -349,6 +350,7 @@ public actor SQLiteIndexStore: SnapshotStoring {
                 WHERE id IN (SELECT resource_id FROM directory_stats);
                 """
             )
+            try connection.execute("UPDATE scan_caches SET dirty = 1;")
             try connection.execute("COMMIT;")
         } catch {
             try? connection.execute("ROLLBACK;")
@@ -408,6 +410,174 @@ public actor SQLiteIndexStore: SnapshotStoring {
                     timeIntervalSince1970: sqlite3_column_double(statement, 1)
                 )
             )
+        }
+    }
+
+    public func cachedApplicationIdentity(
+        for application: ApplicationRecord
+    ) throws -> ApplicationIdentity? {
+        let key = "application-identity:" + application.url.standardizedFileURL.path
+        guard let cached: ApplicationIdentity = try cachedScanResult(
+            key: key,
+            validationToken: ScanCacheValidation.token(for: application)
+        ) else {
+            return nil
+        }
+        return ApplicationIdentity(
+            applicationID: application.id,
+            mainBundleIdentifier: cached.mainBundleIdentifier,
+            componentBundleIdentifiers: cached.componentBundleIdentifiers,
+            teamIdentifier: cached.teamIdentifier,
+            applicationGroups: cached.applicationGroups
+        )
+    }
+
+    public func cachedApplicationInventory(
+        at location: URL
+    ) throws -> [ApplicationRecord]? {
+        try cachedScanResult(
+            key: "application-inventory:"
+                + location.standardizedFileURL.path,
+            validationToken: ScanCacheValidation.applicationInventoryToken(
+                at: location
+            )
+        )
+    }
+
+    public func save(
+        applicationInventory: [ApplicationRecord],
+        at location: URL
+    ) throws {
+        try saveScanResult(
+            applicationInventory,
+            key: "application-inventory:"
+                + location.standardizedFileURL.path,
+            root: location,
+            validationToken: ScanCacheValidation.applicationInventoryToken(
+                at: location
+            )
+        )
+    }
+
+    public func save(
+        applicationIdentity: ApplicationIdentity,
+        for application: ApplicationRecord
+    ) throws {
+        try saveScanResult(
+            applicationIdentity,
+            key: "application-identity:"
+                + application.url.standardizedFileURL.path,
+            root: application.url,
+            validationToken: ScanCacheValidation.token(for: application)
+        )
+    }
+
+    public func cachedAIApplicationScan(
+        key: String,
+        root: URL
+    ) throws -> AIApplicationScanResult? {
+        try cachedScanResult(
+            key: "ai-application:" + key,
+            validationToken: ScanCacheValidation.token(for: root)
+        )
+    }
+
+    public func save(
+        aiApplicationScan: AIApplicationScanResult,
+        key: String,
+        root: URL
+    ) throws {
+        try saveScanResult(
+            aiApplicationScan,
+            key: "ai-application:" + key,
+            root: root,
+            validationToken: ScanCacheValidation.token(for: root)
+        )
+    }
+
+    private func cachedScanResult<Value: Decodable>(
+        key: String,
+        validationToken: String
+    ) throws -> Value? {
+        do {
+            return try connection.statement(
+                """
+                SELECT payload
+                FROM scan_caches
+                WHERE cache_key = ?
+                  AND validation_token = ?
+                  AND dirty = 0
+                LIMIT 1;
+                """
+            ) { statement in
+                try connection.bind(key, to: 1, in: statement)
+                try connection.bind(validationToken, to: 2, in: statement)
+                guard try connection.step(statement) == SQLITE_ROW else {
+                    return nil
+                }
+                return try decoder.decode(
+                    Value.self,
+                    from: connection.blob(at: 0, in: statement)
+                )
+            }
+        } catch is DecodingError {
+            try connection.statement(
+                "DELETE FROM scan_caches WHERE cache_key = ?;"
+            ) { statement in
+                try connection.bind(key, to: 1, in: statement)
+                try connection.stepDone(statement)
+            }
+            return nil
+        }
+    }
+
+    private func saveScanResult<Value: Encodable>(
+        _ value: Value,
+        key: String,
+        root: URL,
+        validationToken: String
+    ) throws {
+        let payload = try encoder.encode(value)
+        try connection.statement(
+            """
+            INSERT INTO scan_caches(
+                cache_key, root_path, validation_token, payload, dirty,
+                updated_at
+            ) VALUES (?, ?, ?, ?, 0, ?)
+            ON CONFLICT(cache_key) DO UPDATE SET
+                root_path = excluded.root_path,
+                validation_token = excluded.validation_token,
+                payload = excluded.payload,
+                dirty = 0,
+                updated_at = excluded.updated_at;
+            """
+        ) { statement in
+            try connection.bind(key, to: 1, in: statement)
+            try connection.bind(root.standardizedFileURL.path, to: 2, in: statement)
+            try connection.bind(validationToken, to: 3, in: statement)
+            try connection.bind(payload, to: 4, in: statement)
+            try connection.bind(Date().timeIntervalSince1970, to: 5, in: statement)
+            try connection.stepDone(statement)
+        }
+    }
+
+    private func markScanCachesDirty(paths: [String]) throws {
+        try connection.statement(
+            """
+            UPDATE scan_caches
+            SET dirty = 1
+            WHERE root_path = ?
+               OR ? LIKE root_path || '/%'
+               OR root_path LIKE ? || '/%';
+            """
+        ) { statement in
+            for path in paths {
+                for index: Int32 in 1...3 {
+                    try connection.bind(path, to: index, in: statement)
+                }
+                try connection.stepDone(statement)
+                try connection.reset(statement)
+            }
         }
     }
 

@@ -48,21 +48,35 @@ public struct RuleBasedAIAdapter: AIApplicationAdapting {
     public let bundleIdentifier: String?
     public let rootRelativePath: String
     public let rules: [AIAssetRule]
+    private let cacheKey: String?
+    private let cache: (any ScanResultCaching)?
 
     public init(
         name: String,
         bundleIdentifier: String?,
         rootRelativePath: String,
-        rules: [AIAssetRule]
+        rules: [AIAssetRule],
+        cacheKey: String? = nil,
+        cache: (any ScanResultCaching)? = nil
     ) {
         self.name = name
         self.bundleIdentifier = bundleIdentifier
         self.rootRelativePath = rootRelativePath
         self.rules = rules.sorted { $0.relativePathPrefix.count > $1.relativePathPrefix.count }
+        self.cacheKey = cacheKey
+        self.cache = cache
     }
 
     public func scan(homeDirectory: URL) async throws -> AIApplicationScanResult {
         let root = homeDirectory.appending(path: rootRelativePath, directoryHint: .isDirectory)
+        if let cacheKey, let cache {
+            if let cached = try? await cache.cachedAIApplicationScan(
+                key: cacheKey,
+                root: root
+            ) {
+                return cached
+            }
+        }
         let ownerID = UUID()
         let fileManager = FileManager.default
         var items: [ScannedItem] = []
@@ -119,11 +133,19 @@ public struct RuleBasedAIAdapter: AIApplicationAdapting {
             supportLevel: .deep
         )
         let cleanupIDs = Set(items.filter { $0.risk == .safe }.map(\.id))
-        return AIApplicationScanResult(
+        let result = AIApplicationScanResult(
             application: application,
             items: items.sorted { $0.url.path < $1.url.path },
             cleanupRecommendedItemIDs: cleanupIDs
         )
+        if let cacheKey, let cache {
+            try? await cache.save(
+                aiApplicationScan: result,
+                key: cacheKey,
+                root: root
+            )
+        }
+        return result
     }
 
     private func aggregateURL(
