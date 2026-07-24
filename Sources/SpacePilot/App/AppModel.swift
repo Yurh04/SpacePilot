@@ -41,6 +41,10 @@ final class AppModel {
             || aiQueryProjection?.query != searchText
     }
 
+    var canRefreshCurrentView: Bool {
+        selection != .history
+    }
+
     private var scanTask: Task<Void, Never>?
     private var cleanupTask: Task<Void, Never>?
     private var cleanupOperationID: UUID?
@@ -60,13 +64,13 @@ final class AppModel {
         Task { await loadSavedState() }
     }
 
-    func startScan() {
+    func startScan(scope: ScanScope = .applications) {
         guard !isScanning, let coordinator = runtime?.coordinator else { return }
         errorMessage = nil
         isScanning = true
         scanTask = Task {
             do {
-                for try await event in coordinator.scan() {
+                for try await event in coordinator.scan(scope: scope) {
                     guard !Task.isCancelled else { break }
                     scanStage = event.stage
                     scanProgress = event.progress
@@ -87,6 +91,21 @@ final class AppModel {
 
     func cancelScan() {
         scanTask?.cancel()
+    }
+
+    func refreshCurrentView() {
+        guard canRefreshCurrentView else { return }
+        let scope: ScanScope = switch selection ?? .overview {
+        case .overview, .storage:
+            .full
+        case .applications:
+            .applications
+        case .developerAI:
+            .developerAI
+        case .history:
+            .applications
+        }
+        startScan(scope: scope)
     }
 
     func prepareCleanup(items: [ScannedItem]) {
@@ -181,7 +200,14 @@ final class AppModel {
                 cleanupHistory = try await runtime.store.cleanupHistory()
                 Self.logger.info("Cleanup finished: \(transaction.summary.rawValue, privacy: .public)")
                 showingCleanupConfirmation = false
-                startScan()
+                if let updated = snapshotAfterCleanup(
+                    snapshot,
+                    plan: plan,
+                    transaction: transaction
+                ) {
+                    try await runtime.store.save(snapshot: updated)
+                    apply(snapshot: updated)
+                }
             } catch is CancellationError {
                 Self.logger.info("Cleanup cancelled")
             } catch {
@@ -208,6 +234,78 @@ final class AppModel {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func snapshotAfterCleanup(
+        _ snapshot: ScanSnapshot,
+        plan: CleanupPlan,
+        transaction: CleanupTransaction
+    ) -> ScanSnapshot? {
+        let movedCandidateIDs = Set(transaction.outcomes.compactMap {
+            $0.status == .movedToTrash ? $0.candidateID : nil
+        })
+        let movedCandidates = plan.candidates.filter {
+            movedCandidateIDs.contains($0.id)
+        }
+        guard !movedCandidates.isEmpty else { return nil }
+
+        let movedRoots = movedCandidates.map {
+            $0.url.standardizedFileURL.resolvingSymlinksInPath().path
+        }
+        func wasMoved(_ url: URL) -> Bool {
+            let path = url.standardizedFileURL.resolvingSymlinksInPath().path
+            return movedRoots.contains {
+                path == $0 || path.hasPrefix($0 + "/")
+            }
+        }
+
+        let remainingItems = snapshot.items.filter { !wasMoved($0.url) }
+        let remainingItemIDs = Set(remainingItems.map(\.id))
+        let applications: [ApplicationRecord] = snapshot.applications.compactMap { application in
+            guard !wasMoved(application.url) else { return nil }
+            return ApplicationRecord(
+                id: application.id,
+                name: application.name,
+                bundleIdentifier: application.bundleIdentifier,
+                version: application.version,
+                url: application.url,
+                executableURL: application.executableURL,
+                allocatedSize: application.allocatedSize,
+                lastUsedDate: application.lastUsedDate,
+                associations: application.associations.filter {
+                    remainingItemIDs.contains($0.itemID)
+                }
+            )
+        }
+        let aiApplications: [AIApplicationRecord] = snapshot.aiApplications.compactMap { application in
+            if let applicationURL = application.applicationURL,
+               wasMoved(applicationURL) {
+                return nil
+            }
+            return AIApplicationRecord(
+                id: application.id,
+                name: application.name,
+                bundleIdentifier: application.bundleIdentifier,
+                applicationURL: application.applicationURL,
+                rootURLs: application.rootURLs.filter { !wasMoved($0) },
+                itemIDs: application.itemIDs.intersection(remainingItemIDs),
+                pluginIDs: application.pluginIDs,
+                skillIDs: application.skillIDs,
+                applicationAllocatedSize: application.applicationAllocatedSize,
+                supportLevel: application.supportLevel
+            )
+        }
+        return ScanSnapshot(
+            completedAt: .now,
+            volume: (try? VolumeScanner().scan()) ?? snapshot.volume,
+            items: remainingItems,
+            applications: applications,
+            aiApplications: aiApplications,
+            plugins: snapshot.plugins,
+            skills: snapshot.skills,
+            coverage: snapshot.coverage,
+            pluginDiagnostics: snapshot.pluginDiagnostics
+        )
     }
 
     private func apply(snapshot: ScanSnapshot) {

@@ -2,16 +2,29 @@ import Foundation
 
 public typealias ScanEventEmitter = @Sendable (ScanEvent) -> Void
 public typealias ScanOperation = @Sendable (ScanEventEmitter) async throws -> ScanSnapshot
+public typealias ScopedScanOperation = @Sendable (ScanScope, ScanEventEmitter) async throws -> ScanSnapshot
+
+public enum ScanScope: String, Codable, Sendable {
+    case applications
+    case developerAI
+    case full
+}
 
 public protocol ScanCoordinating: Sendable {
-    func scan() -> AsyncThrowingStream<ScanEvent, Error>
+    func scan(scope: ScanScope) -> AsyncThrowingStream<ScanEvent, Error>
 }
 
 public struct ScanCoordinator: ScanCoordinating, Sendable {
-    private let operation: ScanOperation
+    private let operation: ScopedScanOperation
 
     public init(operation: @escaping ScanOperation) {
-        self.operation = operation
+        self.operation = { _, emit in
+            try await operation(emit)
+        }
+    }
+
+    public init(scopedOperation: @escaping ScopedScanOperation) {
+        self.operation = scopedOperation
     }
 
     public static func live() throws -> ScanCoordinator {
@@ -23,7 +36,10 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
         store: any SnapshotStoring,
         identityReader: any ApplicationIdentityReading = ApplicationIdentityReader()
     ) {
-        self.operation = { emit in
+        self.operation = { scope, emit in
+            let previousSnapshot = scope == .full
+                ? nil
+                : try await store.latestSnapshot()
             let volume = try VolumeScanner().scan()
             let appLocations = [
                 URL(fileURLWithPath: "/Applications", isDirectory: true),
@@ -47,17 +63,17 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                     ))
                 }
             }
-            let quickSnapshot = ScanSnapshot(
-                completedAt: .now,
-                volume: volume,
-                items: [],
-                applications: baseApplications,
-                aiApplications: [],
-                plugins: [],
-                skills: [],
-                coverage: .complete,
-                pluginDiagnostics: nil
-            )
+            let quickSnapshot = previousSnapshot ?? ScanSnapshot(
+                    completedAt: .now,
+                    volume: volume,
+                    items: [],
+                    applications: baseApplications,
+                    aiApplications: [],
+                    plugins: [],
+                    skills: [],
+                    coverage: .complete,
+                    pluginDiagnostics: nil
+                )
             emit(ScanEvent(
                 stage: .quickInventory,
                 progress: 0.18,
@@ -66,16 +82,102 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
             ))
 
             try Task.checkCancellation()
-            async let homeScan = DirectoryScanner(access: LocalFileSystemAccess()).scan(
-                root: homeDirectory,
-                options: DirectoryScanOptions(category: .personal, risk: .sensitive, skipPackages: true)
-            )
+            if scope == .applications {
+                let applicationResolution = try await ApplicationArtifactResolver().resolve(
+                    applications: baseApplications,
+                    identities: identities,
+                    homeDirectory: homeDirectory
+                )
+                let previousAssociationItemIDs = Set(
+                    previousSnapshot?.applications
+                        .flatMap(\.associations)
+                        .map(\.itemID) ?? []
+                )
+                let preservedItems = previousSnapshot?.items.filter {
+                    !previousAssociationItemIDs.contains($0.id)
+                } ?? []
+                let canonicalOwnership = try Self.canonicalOwnership(
+                    sourceItems: preservedItems + applicationResolution.items,
+                    aggregateItems: applicationResolution.items
+                )
+                let associationsByApplicationID = Dictionary(
+                    applicationResolution.resolutions.map { resolution in
+                        (
+                            resolution.applicationID,
+                            resolution.associations.map {
+                                Self.remap(
+                                    association: $0,
+                                    itemIDs: canonicalOwnership.itemIDBySourceItemID
+                                )
+                            }
+                        )
+                    },
+                    uniquingKeysWith: { first, _ in first }
+                )
+                let applications = baseApplications.map { application in
+                    ApplicationRecord(
+                        id: application.id,
+                        name: application.name,
+                        bundleIdentifier: application.bundleIdentifier,
+                        version: application.version,
+                        url: application.url,
+                        executableURL: application.executableURL,
+                        allocatedSize: application.allocatedSize,
+                        lastUsedDate: application.lastUsedDate,
+                        associations: associationsByApplicationID[
+                            application.id,
+                            default: []
+                        ]
+                    )
+                }
+                let snapshot = ScanSnapshot(
+                    completedAt: .now,
+                    volume: volume,
+                    items: canonicalOwnership.items,
+                    applications: applications,
+                    aiApplications: previousSnapshot?.aiApplications ?? [],
+                    plugins: previousSnapshot?.plugins ?? [],
+                    skills: previousSnapshot?.skills ?? [],
+                    coverage: previousSnapshot?.coverage ?? .complete,
+                    pluginDiagnostics: previousSnapshot?.pluginDiagnostics
+                )
+                try await store.save(snapshot: snapshot)
+                emit(ScanEvent(
+                    stage: .completed,
+                    progress: 1,
+                    message: "Application refresh complete",
+                    snapshot: snapshot
+                ))
+                return snapshot
+            }
+
             async let codexScan = CodexAdapter().scan(homeDirectory: homeDirectory)
             async let claudeScan = ClaudeAdapter().scan(homeDirectory: homeDirectory)
             async let standaloneSkillScan = SkillScanner().scan(roots: SkillRoot.production(homeDirectory: homeDirectory))
 
-            let (homeResult, codex, claude, standaloneSkills) = try await (
-                homeScan, codexScan, claudeScan, standaloneSkillScan
+            let homeResult: DirectoryScanResult
+            if scope == .full {
+                homeResult = try await DirectoryScanner(access: LocalFileSystemAccess()).scan(
+                    root: homeDirectory,
+                    options: DirectoryScanOptions(
+                        category: .personal,
+                        risk: .sensitive,
+                        skipPackages: true
+                    )
+                )
+            } else {
+                homeResult = DirectoryScanResult(
+                    root: homeDirectory,
+                    items: previousSnapshot?.items.filter {
+                        $0.category == .personal
+                            || $0.category == .system
+                            || $0.category == .unclassified
+                    } ?? [],
+                    coverage: previousSnapshot?.coverage ?? .complete
+                )
+            }
+            let (codex, claude, standaloneSkills) = try await (
+                codexScan, claudeScan, standaloneSkillScan
             )
             let developer = try await DeveloperStorageScanner().scan(homeDirectory: homeDirectory)
             var basicAIScans: [AIApplicationScanResult] = []
@@ -231,11 +333,11 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
         }
     }
 
-    public func scan() -> AsyncThrowingStream<ScanEvent, Error> {
+    public func scan(scope: ScanScope = .full) -> AsyncThrowingStream<ScanEvent, Error> {
         AsyncThrowingStream { continuation in
             let task = Task {
                 do {
-                    _ = try await operation { continuation.yield($0) }
+                    _ = try await operation(scope) { continuation.yield($0) }
                     continuation.finish()
                 } catch {
                     continuation.finish(throwing: error)
@@ -245,9 +347,9 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
         }
     }
 
-    public func collectScan() async throws -> ScanSnapshot {
+    public func collectScan(scope: ScanScope = .full) async throws -> ScanSnapshot {
         var completed: ScanSnapshot?
-        for try await event in scan() {
+        for try await event in scan(scope: scope) {
             if let snapshot = event.snapshot { completed = snapshot }
         }
         guard let completed else { throw CancellationError() }

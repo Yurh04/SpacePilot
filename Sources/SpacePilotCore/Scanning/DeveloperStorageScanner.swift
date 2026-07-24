@@ -30,7 +30,7 @@ public struct DeveloperStorageScanner: Sendable {
             try Task.checkCancellation()
             let root = homeDirectory.appending(path: rule.relativePath, directoryHint: .isDirectory)
             guard FileManager.default.fileExists(atPath: root.path) else { continue }
-            let sizes = directorySizes(root)
+            let sizes = try directorySizes(root)
             items.append(ScannedItem(
                 url: root,
                 logicalSize: sizes.logical,
@@ -43,7 +43,8 @@ public struct DeveloperStorageScanner: Sendable {
         return DeveloperStorageScanResult(items: items.sorted { $0.allocatedSize > $1.allocatedSize })
     }
 
-    private func directorySizes(_ root: URL) -> (logical: Int64, allocated: Int64) {
+    private func directorySizes(_ root: URL) throws -> (logical: Int64, allocated: Int64) {
+        try Task.checkCancellation()
         guard let enumerator = FileManager.default.enumerator(
             at: root,
             includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey, .totalFileAllocatedSizeKey],
@@ -51,12 +52,18 @@ public struct DeveloperStorageScanner: Sendable {
         ) else { return (0, 0) }
         var logical: Int64 = 0
         var allocated: Int64 = 0
+        var processed = 0
         for case let url as URL in enumerator {
+            processed += 1
+            if processed.isMultiple(of: 128) {
+                try Task.checkCancellation()
+            }
             guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey, .totalFileAllocatedSizeKey]),
                   values.isRegularFile == true else { continue }
             logical += Int64(values.fileSize ?? 0)
             allocated += Int64(values.totalFileAllocatedSize ?? 0)
         }
+        try Task.checkCancellation()
         return (logical, allocated)
     }
 }

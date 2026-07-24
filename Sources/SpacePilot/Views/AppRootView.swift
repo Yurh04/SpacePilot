@@ -17,8 +17,10 @@ struct AppRootView: View {
                 if model.isScanning {
                     Button(L10n.cancel(), systemImage: "xmark") { model.cancelScan() }
                         .keyboardShortcut(.cancelAction)
-                } else {
-                    Button(L10n.scan(), systemImage: "arrow.clockwise") { model.startScan() }
+                } else if model.canRefreshCurrentView {
+                    Button(L10n.scan(), systemImage: "arrow.clockwise") {
+                        model.refreshCurrentView()
+                    }
                         .keyboardShortcut("r", modifiers: .command)
                 }
             }
@@ -45,7 +47,7 @@ struct AppRootView: View {
             OverviewView(
                 projection: model.projection?.overview,
                 hasSnapshot: model.latestSnapshot != nil,
-                startScan: model.startScan,
+                startScan: { model.startScan(scope: .full) },
                 reviewCleanup: model.prepareCleanup
             )
         case .storage:

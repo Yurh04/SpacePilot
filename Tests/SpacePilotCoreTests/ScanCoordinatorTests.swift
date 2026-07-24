@@ -3,6 +3,25 @@ import XCTest
 @testable import SpacePilotCore
 
 final class ScanCoordinatorTests: XCTestCase {
+    func testFocusedScopeIsForwardedToScopedOperation() async throws {
+        let recorder = ScanScopeRecorder()
+        let snapshot = ScanSnapshot.fixture()
+        let coordinator = ScanCoordinator(scopedOperation: { scope, emit in
+            recorder.record(scope)
+            emit(ScanEvent(
+                stage: .completed,
+                progress: 1,
+                message: "Done",
+                snapshot: snapshot
+            ))
+            return snapshot
+        })
+
+        _ = try await coordinator.collectScan(scope: .applications)
+
+        XCTAssertEqual(recorder.value, .applications)
+    }
+
     func testQuickInventoryArrivesBeforeTargetedCompletion() async throws {
         let coordinator = ScanCoordinator.fixture()
         var stages: [ScanStage] = []
@@ -202,6 +221,19 @@ final class ScanCoordinatorTests: XCTestCase {
                 .flatMap(\.itemIDs)
                 .allSatisfy { snapshotItemIDs.contains($0) }
         )
+    }
+}
+
+private final class ScanScopeRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var scope: ScanScope?
+
+    var value: ScanScope? {
+        lock.withLock { scope }
+    }
+
+    func record(_ value: ScanScope) {
+        lock.withLock { scope = value }
     }
 }
 
