@@ -12,6 +12,8 @@ public struct CodexAdapter: AIApplicationAdapting {
                 .init(relativePathPrefix: "sessions", category: .conversation, risk: .sensitive, explanation: "Codex conversation history"),
                 .init(relativePathPrefix: "logs", category: .log, risk: .rebuildable, explanation: "Codex diagnostic logs"),
                 .init(relativePathPrefix: "cache", category: .cache, risk: .safe, explanation: "Codex rebuildable cache"),
+                .init(relativePathPrefix: "plugins", category: .plugin, risk: .managed, explanation: "Codex managed plugins"),
+                .init(relativePathPrefix: "skills", category: .skill, risk: .managed, explanation: "Codex-specific skills"),
                 .init(relativePathPrefix: "config.toml", category: .aiData, risk: .sensitive, explanation: "Codex configuration")
             ]
         ).scan(homeDirectory: homeDirectory)

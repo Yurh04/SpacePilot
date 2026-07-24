@@ -10,7 +10,7 @@ public protocol SnapshotStoring: Sendable {
 
 public actor SQLiteIndexStore: SnapshotStoring {
     static let maximumDatabaseBytes: Int64 = 128 * 1024 * 1024
-    static let maximumSnapshotItems = 10_000
+    static let maximumSnapshotItems = ScanSnapshot.maximumRetainedItems
 
     private let connection: SQLiteConnection
     private let encoder: JSONEncoder
@@ -247,6 +247,159 @@ public actor SQLiteIndexStore: SnapshotStoring {
                 ))
             }
             return resources
+        }
+    }
+
+    public func cachedDirectoryStat(at url: URL) throws -> DirectoryStat? {
+        try connection.statement(
+            """
+            SELECT
+                d.resource_id, d.total_logical_size, d.total_allocated_size,
+                d.file_count, d.directory_count, d.indexed_at, d.dirty
+            FROM directory_stats d
+            JOIN storage_resources r ON r.id = d.resource_id
+            WHERE r.path = ? AND d.dirty = 0 AND r.state = 'current'
+            LIMIT 1;
+            """
+        ) { statement in
+            try connection.bind(
+                url.standardizedFileURL.path,
+                to: 1,
+                in: statement
+            )
+            guard try connection.step(statement) == SQLITE_ROW else {
+                return nil
+            }
+            let fileCount = sqlite3_column_int64(statement, 3)
+            let directoryCount = sqlite3_column_int64(statement, 4)
+            return DirectoryStat(
+                resourceID: Self.text(at: 0, in: statement),
+                totalLogicalSize: sqlite3_column_int64(statement, 1),
+                totalAllocatedSize: sqlite3_column_int64(statement, 2),
+                fileCount: fileCount >= 0 ? Int(fileCount) : nil,
+                directoryCount: directoryCount >= 0
+                    ? Int(directoryCount)
+                    : nil,
+                indexedAt: Date(
+                    timeIntervalSince1970: sqlite3_column_double(statement, 5)
+                ),
+                isDirty: sqlite3_column_int64(statement, 6) != 0
+            )
+        }
+    }
+
+    public func markDirectoryStatsDirty(changedPaths: [URL]) throws {
+        let paths = Set(changedPaths.map { $0.standardizedFileURL.path })
+            .sorted()
+        guard !paths.isEmpty else { return }
+        try connection.execute("BEGIN IMMEDIATE;")
+        do {
+            try connection.statement(
+                """
+                UPDATE directory_stats
+                SET dirty = 1
+                WHERE resource_id IN (
+                    SELECT id FROM storage_resources
+                    WHERE path = ?
+                       OR ? LIKE path || '/%'
+                       OR path LIKE ? || '/%'
+                );
+                """
+            ) { statement in
+                for path in paths {
+                    for index: Int32 in 1...3 {
+                        try connection.bind(path, to: index, in: statement)
+                    }
+                    try connection.stepDone(statement)
+                    try connection.reset(statement)
+                }
+            }
+            try connection.statement(
+                """
+                UPDATE storage_resources
+                SET state = 'dirty'
+                WHERE path = ?
+                   OR ? LIKE path || '/%'
+                   OR path LIKE ? || '/%';
+                """
+            ) { statement in
+                for path in paths {
+                    for index: Int32 in 1...3 {
+                        try connection.bind(path, to: index, in: statement)
+                    }
+                    try connection.stepDone(statement)
+                    try connection.reset(statement)
+                }
+            }
+            try connection.execute("COMMIT;")
+        } catch {
+            try? connection.execute("ROLLBACK;")
+            throw error
+        }
+    }
+
+    public func markAllDirectoryStatsDirty() throws {
+        try connection.execute("BEGIN IMMEDIATE;")
+        do {
+            try connection.execute("UPDATE directory_stats SET dirty = 1;")
+            try connection.execute(
+                """
+                UPDATE storage_resources
+                SET state = 'dirty'
+                WHERE id IN (SELECT resource_id FROM directory_stats);
+                """
+            )
+            try connection.execute("COMMIT;")
+        } catch {
+            try? connection.execute("ROLLBACK;")
+            throw error
+        }
+    }
+
+    public func save(fileSystemEventCursor cursor: FileSystemEventCursor) throws {
+        try connection.statement(
+            """
+            INSERT INTO fsevent_cursors(
+                volume_id, last_event_id, last_reconciled_at
+            ) VALUES (?, ?, ?)
+            ON CONFLICT(volume_id) DO UPDATE SET
+                last_event_id = excluded.last_event_id,
+                last_reconciled_at = excluded.last_reconciled_at;
+            """
+        ) { statement in
+            try connection.bind(cursor.volumeID, to: 1, in: statement)
+            try connection.bind(cursor.lastEventID, to: 2, in: statement)
+            try connection.bind(
+                cursor.lastReconciledAt.timeIntervalSince1970,
+                to: 3,
+                in: statement
+            )
+            try connection.stepDone(statement)
+        }
+    }
+
+    public func fileSystemEventCursor(
+        volumeID: String
+    ) throws -> FileSystemEventCursor? {
+        try connection.statement(
+            """
+            SELECT last_event_id, last_reconciled_at
+            FROM fsevent_cursors
+            WHERE volume_id = ?
+            LIMIT 1;
+            """
+        ) { statement in
+            try connection.bind(volumeID, to: 1, in: statement)
+            guard try connection.step(statement) == SQLITE_ROW else {
+                return nil
+            }
+            return FileSystemEventCursor(
+                volumeID: volumeID,
+                lastEventID: sqlite3_column_int64(statement, 0),
+                lastReconciledAt: Date(
+                    timeIntervalSince1970: sqlite3_column_double(statement, 1)
+                )
+            )
         }
     }
 

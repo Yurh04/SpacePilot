@@ -47,6 +47,28 @@ final class AIAdapterTests: XCTestCase {
         XCTAssertFalse(result.cleanupRecommendedItemIDs.contains(item.id))
     }
 
+    func testCodexLargeConversationTreeProducesOneBoundedAggregate() async throws {
+        let fileCount = 1_500
+        let files = Dictionary(
+            uniqueKeysWithValues: (0..<fileCount).map {
+                (".codex/sessions/session-\($0).jsonl", 8)
+            }
+        )
+        let tree = try TemporaryTree(files: files)
+
+        let result = try await CodexAdapter().scan(homeDirectory: tree.url)
+
+        let conversations = try XCTUnwrap(
+            result.itemsByCategory[.conversation]
+        )
+        XCTAssertEqual(conversations.count, 1)
+        XCTAssertEqual(conversations[0].logicalSize, Int64(fileCount * 8))
+        XCTAssertTrue(
+            conversations[0].explanation.contains("\(fileCount) files")
+        )
+        XCTAssertLessThanOrEqual(result.items.count, 5)
+    }
+
     func testBasicScannerReportsOnlyConfiguredFootprintRoots() async throws {
         let tree = try TemporaryTree(files: [
             "Library/Application Support/ChatGPT/state.db": 50,

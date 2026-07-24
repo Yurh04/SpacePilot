@@ -86,7 +86,9 @@ enum AIAssetByteOwnership {
         var dataItemBytes: Int64 = 0
         for item in items {
             try checkpoint.checkPeriodically()
-            if !managedAssets.contains(item.url) {
+            if item.category != .plugin,
+               item.category != .skill,
+               !managedAssets.contains(item.url) {
                 dataItemBytes += item.allocatedSize
             }
         }

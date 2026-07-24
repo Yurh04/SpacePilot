@@ -1,3 +1,4 @@
+import CoreServices
 import Foundation
 
 public struct ApplicationScanner: Sendable {
@@ -51,6 +52,16 @@ public struct ApplicationScanner: Sendable {
     }
 
     private func allocatedSize(of root: URL) -> Int64 {
+        if let metadataItem = MDItemCreate(
+            kCFAllocatorDefault,
+            root.path as CFString
+        ), let size = MDItemCopyAttribute(
+            metadataItem,
+            "kMDItemPhysicalSize" as CFString
+        ) as? NSNumber, size.int64Value > 0 {
+            return size.int64Value
+        }
+
         guard let enumerator = FileManager.default.enumerator(
             at: root,
             includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .isRegularFileKey],

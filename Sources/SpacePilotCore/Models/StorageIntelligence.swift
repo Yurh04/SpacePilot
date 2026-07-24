@@ -145,6 +145,22 @@ public struct DirectoryStat: Codable, Hashable, Sendable {
     }
 }
 
+public struct FileSystemEventCursor: Codable, Hashable, Sendable {
+    public let volumeID: String
+    public let lastEventID: Int64
+    public let lastReconciledAt: Date
+
+    public init(
+        volumeID: String,
+        lastEventID: Int64,
+        lastReconciledAt: Date
+    ) {
+        self.volumeID = volumeID
+        self.lastEventID = max(0, lastEventID)
+        self.lastReconciledAt = lastReconciledAt
+    }
+}
+
 public struct StorageIndexSummary: Codable, Hashable, Sendable {
     public let ownerCount: Int
     public let resourceCount: Int

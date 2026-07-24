@@ -1,6 +1,49 @@
 import Foundation
 
 public struct RuleBasedAIAdapter: AIApplicationAdapting {
+    private struct AssetAccumulator {
+        var logicalSize: Int64 = 0
+        var allocatedSize: Int64 = 0
+        var fileCount = 0
+        var creationDate: Date?
+        var modificationDate: Date?
+
+        mutating func add(
+            logicalSize: Int64,
+            allocatedSize: Int64,
+            creationDate: Date?,
+            modificationDate: Date?
+        ) {
+            self.logicalSize += logicalSize
+            self.allocatedSize += allocatedSize
+            fileCount += 1
+            if let creationDate,
+               self.creationDate == nil || creationDate < self.creationDate! {
+                self.creationDate = creationDate
+            }
+            if let modificationDate,
+               self.modificationDate == nil
+                    || modificationDate > self.modificationDate! {
+                self.modificationDate = modificationDate
+            }
+        }
+    }
+
+    private struct AssetAggregation {
+        let rules: [AssetAccumulator]
+        let unknown: AssetAccumulator
+    }
+
+    private static let resourceKeySet: Set<URLResourceKey> = [
+        .isRegularFileKey,
+        .isSymbolicLinkKey,
+        .fileSizeKey,
+        .totalFileAllocatedSizeKey,
+        .creationDateKey,
+        .contentModificationDateKey
+    ]
+    private static let resourceKeys = Array(resourceKeySet)
+
     public let name: String
     public let bundleIdentifier: String?
     public let rootRelativePath: String
@@ -25,30 +68,39 @@ public struct RuleBasedAIAdapter: AIApplicationAdapting {
         var items: [ScannedItem] = []
 
         if fileManager.fileExists(atPath: root.path) {
-            for fileURL in fileURLs(beneath: root) {
-                try Task.checkCancellation()
-                guard let values = try? fileURL.resourceValues(forKeys: [
-                    .isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey,
-                    .totalFileAllocatedSizeKey, .creationDateKey,
-                    .contentModificationDateKey, .fileResourceIdentifierKey
-                ]), values.isRegularFile == true, values.isSymbolicLink != true else { continue }
+            let aggregation = try aggregateFiles(beneath: root)
+            try Task.checkCancellation()
 
-                let relativePath = relativePath(of: fileURL, beneath: root)
-                let rule = rules.first { relativePath == $0.relativePathPrefix || relativePath.hasPrefix($0.relativePathPrefix + "/") }
-                let category = rule?.category ?? .unclassified
-                let risk = rule?.risk ?? .sensitive
-                let explanation = rule?.explanation ?? "Unknown \(name) data; review before changing"
+            for (rule, accumulator) in zip(rules, aggregation.rules)
+                where accumulator.fileCount > 0 {
                 items.append(ScannedItem(
-                    url: fileURL.standardizedFileURL,
-                    logicalSize: Int64(values.fileSize ?? 0),
-                    allocatedSize: Int64(values.totalFileAllocatedSize ?? 0),
-                    creationDate: values.creationDate,
-                    modificationDate: values.contentModificationDate,
-                    resourceIdentifier: values.fileResourceIdentifier.map { String(describing: $0) },
-                    category: category,
-                    risk: risk,
+                    url: aggregateURL(
+                        beneath: root,
+                        relativePath: rule.relativePathPrefix
+                    ),
+                    logicalSize: accumulator.logicalSize,
+                    allocatedSize: accumulator.allocatedSize,
+                    creationDate: accumulator.creationDate,
+                    modificationDate: accumulator.modificationDate,
+                    category: rule.category,
+                    risk: rule.risk,
                     ownerID: ownerID,
-                    explanation: explanation
+                    explanation: rule.explanation
+                        + " (\(accumulator.fileCount) files)"
+                ))
+            }
+            if aggregation.unknown.fileCount > 0 {
+                items.append(ScannedItem(
+                    url: root.standardizedFileURL,
+                    logicalSize: aggregation.unknown.logicalSize,
+                    allocatedSize: aggregation.unknown.allocatedSize,
+                    creationDate: aggregation.unknown.creationDate,
+                    modificationDate: aggregation.unknown.modificationDate,
+                    category: .unclassified,
+                    risk: .sensitive,
+                    ownerID: ownerID,
+                    explanation: "Unknown \(name) data; review before changing"
+                        + " (\(aggregation.unknown.fileCount) files)"
                 ))
             }
         }
@@ -74,17 +126,85 @@ public struct RuleBasedAIAdapter: AIApplicationAdapting {
         )
     }
 
-    private func fileURLs(beneath root: URL) -> [URL] {
+    private func aggregateURL(
+        beneath root: URL,
+        relativePath: String
+    ) -> URL {
+        let candidate = root.appending(path: relativePath).standardizedFileURL
+        let isDirectory = (try? candidate.resourceValues(
+            forKeys: [.isDirectoryKey]
+        ).isDirectory) == true
+        return URL(
+            filePath: candidate.path,
+            directoryHint: isDirectory ? .isDirectory : .notDirectory
+        )
+    }
+
+    private func aggregateFiles(beneath root: URL) throws -> AssetAggregation {
+        var ruleAccumulators = Array(
+            repeating: AssetAccumulator(),
+            count: rules.count
+        )
+        var unknownAccumulator = AssetAccumulator()
         guard let enumerator = FileManager.default.enumerator(
             at: root,
-            includingPropertiesForKeys: [
-                .isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey,
-                .totalFileAllocatedSizeKey, .creationDateKey,
-                .contentModificationDateKey, .fileResourceIdentifierKey
-            ],
+            includingPropertiesForKeys: Self.resourceKeys,
             options: [.skipsPackageDescendants]
-        ) else { return [] }
-        return enumerator.compactMap { $0 as? URL }
+        ) else {
+            return AssetAggregation(
+                rules: ruleAccumulators,
+                unknown: unknownAccumulator
+            )
+        }
+
+        var processed = 0
+        for case let fileURL as URL in enumerator {
+            processed += 1
+            if processed.isMultiple(of: 256) {
+                try Task.checkCancellation()
+            }
+            autoreleasepool {
+                guard let values = try? fileURL.resourceValues(
+                    forKeys: Self.resourceKeySet
+                ), values.isRegularFile == true,
+                   values.isSymbolicLink != true else {
+                    return
+                }
+                let relativePath = relativePath(of: fileURL, beneath: root)
+                let ruleIndex = rules.firstIndex {
+                    relativePath == $0.relativePathPrefix
+                        || relativePath.hasPrefix($0.relativePathPrefix + "/")
+                }
+                if let ruleIndex {
+                    ruleAccumulators[ruleIndex].add(
+                        logicalSize: Int64(values.fileSize ?? 0),
+                        allocatedSize: Int64(
+                            values.totalFileAllocatedSize
+                                ?? values.fileSize
+                                ?? 0
+                        ),
+                        creationDate: values.creationDate,
+                        modificationDate: values.contentModificationDate
+                    )
+                } else {
+                    unknownAccumulator.add(
+                        logicalSize: Int64(values.fileSize ?? 0),
+                        allocatedSize: Int64(
+                            values.totalFileAllocatedSize
+                                ?? values.fileSize
+                                ?? 0
+                        ),
+                        creationDate: values.creationDate,
+                        modificationDate: values.contentModificationDate
+                    )
+                }
+            }
+        }
+        try Task.checkCancellation()
+        return AssetAggregation(
+            rules: ruleAccumulators,
+            unknown: unknownAccumulator
+        )
     }
 
     private func relativePath(of file: URL, beneath root: URL) -> String {

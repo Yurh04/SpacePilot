@@ -145,7 +145,7 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                         homeResult: nil,
                         previous: previousSnapshot
                     )
-                )
+                ).compacted()
                 try await store.save(snapshot: snapshot)
                 emit(ScanEvent(
                     stage: .completed,
@@ -337,7 +337,7 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                     homeResult: scope == .full ? homeResult : nil,
                     previous: previousSnapshot
                 )
-            )
+            ).compacted()
             try await store.save(snapshot: snapshot)
             emit(ScanEvent(stage: .completed, progress: 1, message: "Scan complete", snapshot: snapshot))
             return snapshot

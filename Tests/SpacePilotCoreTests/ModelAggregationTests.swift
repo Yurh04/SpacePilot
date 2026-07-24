@@ -109,6 +109,80 @@ final class ModelAggregationTests: XCTestCase {
         XCTAssertEqual(snapshot.uniqueAIAllocatedSize, 100)
     }
 
+    func testSnapshotCompactionKeepsOwnershipReferencesAndDropsLargeUnownedItem() {
+        let applicationID = UUID()
+        let applicationItem = ScannedItem.fixture(
+            path: "/Users/test/Library/Caches/app",
+            allocatedSize: 10
+        )
+        let aiItem = ScannedItem.fixture(
+            path: "/Users/test/.codex/sessions",
+            allocatedSize: 20
+        )
+        let largeUnownedItem = ScannedItem.fixture(
+            path: "/Users/test/Downloads/archive",
+            allocatedSize: 10_000
+        )
+        let association = ArtifactAssociation(
+            itemID: applicationItem.id,
+            applicationID: applicationID,
+            evidence: .exactBundleIdentifier,
+            confidence: .high,
+            risk: .safe,
+            ownership: .owned
+        )
+        let application = ApplicationRecord(
+            id: applicationID,
+            name: "App",
+            bundleIdentifier: "com.example.app",
+            version: "1",
+            url: URL(fileURLWithPath: "/Applications/App.app"),
+            executableURL: nil,
+            allocatedSize: 100,
+            associations: [association]
+        )
+        let aiApplication = AIApplicationRecord.fixture(
+            name: "Codex",
+            itemIDs: [aiItem.id]
+        )
+        let aggregates = [
+            CategoryAggregate(
+                category: .cache,
+                allocatedSize: 10_030,
+                itemCount: 3
+            )
+        ]
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: [largeUnownedItem, applicationItem, aiItem],
+            applications: [application],
+            aiApplications: [aiApplication],
+            plugins: [],
+            skills: [],
+            coverage: .complete,
+            categoryAggregates: aggregates
+        )
+
+        let compacted = snapshot.compacted(retainedItemLimit: 2)
+
+        XCTAssertEqual(
+            Set(compacted.items.map(\.id)),
+            [applicationItem.id, aiItem.id]
+        )
+        XCTAssertEqual(
+            compacted.applications[0].associations.map(\.itemID),
+            [applicationItem.id]
+        )
+        XCTAssertEqual(compacted.aiApplications[0].itemIDs, [aiItem.id])
+        XCTAssertEqual(compacted.categoryAggregates, aggregates)
+        XCTAssertTrue(
+            compacted.coverage.notes.contains {
+                $0.contains("Retained 2 representative items from 3")
+            }
+        )
+    }
+
     func testRiskSortPlacesSensitiveAndManagedLast() {
         XCTAssertEqual(RiskLevel.allCases.sorted().map(\.rawValue), [
             "safe", "rebuildable", "sensitive", "managed"

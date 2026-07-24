@@ -298,6 +298,68 @@ final class SQLiteIndexStoreTests: XCTestCase {
         XCTAssertLessThan(bytes, 16 * 1_024 * 1_024)
     }
 
+    func testDirectoryCacheInvalidatesIndexedAncestorForChangedChild() async throws {
+        let store = try SQLiteIndexStore(url: temporaryDatabaseURL())
+        let directory = URL(
+            filePath: "/Users/test/.codex/sessions",
+            directoryHint: .isDirectory
+        )
+        let item = ScannedItem(
+            url: directory,
+            logicalSize: 1_024,
+            allocatedSize: 1_000,
+            category: .conversation,
+            risk: .sensitive,
+            explanation: "Conversation aggregate"
+        )
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: [item],
+            applications: [],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: .complete
+        )
+        try await store.save(snapshot: snapshot)
+        let initialStat = try await store.cachedDirectoryStat(at: directory)
+        XCTAssertEqual(
+            initialStat?.totalAllocatedSize,
+            1_000
+        )
+
+        try await store.markDirectoryStatsDirty(changedPaths: [
+            directory.appending(path: "new-session.jsonl")
+        ])
+
+        let dirtyStat = try await store.cachedDirectoryStat(at: directory)
+        XCTAssertNil(dirtyStat)
+        try await store.save(snapshot: snapshot)
+        let refreshedStat = try await store.cachedDirectoryStat(at: directory)
+        XCTAssertNotNil(refreshedStat)
+    }
+
+    func testFileSystemEventCursorRoundTripsByVolume() async throws {
+        let store = try SQLiteIndexStore(url: temporaryDatabaseURL())
+        let cursor = FileSystemEventCursor(
+            volumeID: "volume-fixture",
+            lastEventID: 42,
+            lastReconciledAt: Date(timeIntervalSince1970: 1_234)
+        )
+
+        try await store.save(fileSystemEventCursor: cursor)
+
+        let stored = try await store.fileSystemEventCursor(
+            volumeID: "volume-fixture"
+        )
+        let missing = try await store.fileSystemEventCursor(
+            volumeID: "other-volume"
+        )
+        XCTAssertEqual(stored, cursor)
+        XCTAssertNil(missing)
+    }
+
     func testPruneFailureRollsBackNewSnapshotAndPreservesPreviousLatest() async throws {
         let url = temporaryDatabaseURL()
         let store = try SQLiteIndexStore(url: url)

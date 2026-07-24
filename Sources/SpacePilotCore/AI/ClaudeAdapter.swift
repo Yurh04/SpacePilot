@@ -12,6 +12,7 @@ public struct ClaudeAdapter: AIApplicationAdapting {
                 .init(relativePathPrefix: "projects", category: .conversation, risk: .sensitive, explanation: "Claude project conversation data"),
                 .init(relativePathPrefix: "debug", category: .log, risk: .rebuildable, explanation: "Claude diagnostic logs"),
                 .init(relativePathPrefix: "cache", category: .cache, risk: .safe, explanation: "Claude rebuildable cache"),
+                .init(relativePathPrefix: "skills", category: .skill, risk: .managed, explanation: "Claude-specific skills"),
                 .init(relativePathPrefix: "settings.json", category: .aiData, risk: .sensitive, explanation: "Claude settings")
             ]
         ).scan(homeDirectory: homeDirectory)

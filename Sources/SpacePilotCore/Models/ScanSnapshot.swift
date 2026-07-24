@@ -40,6 +40,8 @@ public struct CategoryAggregate: Codable, Hashable, Sendable {
 }
 
 public struct ScanSnapshot: Identifiable, Codable, Sendable {
+    public static let maximumRetainedItems = 10_000
+
     public let id: UUID
     public let completedAt: Date
     public let volume: VolumeRecord?
@@ -90,5 +92,76 @@ public struct ScanSnapshot: Identifiable, Codable, Sendable {
             skills: skills.lazy.filter { skillIDs.contains($0.id) },
             ownedPluginIDs: pluginIDs
         ).total
+    }
+
+    public func compacted(
+        retainedItemLimit: Int = Self.maximumRetainedItems
+    ) -> ScanSnapshot {
+        let limit = max(0, retainedItemLimit)
+        guard items.count > limit else { return self }
+
+        let referencedItemIDs = Set(
+            applications.flatMap(\.associations).map(\.itemID)
+                + aiApplications.flatMap { Array($0.itemIDs) }
+        )
+        let retainedItems = items.sorted { lhs, rhs in
+            let lhsReferenced = referencedItemIDs.contains(lhs.id)
+            let rhsReferenced = referencedItemIDs.contains(rhs.id)
+            if lhsReferenced != rhsReferenced {
+                return lhsReferenced && !rhsReferenced
+            }
+            if lhs.allocatedSize != rhs.allocatedSize {
+                return lhs.allocatedSize > rhs.allocatedSize
+            }
+            return lhs.url.path < rhs.url.path
+        }.prefix(limit)
+        let retainedIDs = Set(retainedItems.map(\.id))
+        let compactedApplications = applications.map { application in
+            ApplicationRecord(
+                id: application.id,
+                name: application.name,
+                bundleIdentifier: application.bundleIdentifier,
+                version: application.version,
+                url: application.url,
+                executableURL: application.executableURL,
+                allocatedSize: application.allocatedSize,
+                lastUsedDate: application.lastUsedDate,
+                associations: application.associations.filter {
+                    retainedIDs.contains($0.itemID)
+                }
+            )
+        }
+        let compactedAIApplications = aiApplications.map { application in
+            AIApplicationRecord(
+                id: application.id,
+                name: application.name,
+                bundleIdentifier: application.bundleIdentifier,
+                applicationURL: application.applicationURL,
+                rootURLs: application.rootURLs,
+                itemIDs: application.itemIDs.intersection(retainedIDs),
+                pluginIDs: application.pluginIDs,
+                skillIDs: application.skillIDs,
+                applicationAllocatedSize: application.applicationAllocatedSize,
+                supportLevel: application.supportLevel
+            )
+        }
+        let note = "Retained \(limit) representative items from "
+            + "\(items.count) indexed items"
+        return ScanSnapshot(
+            id: id,
+            completedAt: completedAt,
+            volume: volume,
+            items: Array(retainedItems),
+            applications: compactedApplications,
+            aiApplications: compactedAIApplications,
+            plugins: plugins,
+            skills: skills,
+            coverage: ScanCoverage(
+                deniedPaths: coverage.deniedPaths,
+                notes: coverage.notes + [note]
+            ),
+            pluginDiagnostics: pluginDiagnostics,
+            categoryAggregates: categoryAggregates
+        )
     }
 }
