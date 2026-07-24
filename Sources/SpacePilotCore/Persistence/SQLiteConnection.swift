@@ -95,6 +95,13 @@ final class SQLiteConnection {
         guard sqlite3_step(statement) == SQLITE_DONE else { throw currentError() }
     }
 
+    func reset(_ statement: OpaquePointer) throws {
+        guard sqlite3_reset(statement) == SQLITE_OK,
+              sqlite3_clear_bindings(statement) == SQLITE_OK else {
+            throw currentError()
+        }
+    }
+
     func step(_ statement: OpaquePointer) throws -> Int32 {
         let resultCode = sqlite3_step(statement)
         guard resultCode == SQLITE_ROW || resultCode == SQLITE_DONE else {

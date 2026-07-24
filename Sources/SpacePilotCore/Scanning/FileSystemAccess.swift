@@ -40,21 +40,22 @@ public protocol FileSystemAccess: Sendable {
 }
 
 public struct LocalFileSystemAccess: FileSystemAccess {
+    private static let metadataKeys: Set<URLResourceKey> = [
+        .isDirectoryKey,
+        .isRegularFileKey,
+        .isSymbolicLinkKey,
+        .isPackageKey,
+        .fileSizeKey,
+        .totalFileAllocatedSizeKey,
+        .creationDateKey,
+        .contentModificationDateKey,
+        .fileResourceIdentifierKey
+    ]
+
     public init() {}
 
     public func metadata(at url: URL) throws -> FileMetadata {
-        let keys: Set<URLResourceKey> = [
-            .isDirectoryKey,
-            .isRegularFileKey,
-            .isSymbolicLinkKey,
-            .isPackageKey,
-            .fileSizeKey,
-            .totalFileAllocatedSizeKey,
-            .creationDateKey,
-            .contentModificationDateKey,
-            .fileResourceIdentifierKey
-        ]
-        let values = try url.resourceValues(forKeys: keys)
+        let values = try url.resourceValues(forKeys: Self.metadataKeys)
         return FileMetadata(
             isDirectory: values.isDirectory == true,
             isRegularFile: values.isRegularFile == true,
@@ -71,7 +72,7 @@ public struct LocalFileSystemAccess: FileSystemAccess {
     public func contentsOfDirectory(at url: URL) throws -> [URL] {
         try FileManager.default.contentsOfDirectory(
             at: url,
-            includingPropertiesForKeys: nil,
+            includingPropertiesForKeys: Array(Self.metadataKeys),
             options: []
         )
     }

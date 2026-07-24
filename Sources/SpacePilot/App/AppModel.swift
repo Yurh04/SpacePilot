@@ -229,6 +229,7 @@ final class AppModel {
         do {
             if let snapshot = try await runtime.store.latestSnapshot() {
                 apply(snapshot: snapshot)
+                try await runtime.store.ensureStorageIndex(snapshot: snapshot)
             }
             cleanupHistory = try await runtime.store.cleanupHistory()
         } catch {

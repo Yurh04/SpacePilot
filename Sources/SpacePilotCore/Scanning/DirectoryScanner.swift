@@ -65,6 +65,7 @@ public struct DirectoryScanner<Access: FileSystemAccess>: Sendable {
         var deniedPaths: [URL] = []
         var notes: [String] = []
         var processed = 0
+        var processedEntries = 0
         var totalLogicalSize: Int64 = 0
         var totalAllocatedSize: Int64 = 0
         var fileCount = 0
@@ -85,35 +86,41 @@ public struct DirectoryScanner<Access: FileSystemAccess>: Sendable {
             }
 
             for child in children {
+                processedEntries += 1
+                if processedEntries.isMultiple(of: 256) {
+                    try Task.checkCancellation()
+                }
                 if !options.includeHiddenFiles, child.lastPathComponent.hasPrefix(".") {
                     continue
                 }
                 do {
-                    let metadata = try access.metadata(at: child)
-                    if metadata.isSymbolicLink { continue }
-                    if metadata.isDirectory {
-                        if !(options.skipPackages && metadata.isPackage) {
-                            pending.append(child)
-                        }
-                    } else if metadata.isRegularFile {
-                        totalLogicalSize += metadata.logicalSize
-                        totalAllocatedSize += metadata.allocatedSize
-                        fileCount += 1
-                        let item = ScannedItem(
-                            url: child.standardizedFileURL,
-                            logicalSize: metadata.logicalSize,
-                            allocatedSize: metadata.allocatedSize,
-                            creationDate: metadata.creationDate,
-                            modificationDate: metadata.modificationDate,
-                            resourceIdentifier: metadata.resourceIdentifier,
-                            category: options.category,
-                            risk: options.risk,
-                            explanation: "Found under \(root.lastPathComponent.isEmpty ? root.path : root.lastPathComponent)"
-                        )
-                        if options.retainedItemLimit == nil {
-                            items.append(item)
-                        } else {
-                            retainedItems.insert(item)
+                    try autoreleasepool {
+                        let metadata = try access.metadata(at: child)
+                        if metadata.isSymbolicLink { return }
+                        if metadata.isDirectory {
+                            if !(options.skipPackages && metadata.isPackage) {
+                                pending.append(child)
+                            }
+                        } else if metadata.isRegularFile {
+                            totalLogicalSize += metadata.logicalSize
+                            totalAllocatedSize += metadata.allocatedSize
+                            fileCount += 1
+                            let item = ScannedItem(
+                                url: child.standardizedFileURL,
+                                logicalSize: metadata.logicalSize,
+                                allocatedSize: metadata.allocatedSize,
+                                creationDate: metadata.creationDate,
+                                modificationDate: metadata.modificationDate,
+                                resourceIdentifier: metadata.resourceIdentifier,
+                                category: options.category,
+                                risk: options.risk,
+                                explanation: "Found under \(root.lastPathComponent.isEmpty ? root.path : root.lastPathComponent)"
+                            )
+                            if options.retainedItemLimit == nil {
+                                items.append(item)
+                            } else {
+                                retainedItems.insert(item)
+                            }
                         }
                     }
                 } catch {

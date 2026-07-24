@@ -4,6 +4,182 @@ import XCTest
 @testable import SpacePilotCore
 
 final class SQLiteIndexStoreTests: XCTestCase {
+    func testSavingSnapshotBuildsQueryableOwnershipGraph() async throws {
+        let store = try SQLiteIndexStore(url: temporaryDatabaseURL())
+        let applicationID = UUID()
+        let aiApplicationID = UUID()
+        let cacheItemID = UUID()
+        let developerItemID = UUID()
+        let skillID = UUID()
+        let cacheItem = ScannedItem(
+            id: cacheItemID,
+            url: URL(
+                filePath: "/Users/test/Library/Caches/com.example.Editor",
+                directoryHint: .isDirectory
+            ),
+            logicalSize: 600,
+            allocatedSize: 512,
+            category: .cache,
+            risk: .safe,
+            explanation: "Application cache"
+        )
+        let developerItem = ScannedItem(
+            id: developerItemID,
+            url: URL(
+                filePath: "/Users/test/Library/Developer/CoreSimulator",
+                directoryHint: .isDirectory
+            ),
+            logicalSize: 2_048,
+            allocatedSize: 2_000,
+            category: .developer,
+            risk: .sensitive,
+            explanation: "Simulator data"
+        )
+        let association = ArtifactAssociation(
+            itemID: cacheItemID,
+            applicationID: applicationID,
+            evidence: .exactBundleIdentifier,
+            confidence: .high,
+            risk: .safe,
+            ownership: .owned
+        )
+        let application = ApplicationRecord(
+            id: applicationID,
+            name: "Editor",
+            bundleIdentifier: "com.example.Editor",
+            version: "1",
+            url: URL(
+                filePath: "/Applications/Editor.app",
+                directoryHint: .isDirectory
+            ),
+            executableURL: nil,
+            allocatedSize: 4_096,
+            associations: [association]
+        )
+        let skill = SkillRecord.fixture(id: skillID, allocatedSize: 128)
+        let aiApplication = AIApplicationRecord.fixture(
+            id: aiApplicationID,
+            name: "Codex",
+            itemIDs: [cacheItemID],
+            skillIDs: [skillID]
+        )
+        let snapshot = ScanSnapshot(
+            completedAt: Date(timeIntervalSince1970: 1_000),
+            volume: nil,
+            items: [cacheItem, developerItem],
+            applications: [application],
+            aiApplications: [aiApplication],
+            plugins: [],
+            skills: [skill],
+            coverage: .complete
+        )
+
+        try await store.save(snapshot: snapshot)
+
+        let summary = try await store.storageIndexSummary()
+        XCTAssertEqual(summary.ownerCount, 3)
+        XCTAssertEqual(summary.resourceCount, 4)
+        XCTAssertEqual(summary.ownershipCount, 5)
+        XCTAssertEqual(summary.directoryStatCount, 4)
+        XCTAssertEqual(summary.allocatedSize, 6_736)
+        XCTAssertEqual(summary.lastUpdatedAt, snapshot.completedAt)
+        let owners = try await store.storageOwners()
+        XCTAssertEqual(
+            Set(owners.map(\.id)),
+            [
+                "app:com.example.editor",
+                "ai:codex",
+                "developer:tooling"
+            ]
+        )
+        let applicationResources = try await store.resources(
+            ownerID: "app:com.example.editor"
+        )
+        XCTAssertEqual(
+            Set(applicationResources.map(\.url.path)),
+            [
+                "/Applications/Editor.app",
+                "/Users/test/Library/Caches/com.example.Editor"
+            ]
+        )
+        let aiResources = try await store.resources(ownerID: "ai:codex")
+        XCTAssertEqual(
+            Set(aiResources.map(\.url.path)),
+            [
+                "/Users/test/.agents/skills/fixture-skill",
+                "/Users/test/Library/Caches/com.example.Editor"
+            ]
+        )
+    }
+
+    func testNewSnapshotRemovesResourcesNoLongerPresent() async throws {
+        let store = try SQLiteIndexStore(url: temporaryDatabaseURL())
+        let item = ScannedItem.fixture(allocatedSize: 512)
+        let first = ScanSnapshot(
+            completedAt: .distantPast,
+            volume: nil,
+            items: [item],
+            applications: [],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: .complete
+        )
+        try await store.save(snapshot: first)
+
+        try await store.save(snapshot: .fixture())
+
+        let summary = try await store.storageIndexSummary()
+        XCTAssertEqual(summary.resourceCount, 0)
+        XCTAssertEqual(summary.allocatedSize, 0)
+        XCTAssertNil(summary.lastUpdatedAt)
+    }
+
+    func testLegacySnapshotDatabaseMigratesToStorageIntelligenceSchema() async throws {
+        let url = temporaryDatabaseURL()
+        try createLegacyV1Database(at: url)
+
+        let store = try SQLiteIndexStore(url: url)
+
+        XCTAssertEqual(try schemaVersion(at: url), IndexSchema.currentVersion)
+        let summary = try await store.storageIndexSummary()
+        XCTAssertEqual(summary.resourceCount, 0)
+        XCTAssertEqual(try metadataValue(key: "fixture", at: url), "preserved")
+    }
+
+    func testExistingSnapshotCanBackfillMissingStorageIndexWithoutRescan() async throws {
+        let url = temporaryDatabaseURL()
+        let store = try SQLiteIndexStore(url: url)
+        let item = ScannedItem.fixture(allocatedSize: 512)
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: [item],
+            applications: [],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: .complete
+        )
+        try await store.save(snapshot: snapshot)
+        try executeSQL(
+            """
+            DELETE FROM storage_ownership;
+            DELETE FROM directory_stats;
+            DELETE FROM storage_resources;
+            DELETE FROM storage_owners;
+            DELETE FROM metadata WHERE key = 'latest_storage_snapshot';
+            """,
+            at: url
+        )
+
+        try await store.ensureStorageIndex(snapshot: snapshot)
+
+        let summary = try await store.storageIndexSummary()
+        XCTAssertEqual(summary.resourceCount, 1)
+        XCTAssertEqual(summary.allocatedSize, 512)
+    }
+
     func testLatestCompleteSnapshotReplacesOlderSnapshotAtomically() async throws {
         let store = try SQLiteIndexStore(url: temporaryDatabaseURL())
         try await store.save(snapshot: .fixture(id: UUID(), completedAt: .distantPast))
@@ -87,6 +263,39 @@ final class SQLiteIndexStoreTests: XCTestCase {
         } catch let error as SQLiteStoreError {
             XCTAssertTrue(error.message.contains("too many retained items"))
         }
+    }
+
+    func testBoundedFileIndexRemainsFarBelowDatabaseSafetyLimit() async throws {
+        let url = temporaryDatabaseURL()
+        let store = try SQLiteIndexStore(url: url)
+        let items = (0..<2_000).map { index in
+            ScannedItem(
+                url: URL(fileURLWithPath: "/Users/test/Documents/file-\(index)"),
+                logicalSize: 4_096,
+                allocatedSize: 4_096,
+                category: .personal,
+                risk: .sensitive,
+                explanation: "Large-file index representative"
+            )
+        }
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: items,
+            applications: [],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: .complete
+        )
+
+        try await store.save(snapshot: snapshot)
+
+        let summary = try await store.storageIndexSummary()
+        XCTAssertEqual(summary.resourceCount, 2_000)
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        let bytes = (attributes[.size] as? NSNumber)?.int64Value ?? 0
+        XCTAssertLessThan(bytes, 16 * 1_024 * 1_024)
     }
 
     func testPruneFailureRollsBackNewSnapshotAndPreservesPreviousLatest() async throws {
@@ -297,6 +506,94 @@ final class SQLiteIndexStoreTests: XCTestCase {
             throw SQLiteStoreError(message: String(cString: sqlite3_errmsg(database)))
         }
         _ = sqlite3_wal_checkpoint_v2(database, nil, SQLITE_CHECKPOINT_TRUNCATE, nil, nil)
+    }
+
+    private func createLegacyV1Database(at url: URL) throws {
+        var database: OpaquePointer?
+        guard sqlite3_open_v2(
+            url.path,
+            &database,
+            SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE,
+            nil
+        ) == SQLITE_OK, let database else {
+            if let database { sqlite3_close(database) }
+            throw SQLiteStoreError(message: "Could not create legacy SQLite test index")
+        }
+        defer { sqlite3_close(database) }
+        let statements = [
+            "PRAGMA user_version=1;",
+            "CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);",
+            "CREATE TABLE scan_sessions (id TEXT PRIMARY KEY, status TEXT NOT NULL, started_at REAL NOT NULL);",
+            "CREATE TABLE snapshots (id TEXT PRIMARY KEY, completed_at REAL NOT NULL, allocated_size INTEGER NOT NULL, status TEXT NOT NULL, payload BLOB NOT NULL);",
+            "CREATE TABLE cleanup_history (id TEXT PRIMARY KEY, completed_at REAL NOT NULL, payload BLOB NOT NULL);",
+            "INSERT INTO metadata(key, value) VALUES ('fixture', 'preserved');"
+        ]
+        for statement in statements {
+            guard sqlite3_exec(database, statement, nil, nil, nil) == SQLITE_OK else {
+                throw SQLiteStoreError(
+                    message: String(cString: sqlite3_errmsg(database))
+                )
+            }
+        }
+    }
+
+    private func schemaVersion(at url: URL) throws -> Int {
+        try integerQuery("PRAGMA user_version;", at: url)
+    }
+
+    private func metadataValue(key: String, at url: URL) throws -> String? {
+        var database: OpaquePointer?
+        guard sqlite3_open_v2(
+            url.path,
+            &database,
+            SQLITE_OPEN_READONLY,
+            nil
+        ) == SQLITE_OK, let database else {
+            if let database { sqlite3_close(database) }
+            throw SQLiteStoreError(message: "Could not inspect metadata")
+        }
+        defer { sqlite3_close(database) }
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(
+            database,
+            "SELECT value FROM metadata WHERE key = ?;",
+            -1,
+            &statement,
+            nil
+        ) == SQLITE_OK, let statement else {
+            throw SQLiteStoreError(message: String(cString: sqlite3_errmsg(database)))
+        }
+        defer { sqlite3_finalize(statement) }
+        sqlite3_bind_text(statement, 1, key, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        guard sqlite3_step(statement) == SQLITE_ROW,
+              let value = sqlite3_column_text(statement, 0) else {
+            return nil
+        }
+        return String(cString: value)
+    }
+
+    private func integerQuery(_ sql: String, at url: URL) throws -> Int {
+        var database: OpaquePointer?
+        guard sqlite3_open_v2(
+            url.path,
+            &database,
+            SQLITE_OPEN_READONLY,
+            nil
+        ) == SQLITE_OK, let database else {
+            if let database { sqlite3_close(database) }
+            throw SQLiteStoreError(message: "Could not inspect SQLite integer")
+        }
+        defer { sqlite3_close(database) }
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK,
+              let statement else {
+            throw SQLiteStoreError(message: String(cString: sqlite3_errmsg(database)))
+        }
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_step(statement) == SQLITE_ROW else {
+            throw SQLiteStoreError(message: String(cString: sqlite3_errmsg(database)))
+        }
+        return Int(sqlite3_column_int64(statement, 0))
     }
 
     private func fileIdentifier(at url: URL) throws -> AnyHashable {

@@ -58,6 +58,7 @@ public actor SQLiteIndexStore: SnapshotStoring {
             )
         }
         let payload = try encoder.encode(snapshot)
+        let intelligenceGraph = StorageIntelligenceGraph(snapshot: snapshot)
         let allocatedSize = snapshot.items.reduce(Int64(0)) { $0 + $1.allocatedSize }
         try connection.execute("BEGIN IMMEDIATE;")
         do {
@@ -76,6 +77,10 @@ public actor SQLiteIndexStore: SnapshotStoring {
                 try connection.bind(snapshot.id.uuidString, to: 1, in: statement)
                 try connection.stepDone(statement)
             }
+            try synchronize(
+                graph: intelligenceGraph,
+                snapshotID: snapshot.id.uuidString
+            )
             try connection.execute("COMMIT;")
         } catch {
             try? connection.execute("ROLLBACK;")
@@ -89,6 +94,22 @@ public actor SQLiteIndexStore: SnapshotStoring {
             guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
             return try decoder.decode(ScanSnapshot.self, from: connection.blob(at: 0, in: statement))
         }
+    }
+
+    public func ensureStorageIndex(snapshot: ScanSnapshot) throws {
+        if try metadataValue(for: "latest_storage_snapshot") == snapshot.id.uuidString {
+            return
+        }
+        let graph = StorageIntelligenceGraph(snapshot: snapshot)
+        try connection.execute("BEGIN IMMEDIATE;")
+        do {
+            try synchronize(graph: graph, snapshotID: snapshot.id.uuidString)
+            try connection.execute("COMMIT;")
+        } catch {
+            try? connection.execute("ROLLBACK;")
+            throw error
+        }
+        try? connection.execute("PRAGMA wal_checkpoint(TRUNCATE);")
     }
 
     public func save(transaction: CleanupTransaction) throws {
@@ -108,6 +129,320 @@ public actor SQLiteIndexStore: SnapshotStoring {
                 values.append(try decoder.decode(CleanupTransaction.self, from: connection.blob(at: 0, in: statement)))
             }
             return values
+        }
+    }
+
+    public func storageIndexSummary() throws -> StorageIndexSummary {
+        try connection.statement(
+            """
+            SELECT
+                (SELECT COUNT(*) FROM storage_owners),
+                (SELECT COUNT(*) FROM storage_resources),
+                (SELECT COUNT(*) FROM storage_ownership),
+                (SELECT COUNT(*) FROM directory_stats),
+                (SELECT COALESCE(SUM(allocated_size), 0) FROM storage_resources),
+                (SELECT MAX(indexed_at) FROM storage_resources);
+            """
+        ) { statement in
+            guard try connection.step(statement) == SQLITE_ROW else {
+                return StorageIndexSummary(
+                    ownerCount: 0,
+                    resourceCount: 0,
+                    ownershipCount: 0,
+                    directoryStatCount: 0,
+                    allocatedSize: 0,
+                    lastUpdatedAt: nil
+                )
+            }
+            let timestamp = sqlite3_column_type(statement, 5) == SQLITE_NULL
+                ? nil
+                : sqlite3_column_double(statement, 5)
+            return StorageIndexSummary(
+                ownerCount: Int(sqlite3_column_int64(statement, 0)),
+                resourceCount: Int(sqlite3_column_int64(statement, 1)),
+                ownershipCount: Int(sqlite3_column_int64(statement, 2)),
+                directoryStatCount: Int(sqlite3_column_int64(statement, 3)),
+                allocatedSize: sqlite3_column_int64(statement, 4),
+                lastUpdatedAt: timestamp.map(Date.init(timeIntervalSince1970:))
+            )
+        }
+    }
+
+    public func storageOwners() throws -> [StorageOwner] {
+        try connection.statement(
+            """
+            SELECT id, type, identifier, display_name
+            FROM storage_owners
+            ORDER BY type, display_name COLLATE NOCASE, id;
+            """
+        ) { statement in
+            var owners: [StorageOwner] = []
+            while try connection.step(statement) == SQLITE_ROW {
+                guard let type = StorageOwnerType(
+                    rawValue: Self.text(at: 1, in: statement)
+                ) else {
+                    continue
+                }
+                owners.append(StorageOwner(
+                    id: Self.text(at: 0, in: statement),
+                    type: type,
+                    identifier: Self.text(at: 2, in: statement),
+                    displayName: Self.text(at: 3, in: statement)
+                ))
+            }
+            return owners
+        }
+    }
+
+    public func resources(ownerID: String) throws -> [IndexedStorageResource] {
+        try connection.statement(
+            """
+            SELECT
+                r.id, r.path, r.kind, r.logical_size, r.allocated_size,
+                r.modified_at, r.resource_identifier, r.category, r.risk,
+                r.state, r.indexed_at
+            FROM storage_resources r
+            JOIN storage_ownership o ON o.resource_id = r.id
+            WHERE o.owner_id = ?
+            ORDER BY r.allocated_size DESC, r.path;
+            """
+        ) { statement in
+            try connection.bind(ownerID, to: 1, in: statement)
+            var resources: [IndexedStorageResource] = []
+            while try connection.step(statement) == SQLITE_ROW {
+                guard let kind = IndexedResourceKind(
+                    rawValue: Self.text(at: 2, in: statement)
+                ), let category = ItemCategory(
+                    rawValue: Self.text(at: 7, in: statement)
+                ), let risk = RiskLevel(
+                    rawValue: Self.text(at: 8, in: statement)
+                ), let state = IndexedResourceState(
+                    rawValue: Self.text(at: 9, in: statement)
+                ) else {
+                    continue
+                }
+                let modifiedTimestamp = sqlite3_column_double(statement, 5)
+                let resourceIdentifier = Self.text(at: 6, in: statement)
+                resources.append(IndexedStorageResource(
+                    id: Self.text(at: 0, in: statement),
+                    url: URL(fileURLWithPath: Self.text(at: 1, in: statement)),
+                    kind: kind,
+                    logicalSize: sqlite3_column_int64(statement, 3),
+                    allocatedSize: sqlite3_column_int64(statement, 4),
+                    modificationDate: modifiedTimestamp > 0
+                        ? Date(timeIntervalSince1970: modifiedTimestamp)
+                        : nil,
+                    resourceIdentifier: resourceIdentifier.isEmpty
+                        ? nil
+                        : resourceIdentifier,
+                    category: category,
+                    risk: risk,
+                    state: state,
+                    indexedAt: Date(
+                        timeIntervalSince1970: sqlite3_column_double(
+                            statement,
+                            10
+                        )
+                    )
+                ))
+            }
+            return resources
+        }
+    }
+
+    private func synchronize(
+        graph: StorageIntelligenceGraph,
+        snapshotID: String
+    ) throws {
+        try connection.statement(
+            """
+            INSERT INTO storage_owners(
+                id, type, identifier, display_name, last_seen_snapshot
+            ) VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                type = excluded.type,
+                identifier = excluded.identifier,
+                display_name = excluded.display_name,
+                last_seen_snapshot = excluded.last_seen_snapshot;
+            """
+        ) { statement in
+            for owner in graph.owners {
+                try connection.bind(owner.id, to: 1, in: statement)
+                try connection.bind(owner.type.rawValue, to: 2, in: statement)
+                try connection.bind(owner.identifier, to: 3, in: statement)
+                try connection.bind(owner.displayName, to: 4, in: statement)
+                try connection.bind(snapshotID, to: 5, in: statement)
+                try connection.stepDone(statement)
+                try connection.reset(statement)
+            }
+        }
+
+        try connection.statement(
+            """
+            INSERT INTO storage_resources(
+                id, path, kind, logical_size, allocated_size, modified_at,
+                resource_identifier, category, risk, state, indexed_at,
+                last_seen_snapshot
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                path = excluded.path,
+                kind = excluded.kind,
+                logical_size = excluded.logical_size,
+                allocated_size = excluded.allocated_size,
+                modified_at = excluded.modified_at,
+                resource_identifier = excluded.resource_identifier,
+                category = excluded.category,
+                risk = excluded.risk,
+                state = excluded.state,
+                indexed_at = excluded.indexed_at,
+                last_seen_snapshot = excluded.last_seen_snapshot;
+            """
+        ) { statement in
+            for resource in graph.resources {
+                try connection.bind(resource.id, to: 1, in: statement)
+                try connection.bind(resource.url.path, to: 2, in: statement)
+                try connection.bind(resource.kind.rawValue, to: 3, in: statement)
+                try connection.bind(resource.logicalSize, to: 4, in: statement)
+                try connection.bind(resource.allocatedSize, to: 5, in: statement)
+                try connection.bind(
+                    resource.modificationDate?.timeIntervalSince1970 ?? 0,
+                    to: 6,
+                    in: statement
+                )
+                try connection.bind(
+                    resource.resourceIdentifier ?? "",
+                    to: 7,
+                    in: statement
+                )
+                try connection.bind(resource.category.rawValue, to: 8, in: statement)
+                try connection.bind(resource.risk.rawValue, to: 9, in: statement)
+                try connection.bind(resource.state.rawValue, to: 10, in: statement)
+                try connection.bind(
+                    resource.indexedAt.timeIntervalSince1970,
+                    to: 11,
+                    in: statement
+                )
+                try connection.bind(snapshotID, to: 12, in: statement)
+                try connection.stepDone(statement)
+                try connection.reset(statement)
+            }
+        }
+
+        try connection.statement(
+            """
+            INSERT INTO storage_ownership(
+                resource_id, owner_id, role, confidence, reason,
+                last_seen_snapshot
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(resource_id, owner_id, role) DO UPDATE SET
+                confidence = excluded.confidence,
+                reason = excluded.reason,
+                last_seen_snapshot = excluded.last_seen_snapshot;
+            """
+        ) { statement in
+            for ownership in graph.ownerships {
+                try connection.bind(ownership.resourceID, to: 1, in: statement)
+                try connection.bind(ownership.ownerID, to: 2, in: statement)
+                try connection.bind(ownership.role.rawValue, to: 3, in: statement)
+                try connection.bind(Int64(ownership.confidence), to: 4, in: statement)
+                try connection.bind(ownership.reason, to: 5, in: statement)
+                try connection.bind(snapshotID, to: 6, in: statement)
+                try connection.stepDone(statement)
+                try connection.reset(statement)
+            }
+        }
+
+        try connection.statement(
+            """
+            INSERT INTO directory_stats(
+                resource_id, total_logical_size, total_allocated_size,
+                file_count, directory_count, indexed_at, dirty,
+                last_seen_snapshot
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(resource_id) DO UPDATE SET
+                total_logical_size = excluded.total_logical_size,
+                total_allocated_size = excluded.total_allocated_size,
+                file_count = excluded.file_count,
+                directory_count = excluded.directory_count,
+                indexed_at = excluded.indexed_at,
+                dirty = excluded.dirty,
+                last_seen_snapshot = excluded.last_seen_snapshot;
+            """
+        ) { statement in
+            for stat in graph.directoryStats {
+                try connection.bind(stat.resourceID, to: 1, in: statement)
+                try connection.bind(stat.totalLogicalSize, to: 2, in: statement)
+                try connection.bind(stat.totalAllocatedSize, to: 3, in: statement)
+                try connection.bind(Int64(stat.fileCount ?? -1), to: 4, in: statement)
+                try connection.bind(
+                    Int64(stat.directoryCount ?? -1),
+                    to: 5,
+                    in: statement
+                )
+                try connection.bind(
+                    stat.indexedAt.timeIntervalSince1970,
+                    to: 6,
+                    in: statement
+                )
+                try connection.bind(stat.isDirty ? Int64(1) : 0, to: 7, in: statement)
+                try connection.bind(snapshotID, to: 8, in: statement)
+                try connection.stepDone(statement)
+                try connection.reset(statement)
+            }
+        }
+
+        try deleteRows(
+            table: "storage_ownership",
+            snapshotID: snapshotID
+        )
+        try deleteRows(
+            table: "directory_stats",
+            snapshotID: snapshotID
+        )
+        try deleteRows(
+            table: "storage_resources",
+            snapshotID: snapshotID
+        )
+        try deleteRows(
+            table: "storage_owners",
+            snapshotID: snapshotID
+        )
+        try connection.statement(
+            """
+            INSERT OR REPLACE INTO metadata(key, value)
+            VALUES ('latest_storage_snapshot', ?);
+            """
+        ) { statement in
+            try connection.bind(snapshotID, to: 1, in: statement)
+            try connection.stepDone(statement)
+        }
+    }
+
+    private func deleteRows(table: String, snapshotID: String) throws {
+        try connection.statement(
+            "DELETE FROM \(table) WHERE last_seen_snapshot <> ?;"
+        ) { statement in
+            try connection.bind(snapshotID, to: 1, in: statement)
+            try connection.stepDone(statement)
+        }
+    }
+
+    private static func text(
+        at column: Int32,
+        in statement: OpaquePointer
+    ) -> String {
+        sqlite3_column_text(statement, column).map(String.init(cString:)) ?? ""
+    }
+
+    private func metadataValue(for key: String) throws -> String? {
+        try connection.statement(
+            "SELECT value FROM metadata WHERE key = ? LIMIT 1;"
+        ) { statement in
+            try connection.bind(key, to: 1, in: statement)
+            guard try connection.step(statement) == SQLITE_ROW else {
+                return nil
+            }
+            return Self.text(at: 0, in: statement)
         }
     }
 
