@@ -14,6 +14,7 @@ let package = Package(
             name: "SpacePilotCore",
             linkerSettings: [
                 .linkedLibrary("sqlite3"),
+                .linkedFramework("CoreServices"),
                 .linkedFramework("Security")
             ]
         ),

@@ -21,8 +21,11 @@ public struct DeveloperStorageScanner: Sendable {
         .init(relativePath: "Library/Caches/pip", risk: .safe, explanation: "Python pip download cache"),
         .init(relativePath: ".cache/pip", risk: .safe, explanation: "Python pip download cache")
     ]
+    private let directoryStats: (any DirectoryStatProviding)?
 
-    public init() {}
+    public init(directoryStats: (any DirectoryStatProviding)? = nil) {
+        self.directoryStats = directoryStats
+    }
 
     public func scan(homeDirectory: URL) async throws -> DeveloperStorageScanResult {
         var items: [ScannedItem] = []
@@ -30,7 +33,15 @@ public struct DeveloperStorageScanner: Sendable {
             try Task.checkCancellation()
             let root = homeDirectory.appending(path: rule.relativePath, directoryHint: .isDirectory)
             guard FileManager.default.fileExists(atPath: root.path) else { continue }
-            let sizes = try directorySizes(root)
+            let sizes: (logical: Int64, allocated: Int64)
+            if let cached = try await directoryStats?.cachedDirectoryStat(at: root) {
+                sizes = (
+                    cached.totalLogicalSize,
+                    cached.totalAllocatedSize
+                )
+            } else {
+                sizes = try directorySizes(root)
+            }
             items.append(ScannedItem(
                 url: root,
                 logicalSize: sizes.logical,

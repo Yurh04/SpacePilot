@@ -360,6 +360,32 @@ final class SQLiteIndexStoreTests: XCTestCase {
         XCTAssertNil(missing)
     }
 
+    func testFileSystemEventCursorNeverRegresses() async throws {
+        let tree = try TemporaryTree(files: [:])
+        let store = try SQLiteIndexStore(
+            url: tree.url.appending(path: "index.sqlite")
+        )
+        let newerDate = Date(timeIntervalSince1970: 200)
+        let olderDate = Date(timeIntervalSince1970: 100)
+
+        try await store.save(fileSystemEventCursor: .init(
+            volumeID: "volume",
+            lastEventID: 200,
+            lastReconciledAt: newerDate
+        ))
+        try await store.save(fileSystemEventCursor: .init(
+            volumeID: "volume",
+            lastEventID: 100,
+            lastReconciledAt: olderDate
+        ))
+
+        let cursor = try await store.fileSystemEventCursor(
+            volumeID: "volume"
+        )
+        XCTAssertEqual(cursor?.lastEventID, 200)
+        XCTAssertEqual(cursor?.lastReconciledAt, newerDate)
+    }
+
     func testPruneFailureRollsBackNewSnapshotAndPreservesPreviousLatest() async throws {
         let url = temporaryDatabaseURL()
         let store = try SQLiteIndexStore(url: url)

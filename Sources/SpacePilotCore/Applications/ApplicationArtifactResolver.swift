@@ -58,9 +58,14 @@ public struct ApplicationArtifactResolver: Sendable {
     }
 
     private let roots: [ApplicationArtifactRoot]
+    private let directoryStats: (any DirectoryStatProviding)?
 
-    public init(roots: [ApplicationArtifactRoot] = ApplicationArtifactRoot.standard) {
+    public init(
+        roots: [ApplicationArtifactRoot] = ApplicationArtifactRoot.standard,
+        directoryStats: (any DirectoryStatProviding)? = nil
+    ) {
         self.roots = roots
+        self.directoryStats = directoryStats
     }
 
     public func resolve(
@@ -126,7 +131,7 @@ public struct ApplicationArtifactResolver: Sendable {
             $0.url.path < $1.url.path
         }) {
             try Task.checkCancellation()
-            let sizes = try sizes(of: candidate.url)
+            let sizes = try await sizes(of: candidate.url)
             let resourceValues = try? candidate.url.resourceValues(
                 forKeys: [
                     .contentModificationDateKey,
@@ -633,7 +638,20 @@ public struct ApplicationArtifactResolver: Sendable {
         value.lowercased().filter { $0.isLetter || $0.isNumber }
     }
 
-    private func sizes(of root: URL) throws -> (
+    private func sizes(of root: URL) async throws -> (
+        logical: Int64,
+        allocated: Int64
+    ) {
+        if let cached = try await directoryStats?.cachedDirectoryStat(at: root) {
+            return (
+                cached.totalLogicalSize,
+                cached.totalAllocatedSize
+            )
+        }
+        return try uncachedSizes(of: root)
+    }
+
+    private func uncachedSizes(of root: URL) throws -> (
         logical: Int64,
         allocated: Int64
     ) {

@@ -24,6 +24,30 @@ actor InMemorySnapshotStore: SnapshotStoring {
     func cleanupHistory() async throws -> [CleanupTransaction] { history }
 }
 
+struct FixedDirectoryStatProvider: DirectoryStatProviding {
+    let values: [String: DirectoryStat]
+
+    init(_ values: [URL: (logical: Int64, allocated: Int64)]) {
+        self.values = Dictionary(
+            uniqueKeysWithValues: values.map { url, sizes in
+                (
+                    url.standardizedFileURL.path,
+                    DirectoryStat(
+                        resourceID: url.standardizedFileURL.path,
+                        totalLogicalSize: sizes.logical,
+                        totalAllocatedSize: sizes.allocated,
+                        indexedAt: .now
+                    )
+                )
+            }
+        )
+    }
+
+    func cachedDirectoryStat(at url: URL) async throws -> DirectoryStat? {
+        values[url.standardizedFileURL.path]
+    }
+}
+
 extension ScanCoordinator {
     static func fixture(
         store: InMemorySnapshotStore = InMemorySnapshotStore(),

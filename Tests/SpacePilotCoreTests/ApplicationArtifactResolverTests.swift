@@ -33,6 +33,37 @@ final class ApplicationArtifactResolverTests: XCTestCase {
         )
     }
 
+    func testResolverUsesValidDirectoryStatForMatchedDirectory() async throws {
+        let home = try TemporaryTree(files: [
+            "Library/Caches/com.example.Example/cache.bin": 75
+        ])
+        let cache = home.url.appending(
+            path: "Library/Caches/com.example.Example",
+            directoryHint: .isDirectory
+        )
+        let application = application(
+            name: "Example",
+            bundleID: "com.example.Example"
+        )
+        let resolver = ApplicationArtifactResolver(
+            directoryStats: FixedDirectoryStatProvider([
+                cache: (logical: 123_000, allocated: 456_000)
+            ])
+        )
+
+        let result = try await resolver.resolve(
+            applications: [application],
+            identities: [identity(for: application)],
+            homeDirectory: home.url
+        )
+
+        let item = try XCTUnwrap(
+            result.items.first { $0.url.standardizedFileURL == cache }
+        )
+        XCTAssertEqual(item.logicalSize, 123_000)
+        XCTAssertEqual(item.allocatedSize, 456_000)
+    }
+
     func testSharedApplicationGroupIsNotOwnedByEitherApplication() async throws {
         let home = try TemporaryTree(files: [
             "Library/Group Containers/TEAM.shared/token.db": 64

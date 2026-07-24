@@ -1,7 +1,11 @@
 import Foundation
 
 public struct BasicAIApplicationScanner: Sendable {
-    public init() {}
+    private let directoryStats: (any DirectoryStatProviding)?
+
+    public init(directoryStats: (any DirectoryStatProviding)? = nil) {
+        self.directoryStats = directoryStats
+    }
 
     public func scan(
         name: String,
@@ -17,7 +21,15 @@ public struct BasicAIApplicationScanner: Sendable {
 
         for root in roots {
             try Task.checkCancellation()
-            let sizes = directorySizes(root)
+            let sizes: (logical: Int64, allocated: Int64)
+            if let cached = try await directoryStats?.cachedDirectoryStat(at: root) {
+                sizes = (
+                    cached.totalLogicalSize,
+                    cached.totalAllocatedSize
+                )
+            } else {
+                sizes = directorySizes(root)
+            }
             items.append(ScannedItem(
                 url: root,
                 logicalSize: sizes.logical,

@@ -91,4 +91,29 @@ final class AIAdapterTests: XCTestCase {
         XCTAssertEqual(result.items.count, 2)
         XCTAssertFalse(result.items.contains { $0.url.path.contains("Documents") })
     }
+
+    func testBasicScannerUsesValidDirectoryStat() async throws {
+        let tree = try TemporaryTree(files: [
+            "Library/Application Support/ChatGPT/state.db": 50
+        ])
+        let root = tree.url.appending(
+            path: "Library/Application Support/ChatGPT",
+            directoryHint: .isDirectory
+        )
+        let scanner = BasicAIApplicationScanner(
+            directoryStats: FixedDirectoryStatProvider([
+                root: (logical: 75_000, allocated: 88_000)
+            ])
+        )
+
+        let result = try await scanner.scan(
+            name: "ChatGPT",
+            bundleIdentifier: "com.openai.chat",
+            homeDirectory: tree.url,
+            relativeRoots: ["Library/Application Support/ChatGPT"]
+        )
+
+        XCTAssertEqual(result.items.first?.logicalSize, 75_000)
+        XCTAssertEqual(result.items.first?.allocatedSize, 88_000)
+    }
 }

@@ -363,8 +363,16 @@ public actor SQLiteIndexStore: SnapshotStoring {
                 volume_id, last_event_id, last_reconciled_at
             ) VALUES (?, ?, ?)
             ON CONFLICT(volume_id) DO UPDATE SET
-                last_event_id = excluded.last_event_id,
-                last_reconciled_at = excluded.last_reconciled_at;
+                last_event_id = MAX(
+                    fsevent_cursors.last_event_id,
+                    excluded.last_event_id
+                ),
+                last_reconciled_at = CASE
+                    WHEN excluded.last_event_id
+                        >= fsevent_cursors.last_event_id
+                    THEN excluded.last_reconciled_at
+                    ELSE fsevent_cursors.last_reconciled_at
+                END;
             """
         ) { statement in
             try connection.bind(cursor.volumeID, to: 1, in: statement)

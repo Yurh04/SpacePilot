@@ -52,6 +52,7 @@ final class AppModel {
     private var projectionPublicationTask: Task<Void, Never>?
     private var aiQueryWorker: Task<AIApplicationQueryProjection, Error>?
     private var aiQueryPublicationTask: Task<Void, Never>?
+    private var fileSystemMonitor: FileSystemChangeMonitor?
     private let runtime: SpacePilotRuntime?
 
     init() {
@@ -234,6 +235,73 @@ final class AppModel {
             cleanupHistory = try await runtime.store.cleanupHistory()
         } catch {
             errorMessage = error.localizedDescription
+        }
+        do {
+            try await startStorageMonitoring(runtime: runtime)
+        } catch {
+            Self.logger.error(
+                "Could not start storage monitoring: \(error.localizedDescription, privacy: .public)"
+            )
+        }
+    }
+
+    private func startStorageMonitoring(
+        runtime: SpacePilotRuntime
+    ) async throws {
+        guard fileSystemMonitor == nil else { return }
+        let volumeID = FileSystemChangeMonitor.volumeID(
+            for: runtime.homeDirectory
+        )
+        let cursor = try await runtime.store.fileSystemEventCursor(
+            volumeID: volumeID
+        )
+        if cursor == nil {
+            try await runtime.store.markAllDirectoryStatsDirty()
+        }
+
+        let indexDirectory = runtime.homeDirectory.appending(
+            path: "Library/Application Support/SpacePilot",
+            directoryHint: .isDirectory
+        )
+        let monitor = FileSystemChangeMonitor(
+            root: runtime.homeDirectory,
+            ignoredRoots: [indexDirectory]
+        )
+        let store = runtime.store
+        let logger = Self.logger
+        let startingEventID = try monitor.start(
+            sinceEventID: cursor?.lastEventID
+        ) { batch in
+            Task {
+                do {
+                    if batch.requiresFullInvalidation {
+                        try await store.markAllDirectoryStatsDirty()
+                    } else if !batch.changedPaths.isEmpty {
+                        try await store.markDirectoryStatsDirty(
+                            changedPaths: batch.changedPaths
+                        )
+                    }
+                    if batch.lastEventID > 0 {
+                        try await store.save(fileSystemEventCursor: .init(
+                            volumeID: volumeID,
+                            lastEventID: batch.lastEventID,
+                            lastReconciledAt: .now
+                        ))
+                    }
+                } catch {
+                    logger.error(
+                        "FSEvents reconciliation failed: \(error.localizedDescription, privacy: .public)"
+                    )
+                }
+            }
+        }
+        fileSystemMonitor = monitor
+        if cursor == nil {
+            try await store.save(fileSystemEventCursor: .init(
+                volumeID: volumeID,
+                lastEventID: startingEventID,
+                lastReconciledAt: .now
+            ))
         }
     }
 

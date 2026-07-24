@@ -21,4 +21,25 @@ final class DeveloperStorageScannerTests: XCTestCase {
         XCTAssertEqual(result.items.first { $0.url.path.contains("Homebrew") }?.risk, .safe)
         XCTAssertEqual(result.items.first { $0.url.path.contains("pip") }?.risk, .safe)
     }
+
+    func testValidDirectoryStatAvoidsRecursiveRecalculation() async throws {
+        let tree = try TemporaryTree(files: [
+            ".npm/_cacache/index": 20
+        ])
+        let root = tree.url.appending(
+            path: ".npm/_cacache",
+            directoryHint: .isDirectory
+        )
+        let scanner = DeveloperStorageScanner(
+            directoryStats: FixedDirectoryStatProvider([
+                root: (logical: 41_000, allocated: 52_000)
+            ])
+        )
+
+        let result = try await scanner.scan(homeDirectory: tree.url)
+        let item = try XCTUnwrap(result.items.first)
+
+        XCTAssertEqual(item.logicalSize, 41_000)
+        XCTAssertEqual(item.allocatedSize, 52_000)
+    }
 }

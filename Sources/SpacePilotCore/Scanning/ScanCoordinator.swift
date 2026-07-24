@@ -37,6 +37,7 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
         identityReader: any ApplicationIdentityReading = ApplicationIdentityReader()
     ) {
         self.operation = { scope, emit in
+            let directoryStats = store as? any DirectoryStatProviding
             let previousSnapshot = scope == .full
                 ? nil
                 : try await store.latestSnapshot()
@@ -83,7 +84,9 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
 
             try Task.checkCancellation()
             if scope == .applications {
-                let applicationResolution = try await ApplicationArtifactResolver().resolve(
+                let applicationResolution = try await ApplicationArtifactResolver(
+                    directoryStats: directoryStats
+                ).resolve(
                     applications: baseApplications,
                     identities: identities,
                     homeDirectory: homeDirectory
@@ -185,14 +188,18 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
             let (codex, claude, standaloneSkills) = try await (
                 codexScan, claudeScan, standaloneSkillScan
             )
-            let developer = try await DeveloperStorageScanner().scan(homeDirectory: homeDirectory)
+            let developer = try await DeveloperStorageScanner(
+                directoryStats: directoryStats
+            ).scan(homeDirectory: homeDirectory)
             var basicAIScans: [AIApplicationScanResult] = []
             for definition in BasicAIApplicationDefinition.standard {
                 let matchedApplication = baseApplications.first {
                     definition.bundleIdentifiers.contains($0.bundleIdentifier ?? "")
                         || $0.name.localizedCaseInsensitiveContains(definition.name)
                 }
-                let result = try await BasicAIApplicationScanner().scan(
+                let result = try await BasicAIApplicationScanner(
+                    directoryStats: directoryStats
+                ).scan(
                     name: definition.name,
                     bundleIdentifier: matchedApplication?.bundleIdentifier ?? definition.bundleIdentifiers.first,
                     homeDirectory: homeDirectory,
@@ -221,7 +228,9 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
             let pluginResult = try await PluginScanner(skillScanner: SkillScanner()).scan(roots: pluginDiscovery.roots)
             let indexedSkills = SkillConflictDetector().detect(in: standaloneSkills + pluginResult.skills)
 
-            let resolver = ApplicationArtifactResolver()
+            let resolver = ApplicationArtifactResolver(
+                directoryStats: directoryStats
+            )
             let applicationResolution = try await resolver.resolve(
                 applications: baseApplications,
                 identities: identities,
