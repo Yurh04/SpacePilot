@@ -104,9 +104,19 @@ public struct OverviewProjection: Sendable {
         checkCancellation: @escaping @Sendable () throws -> Void
     ) throws {
         try checkCancellation()
+        let usesAggregates = snapshot.categoryAggregates != nil
         var itemBytes: Int64 = 0
         var safeItemBytes: Int64 = 0
         var categoryTotals: [ItemCategory: StorageCategoryAccumulator] = [:]
+        if let aggregates = snapshot.categoryAggregates {
+            for aggregate in aggregates {
+                categoryTotals[aggregate.category] = StorageCategoryAccumulator(
+                    allocatedSize: aggregate.allocatedSize,
+                    itemCount: aggregate.itemCount
+                )
+                itemBytes += aggregate.allocatedSize
+            }
+        }
         var checkpoint = ProjectionCancellationCheckpoint(checkCancellation: checkCancellation)
         var recommendationSelection = BoundedScannedItemSelection(
             limit: Self.recommendationDisplayLimit,
@@ -114,8 +124,10 @@ public struct OverviewProjection: Sendable {
         )
         for item in snapshot.items {
             try checkpoint.checkPeriodically()
-            itemBytes += item.allocatedSize
-            categoryTotals[item.category, default: .init()].add(item.allocatedSize)
+            if !usesAggregates {
+                itemBytes += item.allocatedSize
+                categoryTotals[item.category, default: .init()].add(item.allocatedSize)
+            }
             if item.risk == .safe {
                 safeItemBytes += item.allocatedSize
                 recommendationSelection.insert(item)
@@ -195,7 +207,16 @@ public struct StorageProjection: Sendable {
         checkCancellation: @escaping @Sendable () throws -> Void
     ) throws {
         try checkCancellation()
+        let usesAggregates = snapshot.categoryAggregates != nil
         var categoryTotals: [ItemCategory: StorageCategoryAccumulator] = [:]
+        if let aggregates = snapshot.categoryAggregates {
+            for aggregate in aggregates {
+                categoryTotals[aggregate.category] = StorageCategoryAccumulator(
+                    allocatedSize: aggregate.allocatedSize,
+                    itemCount: aggregate.itemCount
+                )
+            }
+        }
         var checkpoint = ProjectionCancellationCheckpoint(checkCancellation: checkCancellation)
         var largestSelection = BoundedScannedItemSelection(
             limit: Self.itemDisplayLimit,
@@ -221,12 +242,16 @@ public struct StorageProjection: Sendable {
                 }
             )
         }
-        var itemBytes: Int64 = 0
+        var itemBytes: Int64 = snapshot.categoryAggregates?.reduce(Int64(0)) {
+            $0 + $1.allocatedSize
+        } ?? 0
 
         for item in snapshot.items {
             try checkpoint.checkPeriodically()
-            itemBytes += item.allocatedSize
-            categoryTotals[item.category, default: .init()].add(item.allocatedSize)
+            if !usesAggregates {
+                itemBytes += item.allocatedSize
+                categoryTotals[item.category, default: .init()].add(item.allocatedSize)
+            }
             largestSelection.insert(item)
             largestCategorySelections[item.category]?.insert(item)
             if (item.modificationDate ?? .distantFuture) < cutoff {
@@ -268,6 +293,7 @@ public struct StorageProjection: Sendable {
         categoryValues.reserveCapacity(ItemCategory.allCases.count)
         for (category, total) in categoryTotals {
             try checkpoint.checkPeriodically()
+            guard total.allocatedSize > 0 else { continue }
             categoryValues.append(StorageCategorySummary(
                 category: category,
                 allocatedSize: total.allocatedSize,

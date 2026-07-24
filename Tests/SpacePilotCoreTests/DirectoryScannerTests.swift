@@ -32,4 +32,32 @@ final class DirectoryScannerTests: XCTestCase {
 
         XCTAssertEqual(result.items.filter { $0.url.lastPathComponent == "file.bin" }.count, 1)
     }
+
+    func testBoundedScanRetainsOnlyLargestItemsButCountsEveryFile() async throws {
+        let fixture = try TemporaryTree(files: [
+            "small.bin": 10,
+            "medium.bin": 20,
+            "large.bin": 30,
+            "nested/largest.bin": 40
+        ])
+
+        let result = try await DirectoryScanner(access: LocalFileSystemAccess()).scan(
+            root: fixture.url,
+            options: .init(
+                category: .personal,
+                risk: .sensitive,
+                retainedItemLimit: 2
+            )
+        )
+
+        XCTAssertEqual(result.items.map(\.url.lastPathComponent), [
+            "largest.bin", "large.bin"
+        ])
+        XCTAssertEqual(result.fileCount, 4)
+        XCTAssertEqual(result.totalLogicalSize, 100)
+        XCTAssertGreaterThanOrEqual(
+            result.totalAllocatedSize,
+            result.items.reduce(Int64(0)) { $0 + $1.allocatedSize }
+        )
+    }
 }

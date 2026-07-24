@@ -40,6 +40,55 @@ final class SQLiteIndexStoreTests: XCTestCase {
         XCTAssertEqual(walSize, 0)
     }
 
+    func testOversizedLegacyDatabaseIsDiscardedBeforeOpening() async throws {
+        let url = temporaryDatabaseURL()
+        FileManager.default.createFile(atPath: url.path, contents: nil)
+        let handle = try FileHandle(forWritingTo: url)
+        try handle.truncate(atOffset: UInt64(SQLiteIndexStore.maximumDatabaseBytes + 1))
+        try handle.close()
+        try Data("old wal".utf8).write(to: URL(fileURLWithPath: url.path + "-wal"))
+        try Data("old shm".utf8).write(to: URL(fileURLWithPath: url.path + "-shm"))
+
+        let store = try SQLiteIndexStore(url: url)
+
+        let latest = try await store.latestSnapshot()
+        XCTAssertNil(latest)
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        let size = (attributes[.size] as? NSNumber)?.int64Value ?? 0
+        XCTAssertLessThan(size, SQLiteIndexStore.maximumDatabaseBytes)
+    }
+
+    func testStoreRejectsAnUnboundedSnapshot() async throws {
+        let store = try SQLiteIndexStore(url: temporaryDatabaseURL())
+        let items = (0...SQLiteIndexStore.maximumSnapshotItems).map { index in
+            ScannedItem(
+                url: URL(fileURLWithPath: "/Users/test/file-\(index)"),
+                logicalSize: 1,
+                allocatedSize: 1,
+                category: .personal,
+                risk: .sensitive,
+                explanation: "fixture"
+            )
+        }
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: items,
+            applications: [],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: .complete
+        )
+
+        do {
+            try await store.save(snapshot: snapshot)
+            XCTFail("Expected oversized snapshot to be rejected")
+        } catch let error as SQLiteStoreError {
+            XCTAssertTrue(error.message.contains("too many retained items"))
+        }
+    }
+
     func testPruneFailureRollsBackNewSnapshotAndPreservesPreviousLatest() async throws {
         let url = temporaryDatabaseURL()
         let store = try SQLiteIndexStore(url: url)

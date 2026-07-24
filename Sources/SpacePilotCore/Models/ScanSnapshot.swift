@@ -27,6 +27,18 @@ public struct ScanCoverage: Codable, Hashable, Sendable {
     public var isComplete: Bool { deniedPaths.isEmpty }
 }
 
+public struct CategoryAggregate: Codable, Hashable, Sendable {
+    public let category: ItemCategory
+    public let allocatedSize: Int64
+    public let itemCount: Int
+
+    public init(category: ItemCategory, allocatedSize: Int64, itemCount: Int) {
+        self.category = category
+        self.allocatedSize = max(0, allocatedSize)
+        self.itemCount = max(0, itemCount)
+    }
+}
+
 public struct ScanSnapshot: Identifiable, Codable, Sendable {
     public let id: UUID
     public let completedAt: Date
@@ -38,6 +50,7 @@ public struct ScanSnapshot: Identifiable, Codable, Sendable {
     public let skills: [SkillRecord]
     public let coverage: ScanCoverage
     public let pluginDiagnostics: [String]?
+    public let categoryAggregates: [CategoryAggregate]?
 
     public init(
         id: UUID = UUID(),
@@ -49,7 +62,8 @@ public struct ScanSnapshot: Identifiable, Codable, Sendable {
         plugins: [PluginRecord],
         skills: [SkillRecord],
         coverage: ScanCoverage,
-        pluginDiagnostics: [String]? = nil
+        pluginDiagnostics: [String]? = nil,
+        categoryAggregates: [CategoryAggregate]? = nil
     ) {
         self.id = id
         self.completedAt = completedAt
@@ -61,6 +75,7 @@ public struct ScanSnapshot: Identifiable, Codable, Sendable {
         self.skills = skills
         self.coverage = coverage
         self.pluginDiagnostics = pluginDiagnostics
+        self.categoryAggregates = categoryAggregates
     }
 
     public var uniqueAIAllocatedSize: Int64 {

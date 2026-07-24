@@ -9,12 +9,18 @@ public protocol SnapshotStoring: Sendable {
 }
 
 public actor SQLiteIndexStore: SnapshotStoring {
+    static let maximumDatabaseBytes: Int64 = 128 * 1024 * 1024
+    static let maximumSnapshotItems = 10_000
+
     private let connection: SQLiteConnection
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
 
     public init(url: URL) throws {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        if Self.fileSize(at: url) > Self.maximumDatabaseBytes {
+            try Self.removeStoreFiles(at: url)
+        }
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .millisecondsSince1970
         let decoder = JSONDecoder()
@@ -45,6 +51,12 @@ public actor SQLiteIndexStore: SnapshotStoring {
     }
 
     public func save(snapshot: ScanSnapshot) throws {
+        guard snapshot.items.count <= Self.maximumSnapshotItems else {
+            throw SQLiteStoreError(
+                message: "Snapshot contains too many retained items (\(snapshot.items.count)); "
+                    + "the limit is \(Self.maximumSnapshotItems)"
+            )
+        }
         let payload = try encoder.encode(snapshot)
         let allocatedSize = snapshot.items.reduce(Int64(0)) { $0 + $1.allocatedSize }
         try connection.execute("BEGIN IMMEDIATE;")
@@ -114,6 +126,18 @@ public actor SQLiteIndexStore: SnapshotStoring {
                     confirmedCorruption: true
                 )
             }
+        }
+    }
+
+    private static func fileSize(at url: URL) -> Int64 {
+        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+        return (attributes?[.size] as? NSNumber)?.int64Value ?? 0
+    }
+
+    private static func removeStoreFiles(at url: URL) throws {
+        for path in [url.path, url.path + "-wal", url.path + "-shm"] {
+            guard FileManager.default.fileExists(atPath: path) else { continue }
+            try FileManager.default.removeItem(atPath: path)
         }
     }
 

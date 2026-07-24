@@ -139,7 +139,12 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                     plugins: previousSnapshot?.plugins ?? [],
                     skills: previousSnapshot?.skills ?? [],
                     coverage: previousSnapshot?.coverage ?? .complete,
-                    pluginDiagnostics: previousSnapshot?.pluginDiagnostics
+                    pluginDiagnostics: previousSnapshot?.pluginDiagnostics,
+                    categoryAggregates: Self.categoryAggregates(
+                        items: canonicalOwnership.items,
+                        homeResult: nil,
+                        previous: previousSnapshot
+                    )
                 )
                 try await store.save(snapshot: snapshot)
                 emit(ScanEvent(
@@ -162,7 +167,8 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                     options: DirectoryScanOptions(
                         category: .personal,
                         risk: .sensitive,
-                        skipPackages: true
+                        skipPackages: true,
+                        retainedItemLimit: 2_000
                     )
                 )
             } else {
@@ -325,7 +331,12 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                 plugins: pluginResult.plugins,
                 skills: indexedSkills,
                 coverage: homeResult.coverage,
-                pluginDiagnostics: pluginDiscovery.diagnostics.map(\.message) + pluginResult.diagnostics
+                pluginDiagnostics: pluginDiscovery.diagnostics.map(\.message) + pluginResult.diagnostics,
+                categoryAggregates: Self.categoryAggregates(
+                    items: items,
+                    homeResult: scope == .full ? homeResult : nil,
+                    previous: previousSnapshot
+                )
             )
             try await store.save(snapshot: snapshot)
             emit(ScanEvent(stage: .completed, progress: 1, message: "Scan complete", snapshot: snapshot))
@@ -358,6 +369,52 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
 
     private static func canonicalPath(for url: URL) -> String {
         url.standardizedFileURL.resolvingSymlinksInPath().path
+    }
+
+    private static func categoryAggregates(
+        items: [ScannedItem],
+        homeResult: DirectoryScanResult?,
+        previous: ScanSnapshot?
+    ) -> [CategoryAggregate] {
+        var totals: [ItemCategory: (bytes: Int64, count: Int)] = [:]
+        for item in items where item.category != .personal {
+            totals[item.category, default: (0, 0)].bytes += item.allocatedSize
+            totals[item.category, default: (0, 0)].count += 1
+        }
+
+        if let homeResult {
+            let canonicalHome = canonicalPath(for: homeResult.root)
+            let reassignedBytes = items.lazy.filter {
+                guard $0.category != .personal else { return false }
+                let path = canonicalPath(for: $0.url)
+                return path == canonicalHome || path.hasPrefix(canonicalHome + "/")
+            }.reduce(Int64(0)) { $0 + $1.allocatedSize }
+            totals[.personal] = (
+                max(0, homeResult.totalAllocatedSize - reassignedBytes),
+                homeResult.fileCount
+            )
+        } else if let previousPersonal = previous?.categoryAggregates?.first(where: {
+            $0.category == .personal
+        }) {
+            totals[.personal] = (
+                previousPersonal.allocatedSize,
+                previousPersonal.itemCount
+            )
+        } else {
+            let personalItems = items.filter { $0.category == .personal }
+            totals[.personal] = (
+                personalItems.reduce(Int64(0)) { $0 + $1.allocatedSize },
+                personalItems.count
+            )
+        }
+
+        return totals.map {
+            CategoryAggregate(
+                category: $0.key,
+                allocatedSize: $0.value.bytes,
+                itemCount: $0.value.count
+            )
+        }.sorted { $0.category.rawValue < $1.category.rawValue }
     }
 
     private static func canonicalOwnership(

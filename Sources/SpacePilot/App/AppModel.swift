@@ -295,6 +295,23 @@ final class AppModel {
                 supportLevel: application.supportLevel
             )
         }
+        let categoryByItemID = Dictionary(
+            uniqueKeysWithValues: snapshot.items.map { ($0.id, $0.category) }
+        )
+        var aggregates = Dictionary(
+            uniqueKeysWithValues: (snapshot.categoryAggregates ?? []).map {
+                ($0.category, $0)
+            }
+        )
+        for candidate in movedCandidates {
+            guard let category = categoryByItemID[candidate.itemID],
+                  let aggregate = aggregates[category] else { continue }
+            aggregates[category] = CategoryAggregate(
+                category: category,
+                allocatedSize: max(0, aggregate.allocatedSize - candidate.allocatedSize),
+                itemCount: max(0, aggregate.itemCount - 1)
+            )
+        }
         return ScanSnapshot(
             completedAt: .now,
             volume: (try? VolumeScanner().scan()) ?? snapshot.volume,
@@ -304,7 +321,10 @@ final class AppModel {
             plugins: snapshot.plugins,
             skills: snapshot.skills,
             coverage: snapshot.coverage,
-            pluginDiagnostics: snapshot.pluginDiagnostics
+            pluginDiagnostics: snapshot.pluginDiagnostics,
+            categoryAggregates: aggregates.isEmpty
+                ? snapshot.categoryAggregates
+                : Array(aggregates.values)
         )
     }
 
