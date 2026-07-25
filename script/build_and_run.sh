@@ -18,6 +18,7 @@ APP_CONTENTS="$APP_BUNDLE/Contents"
 APP_MACOS="$APP_CONTENTS/MacOS"
 APP_BINARY="$APP_MACOS/$APP_NAME"
 APP_RESOURCES="$APP_CONTENTS/Resources"
+APP_ICON="$ROOT_DIR/Sources/SpacePilot/Resources/AppIcon.icns"
 
 SWIFT_BUILD_ARGUMENTS=(--package-path "$ROOT_DIR" -c "$BUILD_CONFIGURATION")
 if [[ -n "${SPACEPILOT_SCRATCH_PATH:-}" ]]; then
@@ -26,6 +27,10 @@ fi
 swift build "${SWIFT_BUILD_ARGUMENTS[@]}"
 BUILD_DIR="$(swift build "${SWIFT_BUILD_ARGUMENTS[@]}" --show-bin-path)"
 BUILD_BINARY="$BUILD_DIR/$APP_NAME"
+if [[ ! -f "$APP_ICON" ]]; then
+  echo "Missing application icon: $APP_ICON" >&2
+  exit 1
+fi
 
 RESOURCE_BUNDLES=()
 while IFS= read -r -d '' candidate; do
@@ -48,6 +53,7 @@ cp "$BUILD_BINARY" "$APP_BINARY"
 cp "$ROOT_DIR/script/Info.plist" "$APP_CONTENTS/Info.plist"
 mkdir -p "$APP_RESOURCES"
 cp -R "$RESOURCE_BUNDLE" "$APP_RESOURCES/"
+cp "$APP_ICON" "$APP_RESOURCES/AppIcon.icns"
 chmod +x "$APP_BINARY"
 /usr/bin/codesign --force --deep --options runtime --sign - "$APP_BUNDLE" >/dev/null
 
