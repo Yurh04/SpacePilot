@@ -49,9 +49,10 @@ final class ApplicationCleanupArchitectureTests: XCTestCase {
         XCTAssertTrue(contextMenu.contains("reset(projection)"))
         XCTAssertTrue(contextMenu.contains("uninstall(projection)"))
         XCTAssertTrue(
-            normalized.contains(
-                "ApplicationDetail( projection: application, uninstall: { uninstall(application) }, reset: { reset(application) } )"
-            ),
+            normalized.range(
+                of: #"ApplicationDetail\(\s*projection:\s*application,.*uninstall:\s*\{\s*uninstall\(application\)\s*\},\s*reset:\s*\{\s*reset\(application\)\s*\}\s*\)"#,
+                options: .regularExpression
+            ) != nil,
             "Detail actions must forward the selected ApplicationProjection"
         )
     }

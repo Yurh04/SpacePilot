@@ -62,6 +62,8 @@ struct AppRootView: View {
                 projection: model.projection?.applications,
                 hasSnapshot: model.latestSnapshot != nil,
                 searchText: model.searchText,
+                analyzingApplicationID: model.analyzingApplicationID,
+                analyze: model.analyzeApplication,
                 uninstall: model.prepareUninstall,
                 reset: model.prepareReset
             )

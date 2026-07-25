@@ -42,3 +42,13 @@ public struct ApplicationSigningMetadata: Sendable {
         self.applicationGroups = applicationGroups
     }
 }
+
+struct ApplicationIdentityDiscoveryLimits: Sendable {
+    let maximumDepth: Int
+    let maximumScannedEntries: Int
+
+    static let standard = ApplicationIdentityDiscoveryLimits(
+        maximumDepth: 6,
+        maximumScannedEntries: 4_096
+    )
+}

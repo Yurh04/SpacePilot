@@ -71,6 +71,122 @@ final class ScanCoordinatorTests: XCTestCase {
         XCTAssertEqual(PermissionService().coverageStatus(deniedPaths: denied), .limited(deniedPaths: denied))
     }
 
+    func testApplicationsScopeDoesNotReadEveryApplicationIdentity()
+        async throws
+    {
+        let home = try TemporaryTree(files: [:])
+        let applicationsDirectory = home.url.appending(
+            path: "Applications",
+            directoryHint: .isDirectory
+        )
+        _ = try TestAppBuilder.make(
+            in: applicationsDirectory,
+            name: "Focused",
+            bundleID: "com.example.focused",
+            version: "1.0",
+            executableBytes: 16
+        )
+        let identityReader = SharedGroupIdentityReader(
+            bundleIdentifiers: []
+        )
+        let coordinator = ScanCoordinator(
+            homeDirectory: home.url,
+            store: InMemorySnapshotStore(),
+            identityReader: identityReader
+        )
+
+        let snapshot = try await coordinator.collectScan(
+            scope: .applications
+        )
+
+        XCTAssertTrue(identityReader.readApplicationIDs.isEmpty)
+        XCTAssertTrue(snapshot.applications.allSatisfy {
+            $0.associations.isEmpty
+        })
+    }
+
+    func testApplicationsScopeRetainsUnchangedIndexedAssociations()
+        async throws
+    {
+        let home = try TemporaryTree(files: [
+            "Library/Caches/com.example.focused/cache.bin": 41
+        ])
+        let applicationsDirectory = home.url.appending(
+            path: "Applications",
+            directoryHint: .isDirectory
+        )
+        _ = try TestAppBuilder.make(
+            in: applicationsDirectory,
+            name: "Focused",
+            bundleID: "com.example.focused",
+            version: "1.0",
+            executableBytes: 16
+        )
+        let scannedApplications = try await ApplicationScanner().scan(
+            locations: [applicationsDirectory]
+        )
+        let scanned = try XCTUnwrap(scannedApplications.first)
+        let item = ScannedItem(
+            url: home.url.appending(
+                path: "Library/Caches/com.example.focused",
+                directoryHint: .isDirectory
+            ),
+            logicalSize: 41,
+            allocatedSize: 41,
+            category: .cache,
+            risk: .rebuildable,
+            ownerID: scanned.id,
+            explanation: "Indexed association"
+        )
+        let association = ArtifactAssociation(
+            itemID: item.id,
+            applicationID: scanned.id,
+            evidence: .exactBundleIdentifier,
+            confidence: .high,
+            risk: .rebuildable,
+            ownership: .owned
+        )
+        let previousApplication = ApplicationRecord(
+            id: scanned.id,
+            name: scanned.name,
+            bundleIdentifier: scanned.bundleIdentifier,
+            version: scanned.version,
+            url: scanned.url,
+            executableURL: scanned.executableURL,
+            allocatedSize: scanned.allocatedSize,
+            lastUsedDate: scanned.lastUsedDate,
+            associations: [association]
+        )
+        let previous = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: [item],
+            applications: [previousApplication],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: .complete
+        )
+        let coordinator = ScanCoordinator(
+            homeDirectory: home.url,
+            store: InMemorySnapshotStore(latest: previous)
+        )
+
+        let snapshot = try await coordinator.collectScan(
+            scope: .applications
+        )
+
+        let focused = try XCTUnwrap(snapshot.applications.first {
+            $0.bundleIdentifier == "com.example.focused"
+        })
+        XCTAssertEqual(focused.associations.count, 1)
+        XCTAssertEqual(
+            focused.associations.first?.applicationID,
+            focused.id
+        )
+        XCTAssertTrue(snapshot.items.contains { $0.id == item.id })
+    }
+
     func testSnapshotKeepsOneSharedItemWithAssociationsForBothApplications() async throws {
         let home = try TemporaryTree(files: [
             "Library/Group Containers/TEAM.shared/token.db": 64,

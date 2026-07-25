@@ -33,6 +33,7 @@ final class AppModel {
     var cleanupCandidates: [CleanupReviewItem] = []
     var latestCleanupTransaction: CleanupTransaction?
     var cleanupHistory: [CleanupTransaction] = []
+    var analyzingApplicationID: UUID?
 
     var isPreparingAIQuery: Bool {
         guard selection == .developerAI,
@@ -52,6 +53,8 @@ final class AppModel {
 
     private var scanTask: Task<Void, Never>?
     private var cleanupTask: Task<Void, Never>?
+    private var applicationAnalysisTask: Task<Void, Never>?
+    private var analyzedApplicationIDs: Set<UUID> = []
     private var cleanupOperationID: UUID?
     private var projectionWorker: Task<AppSnapshotProjection, Error>?
     private var projectionPublicationTask: Task<Void, Never>?
@@ -86,6 +89,12 @@ final class AppModel {
             do {
                 for try await event in coordinator.scan(scope: scope) {
                     guard !Task.isCancelled else { break }
+                    if event.stage == .completed, scope == .applications {
+                        applicationAnalysisTask?.cancel()
+                        applicationAnalysisTask = nil
+                        analyzingApplicationID = nil
+                        analyzedApplicationIDs.removeAll(keepingCapacity: true)
+                    }
                     if background {
                         if event.stage == .completed,
                            let snapshot = event.snapshot {
@@ -173,6 +182,56 @@ final class AppModel {
             return
         }
         prepareCleanup(items: items)
+    }
+
+    func analyzeApplication(_ projection: ApplicationProjection) {
+        guard projection.associations.isEmpty,
+              !analyzedApplicationIDs.contains(projection.id),
+              analyzingApplicationID != projection.id,
+              let runtime,
+              let currentSnapshot = latestSnapshot else {
+            return
+        }
+        applicationAnalysisTask?.cancel()
+        analyzingApplicationID = projection.id
+        let snapshotID = currentSnapshot.id
+        let application = projection.application
+        applicationAnalysisTask = Task {
+            do {
+                let analysis = try await ApplicationDetailAnalyzer(
+                    directoryStats: runtime.store,
+                    cache: runtime.store
+                ).analyze(
+                    application: application,
+                    homeDirectory: runtime.homeDirectory
+                )
+                guard !Task.isCancelled,
+                      latestSnapshot?.id == snapshotID,
+                      analyzingApplicationID == application.id,
+                      let updated = snapshot(
+                          currentSnapshot,
+                          applying: analysis
+                      ) else {
+                    throw CancellationError()
+                }
+                try await runtime.store.save(snapshot: updated)
+                analyzedApplicationIDs.insert(application.id)
+                apply(snapshot: updated)
+            } catch is CancellationError {
+                Self.logger.info("Application detail analysis cancelled")
+            } catch {
+                if analyzingApplicationID == application.id {
+                    errorMessage = error.localizedDescription
+                }
+                Self.logger.error(
+                    "Application detail analysis failed: \(error.localizedDescription, privacy: .public)"
+                )
+            }
+            if analyzingApplicationID == application.id {
+                analyzingApplicationID = nil
+                applicationAnalysisTask = nil
+            }
+        }
     }
 
     func executePreparedCleanup(selectedIDs: Set<UUID>, confirmSensitive: Bool) {
@@ -470,6 +529,167 @@ final class AppModel {
                 ? snapshot.categoryAggregates
                 : Array(aggregates.values)
         )
+    }
+
+    private func snapshot(
+        _ snapshot: ScanSnapshot,
+        applying analysis: ApplicationDetailAnalysis
+    ) -> ScanSnapshot? {
+        guard let target = snapshot.applications.first(where: {
+            $0.id == analysis.applicationID
+        }) else {
+            return nil
+        }
+        let oldTargetItemIDs = Set(target.associations.map(\.itemID))
+        let otherApplicationItemIDs = Set(
+            snapshot.applications
+                .filter { $0.id != target.id }
+                .flatMap(\.associations)
+                .map(\.itemID)
+        )
+        let aiItemIDs = Set(snapshot.aiApplications.flatMap(\.itemIDs))
+        let protectedItemIDs = otherApplicationItemIDs.union(aiItemIDs)
+        var items = snapshot.items.filter {
+            !oldTargetItemIDs.contains($0.id)
+                || protectedItemIDs.contains($0.id)
+        }
+        var itemIndexByPath = Dictionary(
+            items.enumerated().map {
+                ($0.element.url.standardizedFileURL.path, $0.offset)
+            },
+            uniquingKeysWith: { first, _ in first }
+        )
+        var itemIDByAnalysisItemID: [UUID: UUID] = [:]
+
+        for item in analysis.items {
+            let path = item.url.standardizedFileURL.path
+            if let existingIndex = itemIndexByPath[path] {
+                let existing = items[existingIndex]
+                itemIDByAnalysisItemID[item.id] = existing.id
+                if otherApplicationItemIDs.contains(existing.id) {
+                    items[existingIndex] = ScannedItem(
+                        id: existing.id,
+                        url: existing.url,
+                        logicalSize: max(
+                            existing.logicalSize,
+                            item.logicalSize
+                        ),
+                        allocatedSize: max(
+                            existing.allocatedSize,
+                            item.allocatedSize
+                        ),
+                        creationDate: existing.creationDate,
+                        modificationDate: item.modificationDate
+                            ?? existing.modificationDate,
+                        resourceIdentifier: item.resourceIdentifier
+                            ?? existing.resourceIdentifier,
+                        category: existing.category,
+                        risk: max(existing.risk, item.risk),
+                        ownerID: nil,
+                        explanation: existing.explanation
+                    )
+                }
+                continue
+            }
+            itemIndexByPath[path] = items.count
+            itemIDByAnalysisItemID[item.id] = item.id
+            items.append(item)
+        }
+
+        let associations = analysis.associations.compactMap {
+            association -> ArtifactAssociation? in
+            guard let itemID = itemIDByAnalysisItemID[
+                association.itemID
+            ] else {
+                return nil
+            }
+            let isShared = otherApplicationItemIDs.contains(itemID)
+            return ArtifactAssociation(
+                itemID: itemID,
+                applicationID: target.id,
+                evidence: association.evidence,
+                confidence: association.confidence,
+                risk: association.risk,
+                ownership: isShared ? .shared : association.ownership
+            )
+        }
+        let applications = snapshot.applications.map { application in
+            guard application.id == target.id else { return application }
+            return ApplicationRecord(
+                id: application.id,
+                name: application.name,
+                bundleIdentifier: application.bundleIdentifier,
+                version: application.version,
+                url: application.url,
+                executableURL: application.executableURL,
+                allocatedSize: application.allocatedSize,
+                lastUsedDate: application.lastUsedDate,
+                associations: associations
+            )
+        }
+        return ScanSnapshot(
+            completedAt: .now,
+            volume: snapshot.volume,
+            items: items,
+            applications: applications,
+            aiApplications: snapshot.aiApplications,
+            plugins: snapshot.plugins,
+            skills: snapshot.skills,
+            coverage: snapshot.coverage,
+            pluginDiagnostics: snapshot.pluginDiagnostics,
+            categoryAggregates: updatedCategoryAggregates(
+                previous: snapshot,
+                items: items
+            )
+        ).compacted()
+    }
+
+    private func updatedCategoryAggregates(
+        previous snapshot: ScanSnapshot,
+        items: [ScannedItem]
+    ) -> [CategoryAggregate]? {
+        guard let previous = snapshot.categoryAggregates else {
+            return nil
+        }
+        let oldItems = Dictionary(
+            uniqueKeysWithValues: snapshot.items.map { ($0.id, $0) }
+        )
+        let newItems = Dictionary(
+            uniqueKeysWithValues: items.map { ($0.id, $0) }
+        )
+        var aggregates = Dictionary(
+            uniqueKeysWithValues: previous.map { ($0.category, $0) }
+        )
+        for item in oldItems.values where newItems[item.id] == nil {
+            let current = aggregates[item.category]
+                ?? CategoryAggregate(
+                    category: item.category,
+                    allocatedSize: 0,
+                    itemCount: 0
+                )
+            aggregates[item.category] = CategoryAggregate(
+                category: item.category,
+                allocatedSize: max(
+                    0,
+                    current.allocatedSize - item.allocatedSize
+                ),
+                itemCount: max(0, current.itemCount - 1)
+            )
+        }
+        for item in newItems.values where oldItems[item.id] == nil {
+            let current = aggregates[item.category]
+                ?? CategoryAggregate(
+                    category: item.category,
+                    allocatedSize: 0,
+                    itemCount: 0
+                )
+            aggregates[item.category] = CategoryAggregate(
+                category: item.category,
+                allocatedSize: current.allocatedSize + item.allocatedSize,
+                itemCount: current.itemCount + 1
+            )
+        }
+        return Array(aggregates.values)
     }
 
     private func apply(snapshot: ScanSnapshot) {

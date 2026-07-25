@@ -39,7 +39,7 @@ final class ApplicationIdentityReaderTests: XCTestCase {
         )
     }
 
-    func testDiscoversOnlySupportedBundlesInBoundedDirectories() throws {
+    func testDiscoversSupportedBundlesRecursivelyInBoundedDirectories() throws {
         let app = try TestAppBuilder(
             name: "Browser",
             bundleIdentifier: "com.example.browser"
@@ -62,11 +62,19 @@ final class ApplicationIdentityReaderTests: XCTestCase {
         )
         .withEmbeddedBundle(
             relativePath: "Contents/Resources/Unrelated.app",
-            bundleIdentifier: "com.example.unrelated"
+            bundleIdentifier: "com.example.browser.resource"
         )
         .withEmbeddedBundle(
             relativePath: "Contents/PlugIns/Nested/Deep.appex",
             bundleIdentifier: "com.example.browser.deep"
+        )
+        .withEmbeddedBundle(
+            relativePath: "Contents/Frameworks/Product.framework/Versions/A/Helpers/Renderer.app",
+            bundleIdentifier: "com.example.browser.renderer"
+        )
+        .withEmbeddedBundle(
+            relativePath: "Contents/SharedSupport/Components/Import.bundle",
+            bundleIdentifier: "com.example.browser.import"
         )
         .build()
 
@@ -84,9 +92,134 @@ final class ApplicationIdentityReaderTests: XCTestCase {
                 "com.example.browser.widget",
                 "com.example.browser.service",
                 "com.example.browser.launcher",
-                "com.example.browser.helper"
+                "com.example.browser.helper",
+                "com.example.browser.resource",
+                "com.example.browser.deep",
+                "com.example.browser.renderer",
+                "com.example.browser.import"
             ]
         )
+    }
+
+    func testHonorsDepthLimit() throws {
+        let app = try TestAppBuilder(
+            name: "Browser",
+            bundleIdentifier: "com.example.browser"
+        )
+        .withEmbeddedBundle(
+            relativePath: "Contents/Resources/One/Allowed.app",
+            bundleIdentifier: "com.example.allowed"
+        )
+        .withEmbeddedBundle(
+            relativePath: "Contents/Resources/One/Two/TooDeep.app",
+            bundleIdentifier: "com.example.too-deep"
+        )
+        .withEmbeddedBundle(
+            relativePath: "Contents/SharedSupport/Later.app",
+            bundleIdentifier: "com.example.later"
+        )
+        .build()
+        let reader = ApplicationIdentityReader(
+            signingReader: StubSigningMetadata(
+                teamIdentifier: nil,
+                applicationGroups: []
+            ),
+            discoveryLimits: ApplicationIdentityDiscoveryLimits(
+                maximumDepth: 2,
+                maximumScannedEntries: 100
+            )
+        )
+
+        let identity = try reader.read(application: app.record)
+
+        XCTAssertTrue(
+            identity.componentBundleIdentifiers.contains("com.example.allowed")
+        )
+        XCTAssertFalse(
+            identity.componentBundleIdentifiers.contains("com.example.too-deep")
+        )
+    }
+
+    func testReadsFlatBundleInfoPlist() throws {
+        let app = try TestAppBuilder(
+            name: "Browser",
+            bundleIdentifier: "com.example.browser"
+        )
+        .withEmbeddedBundle(
+            relativePath: "Contents/Resources/Import.bundle",
+            bundleIdentifier: "com.example.import"
+        )
+        .build()
+        let bundle = app.record.url.appending(
+            path: "Contents/Resources/Import.bundle"
+        )
+        try FileManager.default.moveItem(
+            at: bundle.appending(path: "Contents/Info.plist"),
+            to: bundle.appending(path: "Info.plist")
+        )
+
+        let identity = try makeReader().read(application: app.record)
+
+        XCTAssertTrue(
+            identity.componentBundleIdentifiers.contains("com.example.import")
+        )
+    }
+
+    func testHonorsGlobalEntryLimitAcrossDiscoveryRoots() throws {
+        let app = try TestAppBuilder(
+            name: "Browser",
+            bundleIdentifier: "com.example.browser"
+        )
+        .withEmbeddedBundle(
+            relativePath: "Contents/SharedSupport/First.app",
+            bundleIdentifier: "com.example.first"
+        )
+        .withEmbeddedBundle(
+            relativePath: "Contents/Resources/Second.app",
+            bundleIdentifier: "com.example.second"
+        )
+        .build()
+        let reader = ApplicationIdentityReader(
+            signingReader: StubSigningMetadata(
+                teamIdentifier: nil,
+                applicationGroups: []
+            ),
+            discoveryLimits: ApplicationIdentityDiscoveryLimits(
+                maximumDepth: 6,
+                maximumScannedEntries: 1
+            )
+        )
+
+        let identity = try reader.read(application: app.record)
+
+        XCTAssertEqual(
+            identity.componentBundleIdentifiers,
+            ["com.example.first"]
+        )
+    }
+
+    func testStopsImmediatelyWhenTaskIsCancelled() async throws {
+        let app = try TestAppBuilder(
+            name: "Browser",
+            bundleIdentifier: "com.example.browser"
+        )
+        .withEmbeddedBundle(
+            relativePath: "Contents/Resources/Component.app",
+            bundleIdentifier: "com.example.component"
+        )
+        .build()
+        let reader = makeReader()
+        let task = Task {
+            return try reader.read(application: app.record)
+        }
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            XCTFail("Expected cancellation")
+        } catch is CancellationError {
+            // Expected.
+        }
     }
 
     func testRejectsAllowedDirectorySymlinkEscapingApplicationBundle() throws {

@@ -49,6 +49,131 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
             ].filter { FileManager.default.fileExists(atPath: $0.path) }
             let applicationScanner = ApplicationScanner(cache: scanCache)
             let baseApplications = try await applicationScanner.scan(locations: appLocations)
+            let quickSnapshot = previousSnapshot ?? ScanSnapshot(
+                    completedAt: .now,
+                    volume: volume,
+                    items: [],
+                    applications: baseApplications,
+                    aiApplications: [],
+                    plugins: [],
+                    skills: [],
+                    coverage: .complete,
+                    pluginDiagnostics: nil
+                )
+            emit(ScanEvent(
+                stage: .quickInventory,
+                progress: 0.18,
+                message: "Found \(baseApplications.count) applications",
+                snapshot: quickSnapshot
+            ))
+
+            try Task.checkCancellation()
+            if scope == .applications {
+                let previousApplicationsByPath = Dictionary(
+                    (previousSnapshot?.applications ?? []).map {
+                        ($0.url.standardizedFileURL.path, $0)
+                    },
+                    uniquingKeysWith: { first, _ in first }
+                )
+                let retainedAssociationsByApplicationID = Dictionary(
+                    uniqueKeysWithValues: baseApplications.map { application in
+                        let previous = previousApplicationsByPath[
+                            application.url.standardizedFileURL.path
+                        ]
+                        let associations: [ArtifactAssociation]
+                        if let previous,
+                           previous.bundleIdentifier
+                               == application.bundleIdentifier,
+                           previous.version == application.version,
+                           previous.allocatedSize == application.allocatedSize {
+                            associations = previous.associations.map {
+                                ArtifactAssociation(
+                                    itemID: $0.itemID,
+                                    applicationID: application.id,
+                                    evidence: $0.evidence,
+                                    confidence: $0.confidence,
+                                    risk: $0.risk,
+                                    ownership: $0.ownership
+                                )
+                            }
+                        } else {
+                            associations = []
+                        }
+                        return (application.id, associations)
+                    }
+                )
+                let previousAssociationItemIDs = Set(
+                    previousSnapshot?.applications
+                        .flatMap(\.associations)
+                        .map(\.itemID) ?? []
+                )
+                let retainedApplicationItemIDs = Set(
+                    retainedAssociationsByApplicationID.values
+                        .flatMap { $0 }
+                        .map(\.itemID)
+                )
+                let retainedAIItemIDs = Set(
+                    previousSnapshot?.aiApplications
+                        .flatMap(\.itemIDs) ?? []
+                )
+                let retainedAssociationItemIDs =
+                    retainedApplicationItemIDs.union(retainedAIItemIDs)
+                let preservedItems = previousSnapshot?.items.filter {
+                    !previousAssociationItemIDs.contains($0.id)
+                        || retainedAssociationItemIDs.contains($0.id)
+                } ?? []
+                let canonicalOwnership = try Self.canonicalOwnership(
+                    sourceItems: preservedItems,
+                    aggregateItems: []
+                )
+                let applications = baseApplications.map { application in
+                    let associations = retainedAssociationsByApplicationID[
+                        application.id,
+                        default: []
+                    ].map {
+                        Self.remap(
+                            association: $0,
+                            itemIDs: canonicalOwnership.itemIDBySourceItemID
+                        )
+                    }
+                    return ApplicationRecord(
+                        id: application.id,
+                        name: application.name,
+                        bundleIdentifier: application.bundleIdentifier,
+                        version: application.version,
+                        url: application.url,
+                        executableURL: application.executableURL,
+                        allocatedSize: application.allocatedSize,
+                        lastUsedDate: application.lastUsedDate,
+                        associations: associations
+                    )
+                }
+                let snapshot = ScanSnapshot(
+                    completedAt: .now,
+                    volume: volume,
+                    items: canonicalOwnership.items,
+                    applications: applications,
+                    aiApplications: previousSnapshot?.aiApplications ?? [],
+                    plugins: previousSnapshot?.plugins ?? [],
+                    skills: previousSnapshot?.skills ?? [],
+                    coverage: previousSnapshot?.coverage ?? .complete,
+                    pluginDiagnostics: previousSnapshot?.pluginDiagnostics,
+                    categoryAggregates: Self.categoryAggregates(
+                        items: canonicalOwnership.items,
+                        homeResult: nil,
+                        previous: previousSnapshot
+                    )
+                ).compacted()
+                try await store.save(snapshot: snapshot)
+                emit(ScanEvent(
+                    stage: .completed,
+                    progress: 1,
+                    message: "Application inventory refresh complete",
+                    snapshot: snapshot
+                ))
+                return snapshot
+            }
+
             var identities: [ApplicationIdentity] = []
             identities.reserveCapacity(baseApplications.count)
             for application in baseApplications {
@@ -84,100 +209,6 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                         applicationGroups: []
                     ))
                 }
-            }
-            let quickSnapshot = previousSnapshot ?? ScanSnapshot(
-                    completedAt: .now,
-                    volume: volume,
-                    items: [],
-                    applications: baseApplications,
-                    aiApplications: [],
-                    plugins: [],
-                    skills: [],
-                    coverage: .complete,
-                    pluginDiagnostics: nil
-                )
-            emit(ScanEvent(
-                stage: .quickInventory,
-                progress: 0.18,
-                message: "Found \(baseApplications.count) applications",
-                snapshot: quickSnapshot
-            ))
-
-            try Task.checkCancellation()
-            if scope == .applications {
-                let applicationResolution = try await ApplicationArtifactResolver(
-                    directoryStats: directoryStats
-                ).resolve(
-                    applications: baseApplications,
-                    identities: identities,
-                    homeDirectory: homeDirectory
-                )
-                let previousAssociationItemIDs = Set(
-                    previousSnapshot?.applications
-                        .flatMap(\.associations)
-                        .map(\.itemID) ?? []
-                )
-                let preservedItems = previousSnapshot?.items.filter {
-                    !previousAssociationItemIDs.contains($0.id)
-                } ?? []
-                let canonicalOwnership = try Self.canonicalOwnership(
-                    sourceItems: preservedItems + applicationResolution.items,
-                    aggregateItems: applicationResolution.items
-                )
-                let associationsByApplicationID = Dictionary(
-                    applicationResolution.resolutions.map { resolution in
-                        (
-                            resolution.applicationID,
-                            resolution.associations.map {
-                                Self.remap(
-                                    association: $0,
-                                    itemIDs: canonicalOwnership.itemIDBySourceItemID
-                                )
-                            }
-                        )
-                    },
-                    uniquingKeysWith: { first, _ in first }
-                )
-                let applications = baseApplications.map { application in
-                    ApplicationRecord(
-                        id: application.id,
-                        name: application.name,
-                        bundleIdentifier: application.bundleIdentifier,
-                        version: application.version,
-                        url: application.url,
-                        executableURL: application.executableURL,
-                        allocatedSize: application.allocatedSize,
-                        lastUsedDate: application.lastUsedDate,
-                        associations: associationsByApplicationID[
-                            application.id,
-                            default: []
-                        ]
-                    )
-                }
-                let snapshot = ScanSnapshot(
-                    completedAt: .now,
-                    volume: volume,
-                    items: canonicalOwnership.items,
-                    applications: applications,
-                    aiApplications: previousSnapshot?.aiApplications ?? [],
-                    plugins: previousSnapshot?.plugins ?? [],
-                    skills: previousSnapshot?.skills ?? [],
-                    coverage: previousSnapshot?.coverage ?? .complete,
-                    pluginDiagnostics: previousSnapshot?.pluginDiagnostics,
-                    categoryAggregates: Self.categoryAggregates(
-                        items: canonicalOwnership.items,
-                        homeResult: nil,
-                        previous: previousSnapshot
-                    )
-                ).compacted()
-                try await store.save(snapshot: snapshot)
-                emit(ScanEvent(
-                    stage: .completed,
-                    progress: 1,
-                    message: "Application refresh complete",
-                    snapshot: snapshot
-                ))
-                return snapshot
             }
 
             async let codexScan = CodexAdapter(

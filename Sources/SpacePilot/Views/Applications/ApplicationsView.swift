@@ -6,6 +6,8 @@ struct ApplicationsView: View {
     let projection: ApplicationListProjection?
     let hasSnapshot: Bool
     let searchText: String
+    let analyzingApplicationID: UUID?
+    let analyze: (ApplicationProjection) -> Void
     let uninstall: (ApplicationProjection) -> Void
     let reset: (ApplicationProjection) -> Void
     @State private var selectedApplicationID: UUID?
@@ -46,6 +48,7 @@ struct ApplicationsView: View {
                     Divider()
                     ApplicationDetail(
                         projection: application,
+                        isAnalyzing: analyzingApplicationID == application.id,
                         uninstall: { uninstall(application) },
                         reset: { reset(application) }
                     )
@@ -57,6 +60,23 @@ struct ApplicationsView: View {
                 if !applicationIDs.contains(where: { $0 == selectedApplicationID }) {
                     selectedApplicationID = applicationIDs.first
                 }
+            }
+            .onChange(of: selectedApplicationID, initial: true) {
+                _, applicationID in
+                guard let application = applications.first(where: {
+                    $0.id == applicationID
+                }) else {
+                    return
+                }
+                analyze(application)
+            }
+            .onChange(
+                of: selectedApplication(in: applications)?.associations.count,
+                initial: true
+            ) { _, _ in
+                guard let application = selectedApplication(in: applications)
+                else { return }
+                analyze(application)
             }
         } else if hasSnapshot {
             ProgressView(L10n.preparingSummary())
@@ -74,6 +94,7 @@ struct ApplicationsView: View {
 
 private struct ApplicationDetail: View {
     let projection: ApplicationProjection
+    let isAnalyzing: Bool
     let uninstall: () -> Void
     let reset: () -> Void
 
@@ -128,6 +149,16 @@ private struct ApplicationDetail: View {
                 .contextMenu { Button(L10n.text(.revealFinder)) { reveal(pair.item.url) } }
             }
             .listStyle(.inset)
+            .overlay {
+                if isAnalyzing {
+                    ProgressView()
+                } else if projection.associations.isEmpty {
+                    ContentUnavailableView(
+                        L10n.text(.applicationOnlyHighConfidence),
+                        systemImage: "externaldrive.badge.magnifyingglass"
+                    )
+                }
+            }
         }
         .padding(.vertical, 10)
     }
