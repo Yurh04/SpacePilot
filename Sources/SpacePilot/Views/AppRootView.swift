@@ -14,7 +14,7 @@ struct AppRootView: View {
         .searchable(text: $model.searchText, placement: .toolbar, prompt: L10n.text(.searchCurrent))
         .toolbar {
             ToolbarItemGroup {
-                if model.isScanning {
+                if model.showsScanStatus {
                     Button(L10n.cancel(), systemImage: "xmark") { model.cancelScan() }
                         .keyboardShortcut(.cancelAction)
                 } else if model.canRefreshCurrentView {
@@ -26,7 +26,7 @@ struct AppRootView: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            if model.isScanning || model.errorMessage != nil {
+            if model.showsScanStatus || model.errorMessage != nil {
                 ScanStatusView(model: model)
             }
         }

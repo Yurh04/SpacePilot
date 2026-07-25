@@ -5,6 +5,7 @@ SpacePilot 是一款面向 Apple Silicon、macOS 15 及以上版本的本地储�
 ## 当前能力
 
 - 分析 Mac 内置磁盘与用户目录，显示分类、最大项目和扫描覆盖范围。
+- 启动时直接加载本地索引；文件变化会经过静默合并，并按应用或开发与 AI 范围增量刷新。
 - 识别应用本体及高可信度关联文件，提供完整卸载预览。
 - 深度分析 Codex 与 Claude 的对话、日志、缓存和配置占用；对 ChatGPT、Ollama、OpenCode 提供基础占用统计。
 - 识别 Xcode、Simulator、Homebrew、npm、Gradle 和 pip 的常见开发空间，并解释风险与重建成本。

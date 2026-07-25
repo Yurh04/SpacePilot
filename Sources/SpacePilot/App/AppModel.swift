@@ -27,6 +27,7 @@ final class AppModel {
     var scanMessage = L10n.scanStatus(for: nil)
     var errorMessage: String?
     var isScanning = false
+    var isBackgroundRefreshing = false
     var isCleaning = false
     var showingCleanupConfirmation = false
     var cleanupCandidates: [CleanupReviewItem] = []
@@ -42,7 +43,11 @@ final class AppModel {
     }
 
     var canRefreshCurrentView: Bool {
-        selection != .history
+        selection != .history && !isScanning
+    }
+
+    var showsScanStatus: Bool {
+        isScanning && !isBackgroundRefreshing
     }
 
     private var scanTask: Task<Void, Never>?
@@ -53,6 +58,8 @@ final class AppModel {
     private var aiQueryWorker: Task<AIApplicationQueryProjection, Error>?
     private var aiQueryPublicationTask: Task<Void, Never>?
     private var fileSystemMonitor: FileSystemChangeMonitor?
+    private var fileSystemChangeReconciler: FileSystemChangeReconciler?
+    private var pendingAutomaticRefreshScope: ScanScope?
     private let runtime: SpacePilotRuntime?
 
     init() {
@@ -65,28 +72,49 @@ final class AppModel {
         Task { await loadSavedState() }
     }
 
-    func startScan(scope: ScanScope = .applications) {
+    func startScan(
+        scope: ScanScope = .applications,
+        background: Bool = false
+    ) {
         guard !isScanning, let coordinator = runtime?.coordinator else { return }
-        errorMessage = nil
+        if !background {
+            errorMessage = nil
+        }
         isScanning = true
+        isBackgroundRefreshing = background
         scanTask = Task {
             do {
                 for try await event in coordinator.scan(scope: scope) {
                     guard !Task.isCancelled else { break }
-                    scanStage = event.stage
-                    scanProgress = event.progress
-                    scanMessage = event.message
-                    if let snapshot = event.snapshot { apply(snapshot: snapshot) }
+                    if background {
+                        if event.stage == .completed,
+                           let snapshot = event.snapshot {
+                            apply(snapshot: snapshot)
+                        }
+                    } else {
+                        scanStage = event.stage
+                        scanProgress = event.progress
+                        scanMessage = event.message
+                        if let snapshot = event.snapshot {
+                            apply(snapshot: snapshot)
+                        }
+                    }
                     Self.logger.info("Scan stage: \(event.stage.rawValue, privacy: .public)")
                 }
             } catch is CancellationError {
-                scanMessage = L10n.text(.scanCancelled)
+                if !background {
+                    scanMessage = L10n.text(.scanCancelled)
+                }
             } catch {
-                errorMessage = error.localizedDescription
+                if !background {
+                    errorMessage = error.localizedDescription
+                }
                 Self.logger.error("Scan failed: \(error.localizedDescription, privacy: .public)")
             }
             isScanning = false
+            isBackgroundRefreshing = false
             scanTask = nil
+            startPendingAutomaticRefreshIfNeeded()
         }
     }
 
@@ -221,6 +249,7 @@ final class AppModel {
                 isCleaning = false
                 cleanupTask = nil
                 cleanupOperationID = nil
+                startPendingAutomaticRefreshIfNeeded()
             }
         }
     }
@@ -269,33 +298,46 @@ final class AppModel {
         )
         let store = runtime.store
         let logger = Self.logger
+        let homeDirectory = runtime.homeDirectory
+        let reconciler = FileSystemChangeReconciler(
+            root: homeDirectory
+        ) { [weak self] batch in
+            do {
+                if batch.requiresFullInvalidation {
+                    try await store.markAllDirectoryStatsDirty()
+                } else if !batch.changedPaths.isEmpty {
+                    try await store.markDirectoryStatsDirty(
+                        changedPaths: batch.changedPaths
+                    )
+                }
+                if batch.lastEventID > 0 {
+                    try await store.save(fileSystemEventCursor: .init(
+                        volumeID: volumeID,
+                        lastEventID: batch.lastEventID,
+                        lastReconciledAt: .now
+                    ))
+                }
+                if let scope = IncrementalRefreshPlanner.scope(
+                    for: batch,
+                    homeDirectory: homeDirectory
+                ) {
+                    await self?.requestAutomaticRefresh(scope: scope)
+                }
+            } catch {
+                logger.error(
+                    "FSEvents reconciliation failed: \(error.localizedDescription, privacy: .public)"
+                )
+            }
+        }
         let startingEventID = try monitor.start(
             sinceEventID: cursor?.lastEventID
         ) { batch in
             Task {
-                do {
-                    if batch.requiresFullInvalidation {
-                        try await store.markAllDirectoryStatsDirty()
-                    } else if !batch.changedPaths.isEmpty {
-                        try await store.markDirectoryStatsDirty(
-                            changedPaths: batch.changedPaths
-                        )
-                    }
-                    if batch.lastEventID > 0 {
-                        try await store.save(fileSystemEventCursor: .init(
-                            volumeID: volumeID,
-                            lastEventID: batch.lastEventID,
-                            lastReconciledAt: .now
-                        ))
-                    }
-                } catch {
-                    logger.error(
-                        "FSEvents reconciliation failed: \(error.localizedDescription, privacy: .public)"
-                    )
-                }
+                await reconciler.submit(batch)
             }
         }
         fileSystemMonitor = monitor
+        fileSystemChangeReconciler = reconciler
         if cursor == nil {
             try await store.save(fileSystemEventCursor: .init(
                 volumeID: volumeID,
@@ -303,6 +345,39 @@ final class AppModel {
                 lastReconciledAt: .now
             ))
         }
+    }
+
+    private func requestAutomaticRefresh(scope: ScanScope) {
+        guard latestSnapshot != nil else { return }
+        if isScanning || isCleaning {
+            pendingAutomaticRefreshScope = Self.mergedRefreshScope(
+                pendingAutomaticRefreshScope,
+                scope
+            )
+            return
+        }
+        startScan(scope: scope, background: true)
+    }
+
+    private func startPendingAutomaticRefreshIfNeeded() {
+        guard !isScanning, !isCleaning,
+              let scope = pendingAutomaticRefreshScope else { return }
+        pendingAutomaticRefreshScope = nil
+        startScan(scope: scope, background: true)
+    }
+
+    private static func mergedRefreshScope(
+        _ current: ScanScope?,
+        _ incoming: ScanScope
+    ) -> ScanScope {
+        guard let current else { return incoming }
+        if current == .full || incoming == .full {
+            return .full
+        }
+        if current == .developerAI || incoming == .developerAI {
+            return .developerAI
+        }
+        return .applications
     }
 
     private func snapshotAfterCleanup(

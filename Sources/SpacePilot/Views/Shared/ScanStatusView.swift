@@ -5,7 +5,7 @@ struct ScanStatusView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            if model.isScanning {
+            if model.showsScanStatus {
                 ProgressView(value: model.scanProgress)
                     .frame(width: 120)
                 Text(verbatim: L10n.scanStatus(for: model.scanStage))
