@@ -64,6 +64,52 @@ final class ApplicationArtifactResolverTests: XCTestCase {
         XCTAssertEqual(item.allocatedSize, 456_000)
     }
 
+    func testUncachedArtifactSizesUseBoundedConcurrency() async throws {
+        let bundleIdentifiers = (0..<6).map { "com.example.App\($0)" }
+        let files = Dictionary(
+            uniqueKeysWithValues: bundleIdentifiers.map {
+                ("Library/Caches/\($0)/cache.bin", 75)
+            }
+        )
+        let home = try TemporaryTree(files: files)
+        let applications = bundleIdentifiers.enumerated().map {
+            application(
+                name: "App\($0.offset)",
+                bundleID: $0.element
+            )
+        }
+        let sizeResolver = TrackingArtifactSizeResolver()
+        let resolver = ApplicationArtifactResolver(
+            roots: [
+                ApplicationArtifactRoot(
+                    relativePath: "Library/Caches",
+                    category: .cache,
+                    risk: .safe
+                )
+            ],
+            sizeResolver: sizeResolver,
+            maximumConcurrentSizeCalculations: 2
+        )
+
+        let result = try await resolver.resolve(
+            applications: applications,
+            identities: applications.map { identity(for: $0) },
+            homeDirectory: home.url
+        )
+        let metrics = await sizeResolver.metrics()
+
+        XCTAssertEqual(result.items.count, 6)
+        XCTAssertEqual(metrics.callCount, 6)
+        XCTAssertEqual(metrics.maximumConcurrentCalls, 2)
+        XCTAssertTrue(result.items.allSatisfy {
+            $0.logicalSize == 100 && $0.allocatedSize == 200
+        })
+        XCTAssertEqual(
+            result.items.map { $0.url.path },
+            result.items.map { $0.url.path }.sorted()
+        )
+    }
+
     func testSharedApplicationGroupIsNotOwnedByEitherApplication() async throws {
         let home = try TemporaryTree(files: [
             "Library/Group Containers/TEAM.shared/token.db": 64
@@ -736,5 +782,29 @@ final class ApplicationArtifactResolverTests: XCTestCase {
             teamIdentifier: "TEAM",
             applicationGroups: groups
         )
+    }
+}
+
+private actor TrackingArtifactSizeResolver:
+    ApplicationArtifactSizeResolving
+{
+    private var activeCalls = 0
+    private var totalCalls = 0
+    private var maximumCalls = 0
+
+    func sizes(of url: URL) async throws -> ApplicationArtifactSize {
+        activeCalls += 1
+        totalCalls += 1
+        maximumCalls = max(maximumCalls, activeCalls)
+        defer { activeCalls -= 1 }
+        try await Task.sleep(for: .milliseconds(20))
+        return ApplicationArtifactSize(logical: 100, allocated: 200)
+    }
+
+    func metrics() -> (
+        callCount: Int,
+        maximumConcurrentCalls: Int
+    ) {
+        (totalCalls, maximumCalls)
     }
 }

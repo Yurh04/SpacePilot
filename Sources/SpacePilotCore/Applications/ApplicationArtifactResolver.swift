@@ -44,21 +44,28 @@ public struct ApplicationArtifactResolver: Sendable {
         let explanation: String
     }
 
-    private struct Candidate {
+    private struct Candidate: Sendable {
         let url: URL
         var rule: ApplicationArtifactRoot
         var rootDepth: Int
         var matchesByApplicationID: [UUID: Match]
     }
 
-    private struct ResolvedRoot {
+    private struct ResolvedRoot: Sendable {
         let rule: ApplicationArtifactRoot
         let url: URL
         let canonicalURL: URL
     }
 
+    private struct IndexedArtifactSize: Sendable {
+        let index: Int
+        let size: ApplicationArtifactSize
+    }
+
     private let roots: [ApplicationArtifactRoot]
     private let directoryStats: (any DirectoryStatProviding)?
+    private let sizeResolver: any ApplicationArtifactSizeResolving
+    private let maximumConcurrentSizeCalculations: Int
 
     public init(
         roots: [ApplicationArtifactRoot] = ApplicationArtifactRoot.standard,
@@ -66,6 +73,23 @@ public struct ApplicationArtifactResolver: Sendable {
     ) {
         self.roots = roots
         self.directoryStats = directoryStats
+        self.sizeResolver = FileSystemApplicationArtifactSizeResolver()
+        self.maximumConcurrentSizeCalculations = 4
+    }
+
+    init(
+        roots: [ApplicationArtifactRoot] = ApplicationArtifactRoot.standard,
+        directoryStats: (any DirectoryStatProviding)? = nil,
+        sizeResolver: any ApplicationArtifactSizeResolving,
+        maximumConcurrentSizeCalculations: Int
+    ) {
+        self.roots = roots
+        self.directoryStats = directoryStats
+        self.sizeResolver = sizeResolver
+        self.maximumConcurrentSizeCalculations = max(
+            1,
+            maximumConcurrentSizeCalculations
+        )
     }
 
     public func resolve(
@@ -127,11 +151,13 @@ public struct ApplicationArtifactResolver: Sendable {
         )
         var items: [ScannedItem] = []
 
-        for candidate in candidatesByPath.values.sorted(by: {
+        let candidates = candidatesByPath.values.sorted(by: {
             $0.url.path < $1.url.path
-        }) {
+        })
+        let candidateSizes = try await sizes(of: candidates)
+
+        for (candidate, sizes) in zip(candidates, candidateSizes) {
             try Task.checkCancellation()
-            let sizes = try await sizes(of: candidate.url)
             let resourceValues = try? candidate.url.resourceValues(
                 forKeys: [
                     .contentModificationDateKey,
@@ -638,63 +664,62 @@ public struct ApplicationArtifactResolver: Sendable {
         value.lowercased().filter { $0.isLetter || $0.isNumber }
     }
 
-    private func sizes(of root: URL) async throws -> (
-        logical: Int64,
-        allocated: Int64
-    ) {
-        if let cached = try await directoryStats?.cachedDirectoryStat(at: root) {
-            return (
-                cached.totalLogicalSize,
-                cached.totalAllocatedSize
-            )
+    private func sizes(
+        of candidates: [Candidate]
+    ) async throws -> [ApplicationArtifactSize] {
+        guard !candidates.isEmpty else {
+            return []
         }
-        return try uncachedSizes(of: root)
+        let concurrentCount = min(
+            maximumConcurrentSizeCalculations,
+            candidates.count
+        )
+        return try await withThrowingTaskGroup(
+            of: IndexedArtifactSize.self
+        ) { group in
+            var nextIndex = 0
+            var results = Array<ApplicationArtifactSize?>(
+                repeating: nil,
+                count: candidates.count
+            )
+
+            func addTask(at index: Int) {
+                let candidate = candidates[index]
+                group.addTask {
+                    IndexedArtifactSize(
+                        index: index,
+                        size: try await sizes(of: candidate.url)
+                    )
+                }
+            }
+
+            while nextIndex < concurrentCount {
+                addTask(at: nextIndex)
+                nextIndex += 1
+            }
+
+            while let result = try await group.next() {
+                results[result.index] = result.size
+                if nextIndex < candidates.count {
+                    addTask(at: nextIndex)
+                    nextIndex += 1
+                }
+            }
+
+            return results.map {
+                $0 ?? ApplicationArtifactSize(logical: 0, allocated: 0)
+            }
+        }
     }
 
-    private func uncachedSizes(of root: URL) throws -> (
-        logical: Int64,
-        allocated: Int64
-    ) {
-        let keys: Set<URLResourceKey> = [
-            .fileSizeKey,
-            .totalFileAllocatedSizeKey,
-            .isRegularFileKey,
-            .isSymbolicLinkKey
-        ]
-        let rootValues = try? root.resourceValues(forKeys: keys)
-        if rootValues?.isRegularFile == true,
-           rootValues?.isSymbolicLink != true {
-            return (
-                Int64(rootValues?.fileSize ?? 0),
-                Int64(rootValues?.totalFileAllocatedSize ?? 0)
+    private func sizes(of root: URL) async throws -> ApplicationArtifactSize {
+        if let cached = try await directoryStats?.cachedDirectoryStat(at: root) {
+            return ApplicationArtifactSize(
+                logical: cached.totalLogicalSize,
+                allocated: cached.totalAllocatedSize
             )
         }
-        guard let enumerator = FileManager.default.enumerator(
-            at: root,
-            includingPropertiesForKeys: Array(keys),
-            options: []
-        ) else {
-            return (0, 0)
-        }
-        var logical: Int64 = 0
-        var allocated: Int64 = 0
-        var processed = 0
-        for case let url as URL in enumerator {
-            processed += 1
-            if processed.isMultiple(of: 128) {
-                try Task.checkCancellation()
-            }
-            guard let values = try? url.resourceValues(forKeys: keys),
-                  values.isRegularFile == true,
-                  values.isSymbolicLink != true
-            else {
-                continue
-            }
-            logical += Int64(values.fileSize ?? 0)
-            allocated += Int64(values.totalFileAllocatedSize ?? 0)
-        }
-        try Task.checkCancellation()
-        return (logical, allocated)
+        return try await sizeResolver.sizes(of: root)
     }
 
     private func safeDirectory(
