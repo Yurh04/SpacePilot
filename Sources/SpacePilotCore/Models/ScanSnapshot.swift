@@ -94,6 +94,26 @@ public struct ScanSnapshot: Identifiable, Codable, Sendable {
         ).total
     }
 
+    public func mergingAIProductFamilies() -> ScanSnapshot {
+        let mergedAIApplications = AIApplicationProductFamilyMerger()
+            .mergeChatGPTAndCodex(in: aiApplications)
+        guard mergedAIApplications != aiApplications else { return self }
+
+        return ScanSnapshot(
+            id: id,
+            completedAt: completedAt,
+            volume: volume,
+            items: items,
+            applications: applications,
+            aiApplications: mergedAIApplications,
+            plugins: plugins,
+            skills: skills,
+            coverage: coverage,
+            pluginDiagnostics: pluginDiagnostics,
+            categoryAggregates: categoryAggregates
+        )
+    }
+
     public func compacted(
         retainedItemLimit: Int = Self.maximumRetainedItems
     ) -> ScanSnapshot {

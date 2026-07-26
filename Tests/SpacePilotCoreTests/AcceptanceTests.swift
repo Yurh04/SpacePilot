@@ -13,16 +13,22 @@ final class AcceptanceTests: XCTestCase {
         XCTAssertFalse(snapshot.items.contains { $0.url == fixture.userDocument && associatedIDs.contains($0.id) })
         XCTAssertFalse(OverviewProjection(snapshot: snapshot).preselectedRecommendations.contains { $0.url == fixture.userDocument })
 
-        let codex = try XCTUnwrap(snapshot.aiApplications.first { $0.name == "Codex" })
+        let codex = try XCTUnwrap(snapshot.aiApplications.first {
+            $0.name == "ChatGPT + Codex"
+        })
         let claude = try XCTUnwrap(snapshot.aiApplications.first { $0.name == "Claude" })
-        let chatGPT = try XCTUnwrap(snapshot.aiApplications.first { $0.name == "ChatGPT" })
         XCTAssertFalse(codex.itemIDs.isEmpty)
         XCTAssertFalse(claude.itemIDs.isEmpty)
         XCTAssertFalse(snapshot.plugins.isEmpty)
         XCTAssertEqual(codex.pluginIDs, Set(snapshot.plugins.map(\.id)))
-        XCTAssertTrue(snapshot.aiApplications.filter { $0.name != "Codex" }.allSatisfy(\.pluginIDs.isEmpty))
+        XCTAssertTrue(snapshot.aiApplications.filter {
+            $0.name != "ChatGPT + Codex"
+        }.allSatisfy(\.pluginIDs.isEmpty))
         XCTAssertNotNil(snapshot.pluginDiagnostics)
-        XCTAssertEqual(chatGPT.supportLevel, .basic)
+        XCTAssertEqual(codex.supportLevel, .deep)
+        XCTAssertFalse(snapshot.aiApplications.contains {
+            $0.name == "ChatGPT" || $0.name == "Codex"
+        })
         XCTAssertTrue(snapshot.items.contains { $0.category == .developer && $0.url.path.contains("_cacache") })
         XCTAssertTrue(snapshot.skills.contains { $0.scope == .sharedAgents })
         XCTAssertTrue(snapshot.skills.contains { $0.scope == .agentSpecific(agent: "Codex") })

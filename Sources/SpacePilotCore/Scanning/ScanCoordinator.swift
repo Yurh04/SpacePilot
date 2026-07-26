@@ -382,8 +382,11 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                     itemIDs: canonicalItemIDBySourceItemID
                 )
             }
-            let aiApplications = [codexApplication, claudeApplication]
-                + basicAIApplications
+            let aiApplications = AIApplicationProductFamilyMerger()
+                .mergeChatGPTAndCodex(
+                    in: [codexApplication, claudeApplication]
+                        + basicAIApplications
+                )
             emit(ScanEvent(stage: .indexing, progress: 0.88, message: "Saving local metadata index"))
             try Task.checkCancellation()
 

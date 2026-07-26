@@ -8,6 +8,7 @@ public struct AppSnapshotProjection: Sendable {
     public let developerAI: DeveloperAIProjection
 
     public init(snapshot: ScanSnapshot) {
+        let snapshot = snapshot.mergingAIProductFamilies()
         self.init(
             snapshotID: snapshot.id,
             overview: OverviewProjection(snapshot: snapshot),
@@ -29,6 +30,7 @@ public struct AppSnapshotProjection: Sendable {
         checkCancellation: @escaping @Sendable () throws -> Void
     ) throws -> Self {
         try checkCancellation()
+        let snapshot = snapshot.mergingAIProductFamilies()
         let overview = try OverviewProjection(
             snapshot: snapshot,
             checkCancellation: checkCancellation
