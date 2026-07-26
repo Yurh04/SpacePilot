@@ -448,8 +448,32 @@ public extension ApplicationAssociationKnowledgeBase {
     /// Built-in version 1 examples. All results are deliberately inspect-only.
     static let builtInV1 = ApplicationAssociationKnowledgeBase(
         schemaVersion: 1,
-        contentVersion: "1.0.0",
+        contentVersion: "1.1.0",
         rules: [
+            ApplicationAssociationKnowledgeRule(
+                id: "product.openai.chatgpt-codex.v1",
+                match: ApplicationAssociationKnowledgeMatch(
+                    bundleIdentifiers: ["com.openai.codex"]
+                ),
+                paths: [
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: "Library/Application Support/Codex",
+                        category: .application,
+                        risk: .sensitive,
+                        confidence: .high,
+                        ownership: .owned
+                    ),
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: "Library/Application Support/OpenAI/Codex",
+                        category: .application,
+                        risk: .sensitive,
+                        confidence: .high,
+                        ownership: .owned
+                    )
+                ]
+            ),
             ApplicationAssociationKnowledgeRule(
                 id: "framework.electron.v1",
                 match: ApplicationAssociationKnowledgeMatch(

@@ -443,7 +443,19 @@ public struct ApplicationListProjection: Sendable {
         applicationProjections.reserveCapacity(snapshot.applications.count)
         for application in snapshot.applications {
             try checkpoint.checkPeriodically()
-            let totalSize = application.allocatedSize + relatedSizes[application.id, default: 0]
+            var relatedSize = relatedSizes[application.id, default: 0]
+            var additionallyCountedItemIDs: Set<UUID> = []
+            for association in application.associations {
+                try checkpoint.checkPeriodically()
+                guard let item = associatedItemsByID[association.itemID],
+                      item.ownerID != application.id,
+                      additionallyCountedItemIDs.insert(item.id).inserted
+                else {
+                    continue
+                }
+                relatedSize += item.allocatedSize
+            }
+            let totalSize = application.allocatedSize + relatedSize
             allTotalSizes[application.id] = totalSize
             var associations: [ApplicationAssociationProjection] = []
             associations.reserveCapacity(application.associations.count)

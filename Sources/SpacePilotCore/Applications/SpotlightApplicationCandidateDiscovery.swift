@@ -77,6 +77,7 @@ public struct SystemSpotlightApplicationCandidateQuery:
 
         let scopePaths = scopes.map(\.path) as CFArray
         MDQuerySetSearchScope(metadataQuery, scopePaths, 0)
+        MDQuerySetMaxCount(metadataQuery, CFIndex(limit))
         guard MDQueryExecute(
             metadataQuery,
             CFOptionFlags(kMDQuerySynchronous.rawValue)

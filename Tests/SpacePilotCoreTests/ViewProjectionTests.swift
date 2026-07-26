@@ -880,6 +880,60 @@ final class ViewProjectionTests: XCTestCase {
         XCTAssertEqual(projection.totalSize(for: smallerID), 200)
     }
 
+    func testApplicationListProjectionCountsSharedAssociatedAIDataOnce() {
+        let applicationID = UUID()
+        let aiOwnerID = UUID()
+        let sharedData = ScannedItem(
+            url: URL(fileURLWithPath: "/Users/test/.codex/sessions"),
+            logicalSize: 2_800,
+            allocatedSize: 2_800,
+            category: .conversation,
+            risk: .sensitive,
+            ownerID: aiOwnerID,
+            explanation: "Codex data"
+        )
+        let associations = (0..<2).map { _ in
+            ArtifactAssociation(
+                itemID: sharedData.id,
+                applicationID: applicationID,
+                evidence: .knownRule,
+                confidence: .high,
+                risk: .sensitive,
+                ownership: .shared
+            )
+        }
+        let application = ApplicationRecord(
+            id: applicationID,
+            name: "ChatGPT",
+            bundleIdentifier: "com.openai.codex",
+            version: "1",
+            url: URL(fileURLWithPath: "/Applications/ChatGPT.app"),
+            executableURL: nil,
+            allocatedSize: 1_400,
+            associations: associations
+        )
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: [sharedData],
+            applications: [application],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: .complete
+        )
+
+        let projection = ApplicationListProjection(
+            snapshot: snapshot,
+            searchText: ""
+        )
+
+        XCTAssertEqual(
+            projection.totalSize(for: applicationID),
+            4_200
+        )
+    }
+
     func testApplicationListProjectionFiltersPreviouslyAggregatedApplications() {
         let alpha = ApplicationRecord(
             name: "Alpha",

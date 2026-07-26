@@ -56,7 +56,9 @@ public struct ApplicationDetailAnalyzer: Sendable {
 
     public func analyze(
         application: ApplicationRecord,
-        homeDirectory: URL
+        homeDirectory: URL,
+        indexedItems: [ScannedItem] = [],
+        indexedAIApplications: [AIApplicationRecord] = []
     ) async throws -> ApplicationDetailAnalysis {
         try Task.checkCancellation()
         let identity: ApplicationIdentity
@@ -88,11 +90,16 @@ public struct ApplicationDetailAnalyzer: Sendable {
             standardResolution.resolutions.first?.associations ?? []
         let occupiedURLs = standardItems.map(\.url)
 
-        async let spotlightCandidates = spotlightFinder.candidates(
-            for: application,
-            identity: identity,
-            homeDirectory: homeDirectory
-        )
+        let spotlightCandidates: [SpotlightApplicationCandidate]
+        if Self.usesSpotlightCandidates(for: application) {
+            spotlightCandidates = try await spotlightFinder.candidates(
+                for: application,
+                identity: identity,
+                homeDirectory: homeDirectory
+            )
+        } else {
+            spotlightCandidates = []
+        }
         let knowledgeCandidates = try knowledgeBase.candidates(
             for: ApplicationAssociationKnowledgeContext(
                 applicationName: application.name,
@@ -103,7 +110,7 @@ public struct ApplicationDetailAnalyzer: Sendable {
             ),
             homeDirectory: homeDirectory
         )
-        let candidates = try await mergeCandidates(
+        let candidates = mergeCandidates(
             spotlight: spotlightCandidates,
             knowledge: knowledgeCandidates,
             excluding: occupiedURLs,
@@ -150,11 +157,55 @@ public struct ApplicationDetailAnalyzer: Sendable {
                 ownership: resolved.candidate.ownership
             ))
         }
+        let indexedItemsByID = Dictionary(
+            uniqueKeysWithValues: indexedItems.map { ($0.id, $0) }
+        )
+        let existingAssociationItemIDs = Set(associations.map(\.itemID))
+        let productFamilyItemIDs = Self.productFamilyItemIDs(
+            for: application,
+            aiApplications: indexedAIApplications
+        )
+        for itemID in productFamilyItemIDs.sorted(by: {
+            $0.uuidString < $1.uuidString
+        }) where !existingAssociationItemIDs.contains(itemID) {
+            guard let item = indexedItemsByID[itemID] else { continue }
+            associations.append(ArtifactAssociation(
+                itemID: itemID,
+                applicationID: application.id,
+                evidence: .knownRule,
+                confidence: .high,
+                risk: item.risk,
+                ownership: .shared
+            ))
+        }
         return ApplicationDetailAnalysis(
             applicationID: application.id,
             items: items,
             associations: associations
         )
+    }
+
+    private static func usesSpotlightCandidates(
+        for application: ApplicationRecord
+    ) -> Bool {
+        application.bundleIdentifier?.lowercased() != "com.openai.codex"
+    }
+
+    private static func productFamilyItemIDs(
+        for application: ApplicationRecord,
+        aiApplications: [AIApplicationRecord]
+    ) -> Set<UUID> {
+        let bundleIdentifier = application.bundleIdentifier?.lowercased()
+        return aiApplications.reduce(into: Set<UUID>()) { result, aiApplication in
+            let sameBundleIdentifier = bundleIdentifier != nil
+                && aiApplication.bundleIdentifier?.lowercased()
+                    == bundleIdentifier
+            let sameApplicationURL = aiApplication.applicationURL?
+                .standardizedFileURL == application.url.standardizedFileURL
+            if sameBundleIdentifier || sameApplicationURL {
+                result.formUnion(aiApplication.itemIDs)
+            }
+        }
     }
 
     private func mergeCandidates(

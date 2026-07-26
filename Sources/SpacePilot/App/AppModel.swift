@@ -185,7 +185,7 @@ final class AppModel {
     }
 
     func analyzeApplication(_ projection: ApplicationProjection) {
-        guard projection.associations.isEmpty,
+        guard needsApplicationAnalysis(projection),
               !analyzedApplicationIDs.contains(projection.id),
               analyzingApplicationID != projection.id,
               let runtime,
@@ -203,7 +203,9 @@ final class AppModel {
                     cache: runtime.store
                 ).analyze(
                     application: application,
-                    homeDirectory: runtime.homeDirectory
+                    homeDirectory: runtime.homeDirectory,
+                    indexedItems: currentSnapshot.items,
+                    indexedAIApplications: currentSnapshot.aiApplications
                 )
                 guard !Task.isCancelled,
                       latestSnapshot?.id == snapshotID,
@@ -231,6 +233,27 @@ final class AppModel {
                 analyzingApplicationID = nil
                 applicationAnalysisTask = nil
             }
+        }
+    }
+
+    private func needsApplicationAnalysis(
+        _ projection: ApplicationProjection
+    ) -> Bool {
+        guard !projection.associations.isEmpty else { return true }
+        guard projection.application.bundleIdentifier == "com.openai.codex",
+              latestSnapshot?.aiApplications.contains(where: {
+                  $0.bundleIdentifier == "com.openai.codex"
+                      && !$0.itemIDs.isEmpty
+              }) == true
+        else {
+            return false
+        }
+        return !projection.associations.contains {
+            $0.item.url.standardizedFileURL.path.hasPrefix(
+                FileManager.default.homeDirectoryForCurrentUser
+                    .appending(path: ".codex")
+                    .standardizedFileURL.path
+            )
         }
     }
 
@@ -559,7 +582,9 @@ final class AppModel {
             },
             uniquingKeysWith: { first, _ in first }
         )
-        var itemIDByAnalysisItemID: [UUID: UUID] = [:]
+        var itemIDByAnalysisItemID = Dictionary(
+            uniqueKeysWithValues: items.map { ($0.id, $0.id) }
+        )
 
         for item in analysis.items {
             let path = item.url.standardizedFileURL.path

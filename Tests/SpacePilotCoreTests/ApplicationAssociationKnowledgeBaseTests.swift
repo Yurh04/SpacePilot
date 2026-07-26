@@ -11,8 +11,8 @@ final class ApplicationAssociationKnowledgeBaseTests: XCTestCase {
 
         XCTAssertEqual(decoded, original)
         XCTAssertEqual(decoded.schemaVersion, 1)
-        XCTAssertEqual(decoded.contentVersion, "1.0.0")
-        XCTAssertEqual(decoded.rules.count, 4)
+        XCTAssertEqual(decoded.contentVersion, "1.1.0")
+        XCTAssertEqual(decoded.rules.count, 5)
     }
 
     func testMatchesExactBundleAndTeamIdentifiers() throws {
@@ -267,6 +267,16 @@ final class ApplicationAssociationKnowledgeBaseTests: XCTestCase {
         XCTAssertEqual(nativeMessaging.ownership, .owned)
         XCTAssertEqual(nativeMessaging.risk, .rebuildable)
         XCTAssertEqual(nativeMessaging.disposition, .inspectOnly)
+        let codexSupportPaths = Set(codexCandidates.filter {
+            $0.ruleID == "product.openai.chatgpt-codex.v1"
+        }.map(\.url.lastPathComponent))
+        XCTAssertEqual(codexSupportPaths, ["Codex"])
+        XCTAssertEqual(
+            codexCandidates.filter {
+                $0.ruleID == "product.openai.chatgpt-codex.v1"
+            }.count,
+            2
+        )
 
         let dockerCandidates = try ApplicationAssociationKnowledgeBase.builtInV1
             .candidates(
