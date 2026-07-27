@@ -20,13 +20,20 @@ final class StorageWorkbenchArchitectureTests: XCTestCase {
         XCTAssertTrue(source.contains("projection.totalCapacity"))
         XCTAssertTrue(source.contains("projection.availableBytes"))
         XCTAssertTrue(source.contains("ProgressView("))
-        XCTAssertTrue(source.contains("reviewCleanup(safeSelectedItems)"))
+        XCTAssertTrue(source.contains(
+            "reviewButton(items: safeSelectedItems)"
+        ))
     }
 
     func testStorageWorkbenchFitsTheMinimumSupportedWindowWidth() throws {
         let source = try storageViewSource()
 
-        XCTAssertTrue(source.contains("maxWidth: 280"))
+        XCTAssertTrue(source.contains(
+            ".frame(minWidth: 190, idealWidth: 220, maxWidth: 250)"
+        ))
+        XCTAssertTrue(source.contains("ViewThatFits(in: .horizontal)"))
+        XCTAssertTrue(source.contains(".width(min: 120, ideal: 180)"))
+        XCTAssertTrue(source.contains(".width(min: 80, ideal: 95)"))
         XCTAssertFalse(source.contains("minWidth: 620"))
         XCTAssertFalse(source.contains(".frame(width: 260)"))
     }

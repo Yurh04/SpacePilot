@@ -30,7 +30,7 @@ struct ApplicationsView: View {
                     uninstall: uninstall,
                     reset: reset
                 )
-                .frame(minWidth: 280, idealWidth: 320, maxWidth: 400)
+                .frame(minWidth: 230, idealWidth: 280, maxWidth: 340)
 
                 if let application = selectedApplication(in: applications) {
                     ApplicationDetail(
@@ -40,14 +40,14 @@ struct ApplicationsView: View {
                         uninstall: { uninstall(application) },
                         reset: { reset(application) }
                     )
-                    .frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ContentUnavailableView(
                         L10n.text(.application),
                         systemImage: "square.grid.2x2",
                         description: Text(L10n.text(.applicationOnlyHighConfidence))
                     )
-                    .frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
             .navigationTitle(L10n.applications())

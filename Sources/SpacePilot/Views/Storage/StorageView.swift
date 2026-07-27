@@ -20,7 +20,7 @@ struct StorageView: View {
 
                 HSplitView {
                     categoryBrowser(projection)
-                        .frame(minWidth: 210, idealWidth: 240, maxWidth: 280)
+                        .frame(minWidth: 190, idealWidth: 220, maxWidth: 250)
 
                     itemsWorkspace(projection)
                         .frame(minWidth: 420)
@@ -86,35 +86,27 @@ struct StorageView: View {
         }
 
         return VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(categoryTitle)
-                        .font(.headline)
-                    Text(verbatim: L10n.visibleItems(visibleItems.count))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    workspaceTitle(visibleItemCount: visibleItems.count)
+
+                    Spacer()
+
+                    modePicker
+
+                    reviewButton(items: safeSelectedItems)
                 }
 
-                Spacer()
+                VStack(alignment: .leading, spacing: 8) {
+                    workspaceTitle(visibleItemCount: visibleItems.count)
 
-                Picker(L10n.text(.items), selection: $mode) {
-                    ForEach(StorageItemMode.allCases) { mode in
-                        Text(verbatim: mode == .largest
-                            ? L10n.text(.storageLargest)
-                            : L10n.text(.storageOlder180)
-                        )
-                        .tag(mode)
+                    HStack(spacing: 10) {
+                        modePicker
+                            .frame(maxWidth: 200)
+                        Spacer(minLength: 0)
+                        reviewButton(items: safeSelectedItems)
                     }
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 200)
-
-                Button(L10n.text(.storageReviewSafeCleanup)) {
-                    reviewCleanup(safeSelectedItems)
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(safeSelectedItems.isEmpty)
             }
             .padding(12)
 
@@ -146,22 +138,22 @@ struct StorageView: View {
                                 }
                             }
                     }
-                    .width(min: 140, ideal: 200)
+                    .width(min: 120, ideal: 180)
                     TableColumn(L10n.location()) { item in
                         Text(item.url.deletingLastPathComponent().path(percentEncoded: false))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
-                    .width(min: 150, ideal: 240)
+                    .width(min: 120, ideal: 190)
                     TableColumn(L10n.risk()) { item in
                         Text(verbatim: L10n.name(for: item.risk))
                     }
-                    .width(120)
+                    .width(min: 90, ideal: 105)
                     TableColumn(L10n.space()) { item in
                         Text(ByteCount.string(item.allocatedSize))
                             .monospacedDigit()
                     }
-                    .width(100)
+                    .width(min: 80, ideal: 95)
                 } rows: {
                     ForEach(visibleItems)
                 }
@@ -177,6 +169,41 @@ struct StorageView: View {
                 )
             }
         }
+    }
+
+    private func workspaceTitle(visibleItemCount: Int) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(categoryTitle)
+                .font(.headline)
+                .lineLimit(1)
+            Text(verbatim: L10n.visibleItems(visibleItemCount))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var modePicker: some View {
+        Picker(L10n.text(.items), selection: $mode) {
+            ForEach(StorageItemMode.allCases) { mode in
+                Text(verbatim: mode == .largest
+                    ? L10n.text(.storageLargest)
+                    : L10n.text(.storageOlder180)
+                )
+                .tag(mode)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .frame(width: 200)
+    }
+
+    private func reviewButton(items: [ScannedItem]) -> some View {
+        Button(L10n.text(.storageReviewSafeCleanup)) {
+            reviewCleanup(items)
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(items.isEmpty)
+        .fixedSize()
     }
 
     private var selectedCategory: ItemCategory? {
@@ -203,16 +230,17 @@ private struct StorageCapacityHeader: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(verbatim: L10n.text(.storageInternalDisk))
-                    .font(.title3.weight(.semibold))
-                Spacer()
-                Text(verbatim: L10n.usedSpace(
-                    ByteCount.string(projection.usedBytes),
-                    total: ByteCount.string(projection.totalCapacity)
-                ))
-                .foregroundStyle(.secondary)
-                .monospacedDigit()
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline) {
+                    diskTitle
+                    Spacer()
+                    usageSummary
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    diskTitle
+                    usageSummary
+                }
             }
 
             ProgressView(
@@ -228,6 +256,22 @@ private struct StorageCapacityHeader: View {
             }
         }
         .padding(16)
+    }
+
+    private var diskTitle: some View {
+        Text(verbatim: L10n.text(.storageInternalDisk))
+            .font(.title3.weight(.semibold))
+    }
+
+    private var usageSummary: some View {
+        Text(verbatim: L10n.usedSpace(
+            ByteCount.string(projection.usedBytes),
+            total: ByteCount.string(projection.totalCapacity)
+        ))
+        .foregroundStyle(.secondary)
+        .monospacedDigit()
+        .lineLimit(1)
+        .minimumScaleFactor(0.85)
     }
 
     private func metric(_ title: String, bytes: Int64) -> some View {

@@ -93,10 +93,10 @@ final class ApplicationCleanupArchitectureTests: XCTestCase {
         XCTAssertLessThan(splitIndex.lowerBound, listIndex.lowerBound)
         XCTAssertLessThan(listIndex.lowerBound, detailIndex.lowerBound)
         XCTAssertTrue(source.contains(
-            ".frame(minWidth: 280, idealWidth: 320, maxWidth: 400)"
+            ".frame(minWidth: 230, idealWidth: 280, maxWidth: 340)"
         ))
         XCTAssertTrue(source.contains(
-            ".frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity)"
+            ".frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)"
         ))
         XCTAssertTrue(source.contains(".listStyle(.sidebar)"))
     }
