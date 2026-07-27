@@ -20,88 +20,19 @@ struct ApplicationsView: View {
                 matching: applicationSearchText,
                 sortedBy: applicationSortOrder
             )
-            VStack(spacing: 0) {
-                HStack(spacing: 8) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundStyle(.secondary)
-                        TextField(
-                            L10n.text(.applicationSearch),
-                            text: $applicationSearchText
-                        )
-                        .textFieldStyle(.plain)
-                        if !applicationSearchText.isEmpty {
-                            Button {
-                                applicationSearchText = ""
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundStyle(.secondary)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(L10n.text(.cleanupClearSelection))
-                        }
-                        Divider()
-                            .frame(height: 18)
-                        Text(applications.count.formatted())
-                            .monospacedDigit()
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.horizontal, 10)
-                    .frame(maxWidth: 360)
-                    .frame(height: 32)
-                    .background(
-                        .background.secondary,
-                        in: RoundedRectangle(cornerRadius: 8)
-                    )
 
-                    Spacer()
-
-                    Picker(
-                        L10n.text(.applicationSort),
-                        selection: $applicationSortOrder
-                    ) {
-                        ForEach(ApplicationSortOrder.allCases, id: \.self) { order in
-                            Text(order.localizedName).tag(order)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .fixedSize()
-                    .accessibilityLabel(L10n.text(.applicationSort))
-                }
-                .padding(12)
-
-                Divider()
-
-                Table(applications, selection: $selectedApplicationID) {
-                    TableColumn(L10n.text(.application)) { projection in
-                        let application = projection.application
-                        HStack {
-                            FileSystemItemIcon(url: application.url, size: 24)
-                            VStack(alignment: .leading) {
-                                Text(application.name)
-                                Text(application.bundleIdentifier ?? application.url.path)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .contextMenu {
-                            Button(L10n.text(.revealFinder)) { reveal(application.url) }
-                            Divider()
-                            Button(L10n.text(.applicationReviewReset)) { reset(projection) }
-                            Button(L10n.text(.applicationReviewUninstall)) { uninstall(projection) }
-                        }
-                        .accessibilityLabel("\(application.name), \(ByteCount.string(projection.totalSize))")
-                    }
-                    TableColumn(L10n.version()) { Text($0.application.versionOrDash) }.width(90)
-                    TableColumn(L10n.text(.applicationRelated)) { Text($0.associations.count.formatted()) }.width(70)
-                    TableColumn(L10n.text(.applicationTotalSpace)) {
-                        Text(ByteCount.string($0.totalSize)).monospacedDigit()
-                    }.width(105)
-                }
-                .frame(minHeight: 280)
+            HSplitView {
+                ApplicationListPane(
+                    applications: applications,
+                    selection: $selectedApplicationID,
+                    searchText: $applicationSearchText,
+                    sortOrder: $applicationSortOrder,
+                    uninstall: uninstall,
+                    reset: reset
+                )
+                .frame(minWidth: 280, idealWidth: 320, maxWidth: 400)
 
                 if let application = selectedApplication(in: applications) {
-                    Divider()
                     ApplicationDetail(
                         projection: application,
                         isAnalyzing: analyzingApplicationID == application.id,
@@ -109,7 +40,14 @@ struct ApplicationsView: View {
                         uninstall: { uninstall(application) },
                         reset: { reset(application) }
                     )
-                    .frame(minHeight: 220, idealHeight: 280)
+                    .frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ContentUnavailableView(
+                        L10n.text(.application),
+                        systemImage: "square.grid.2x2",
+                        description: Text(L10n.text(.applicationOnlyHighConfidence))
+                    )
+                    .frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
             .navigationTitle(L10n.applications())
@@ -144,8 +82,132 @@ struct ApplicationsView: View {
         }
     }
 
-    private func selectedApplication(in applications: [ApplicationProjection]) -> ApplicationProjection? {
+    private func selectedApplication(
+        in applications: [ApplicationProjection]
+    ) -> ApplicationProjection? {
         applications.first { $0.id == selectedApplicationID }
+    }
+}
+
+private struct ApplicationListPane: View {
+    let applications: [ApplicationProjection]
+    @Binding var selection: UUID?
+    @Binding var searchText: String
+    @Binding var sortOrder: ApplicationSortOrder
+    let uninstall: (ApplicationProjection) -> Void
+    let reset: (ApplicationProjection) -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            VStack(spacing: 10) {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.secondary)
+                    TextField(L10n.text(.applicationSearch), text: $searchText)
+                        .textFieldStyle(.plain)
+                    if !searchText.isEmpty {
+                        Button {
+                            searchText = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(L10n.text(.cleanupClearSelection))
+                    }
+                }
+                .padding(.horizontal, 10)
+                .frame(height: 32)
+                .background(
+                    .background.secondary,
+                    in: RoundedRectangle(cornerRadius: 8)
+                )
+
+                HStack {
+                    Text(applications.count.formatted())
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Picker(L10n.text(.applicationSort), selection: $sortOrder) {
+                        ForEach(ApplicationSortOrder.allCases, id: \.self) { order in
+                            Text(order.localizedName).tag(order)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .fixedSize()
+                    .accessibilityLabel(L10n.text(.applicationSort))
+                }
+                .font(.caption)
+            }
+            .padding(12)
+
+            Divider()
+
+            List(applications, selection: $selection) { projection in
+                let application = projection.application
+                ApplicationListRow(projection: projection)
+                    .tag(projection.id)
+                    .contextMenu {
+                        Button(L10n.text(.revealFinder)) { reveal(application.url) }
+                        Divider()
+                        Button(L10n.text(.applicationReviewReset)) { reset(projection) }
+                        Button(L10n.text(.applicationReviewUninstall)) {
+                            uninstall(projection)
+                        }
+                    }
+                    .accessibilityLabel(
+                        "\(application.name), \(ByteCount.string(projection.totalSize))"
+                    )
+            }
+            .listStyle(.sidebar)
+            .overlay {
+                if applications.isEmpty {
+                    if searchText.isEmpty {
+                        ContentUnavailableView(
+                            L10n.applications(),
+                            systemImage: "square.grid.2x2"
+                        )
+                    } else {
+                        ContentUnavailableView.search(text: searchText)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct ApplicationListRow: View {
+    let projection: ApplicationProjection
+
+    private var application: ApplicationRecord { projection.application }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            FileSystemItemIcon(url: application.url, size: 32)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(application.name)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                Text(application.bundleIdentifier ?? application.url.path)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(ByteCount.string(projection.totalSize))
+                    .fontWeight(.medium)
+                    .monospacedDigit()
+                Text(projection.associations.count.formatted())
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+        }
+        .padding(.vertical, 4)
     }
 }
 
@@ -167,52 +229,85 @@ private struct ApplicationDetail: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .center, spacing: 14) {
+                    FileSystemItemIcon(url: application.url, size: 52)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(application.name)
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                            .lineLimit(1)
+                        Text(application.bundleIdentifier ?? application.url.path)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        Text(verbatim: application.versionOrDash)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                HStack(spacing: 8) {
+                    Spacer()
+                    Button(L10n.text(.applicationReset), action: reset)
+                    Button(L10n.text(.applicationUninstall), action: uninstall)
+                        .buttonStyle(.borderedProminent)
+                }
+            }
+            .padding(20)
+
+            Divider()
+
+            HStack(spacing: 12) {
+                ApplicationMetric(
+                    title: L10n.text(.applicationTotalSpace),
+                    value: ByteCount.string(projection.totalSize),
+                    systemImage: "internaldrive"
+                )
+                ApplicationMetric(
+                    title: L10n.text(.application),
+                    value: ByteCount.string(application.allocatedSize),
+                    systemImage: "app"
+                )
+                ApplicationMetric(
+                    title: L10n.text(.applicationRelated),
+                    value: projection.associations.count.formatted(),
+                    systemImage: "link"
+                )
+            }
+            .padding(16)
+
             HStack {
-                VStack(alignment: .leading) {
-                    Text(application.name).font(.headline)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L10n.text(.items))
+                        .font(.headline)
                     Text(verbatim: L10n.text(.applicationOnlyHighConfidence))
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button(L10n.text(.applicationReset), action: reset)
-                Button(L10n.text(.applicationUninstall), action: uninstall).buttonStyle(.borderedProminent)
+                if !searchText.isEmpty {
+                    Text(visibleAssociations.count.formatted())
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
             }
-            .padding(.horizontal)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 10)
+
+            Divider()
 
             List(visibleAssociations) { pair in
-                let ownership = pair.association.ownership
-                let risk = max(pair.item.risk, pair.association.risk)
-                HStack(alignment: .top) {
-                    FileSystemItemIcon(url: pair.item.url)
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text(pair.item.url.lastPathComponent)
-                            Text(pair.item.url.deletingLastPathComponent().path(percentEncoded: false))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                            HStack(spacing: 4) {
-                                if ownership == .shared {
-                                    Image(systemName: "exclamationmark.triangle.fill")
-                                        .accessibilityHidden(true)
-                                }
-                                Text(verbatim: L10n.name(for: ownership))
-                                Text(verbatim: "·")
-                                Text(verbatim: L10n.association(
-                                    pair.association.evidence,
-                                    confidence: pair.association.confidence
-                                ))
-                            }
-                            .font(.caption)
-                            .foregroundStyle(ownership == .shared ? .orange : .secondary)
-                        }
-                        Spacer()
-                        Text(verbatim: L10n.name(for: risk)).foregroundStyle(.secondary)
-                        Text(ByteCount.string(pair.item.allocatedSize)).monospacedDigit()
+                ApplicationAssociationRow(pair: pair)
+                    .contextMenu {
+                        Button(L10n.text(.revealFinder)) { reveal(pair.item.url) }
                     }
-                }
-                .contextMenu { Button(L10n.text(.revealFinder)) { reveal(pair.item.url) } }
             }
             .listStyle(.inset)
             .overlay {
@@ -228,9 +323,89 @@ private struct ApplicationDetail: View {
                 }
             }
         }
-        .padding(.vertical, 10)
     }
+}
 
+private struct ApplicationMetric: View {
+    let title: String
+    let value: String
+    let systemImage: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: systemImage)
+                .font(.title3)
+                .foregroundStyle(.blue)
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(value)
+                    .font(.headline)
+                    .monospacedDigit()
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            .background.secondary,
+            in: RoundedRectangle(cornerRadius: 10)
+        )
+    }
+}
+
+private struct ApplicationAssociationRow: View {
+    let pair: ApplicationAssociationProjection
+
+    private var ownership: AssociationOwnership { pair.association.ownership }
+    private var risk: RiskLevel { max(pair.item.risk, pair.association.risk) }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 10) {
+            FileSystemItemIcon(url: pair.item.url, size: 24)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(pair.item.url.lastPathComponent)
+                    .fontWeight(.medium)
+                    .lineLimit(1)
+                Text(pair.item.url.deletingLastPathComponent().path(percentEncoded: false))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    if ownership == .shared {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .accessibilityHidden(true)
+                    }
+                    Text(verbatim: L10n.name(for: ownership))
+                    Text(verbatim: "·")
+                    Text(verbatim: L10n.association(
+                        pair.association.evidence,
+                        confidence: pair.association.confidence
+                    ))
+                }
+                .font(.caption)
+                .foregroundStyle(ownership == .shared ? .orange : .secondary)
+            }
+
+            Spacer(minLength: 12)
+
+            VStack(alignment: .trailing, spacing: 5) {
+                Text(ByteCount.string(pair.item.allocatedSize))
+                    .fontWeight(.medium)
+                    .monospacedDigit()
+                Text(verbatim: L10n.name(for: risk))
+                    .font(.caption)
+                    .foregroundStyle(risk.tint)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(risk.tint.opacity(0.12), in: Capsule())
+            }
+        }
+        .padding(.vertical, 3)
+    }
 }
 
 private extension ApplicationRecord {
@@ -248,6 +423,21 @@ private extension ApplicationSortOrder {
             L10n.text(.applicationRelated)
         case .lastUsed:
             L10n.text(.applicationLastUsed)
+        }
+    }
+}
+
+private extension RiskLevel {
+    var tint: Color {
+        switch self {
+        case .safe:
+            .green
+        case .rebuildable:
+            .blue
+        case .sensitive:
+            .orange
+        case .managed:
+            .secondary
         }
     }
 }

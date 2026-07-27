@@ -81,6 +81,26 @@ final class ApplicationCleanupArchitectureTests: XCTestCase {
         ))
     }
 
+    func testApplicationScreenUsesHorizontalListAndDetailLayout() throws {
+        let source = try source(
+            at: "Sources/SpacePilot/Views/Applications/ApplicationsView.swift"
+        )
+
+        let splitIndex = try XCTUnwrap(source.range(of: "HSplitView"))
+        let listIndex = try XCTUnwrap(source.range(of: "ApplicationListPane("))
+        let detailIndex = try XCTUnwrap(source.range(of: "ApplicationDetail("))
+
+        XCTAssertLessThan(splitIndex.lowerBound, listIndex.lowerBound)
+        XCTAssertLessThan(listIndex.lowerBound, detailIndex.lowerBound)
+        XCTAssertTrue(source.contains(
+            ".frame(minWidth: 280, idealWidth: 320, maxWidth: 400)"
+        ))
+        XCTAssertTrue(source.contains(
+            ".frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity)"
+        ))
+        XCTAssertTrue(source.contains(".listStyle(.sidebar)"))
+    }
+
     func testAppModelAdaptsReviewRowsWithoutBroadeningCleanupPlannerSelection() throws {
         let source = try source(at: "Sources/SpacePilot/App/AppModel.swift")
 
