@@ -2,6 +2,8 @@ import SpacePilotCore
 import SwiftUI
 
 struct SidebarView: View {
+    private static let stableWidth: CGFloat = 220
+
     @Bindable var model: AppModel
 
     var body: some View {
@@ -11,6 +13,10 @@ struct SidebarView: View {
         }
         .listStyle(.sidebar)
         .navigationTitle("SpacePilot")
-        .navigationSplitViewColumnWidth(min: 190, ideal: 220, max: 260)
+        .navigationSplitViewColumnWidth(
+            min: Self.stableWidth,
+            ideal: Self.stableWidth,
+            max: Self.stableWidth
+        )
     }
 }
