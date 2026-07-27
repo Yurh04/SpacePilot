@@ -12,40 +12,62 @@ struct ApplicationsView: View {
     let reset: (ApplicationProjection) -> Void
     @State private var selectedApplicationID: UUID?
     @State private var applicationSearchText = ""
+    @State private var applicationSortOrder = ApplicationSortOrder.totalSpace
 
     var body: some View {
         if let projection {
-            let applications = projection.filtered(by: applicationSearchText)
+            let applications = projection.results(
+                matching: applicationSearchText,
+                sortedBy: applicationSortOrder
+            )
             VStack(spacing: 0) {
                 HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundStyle(.secondary)
-                    TextField(
-                        L10n.text(.applicationSearch),
-                        text: $applicationSearchText
-                    )
-                    .textFieldStyle(.plain)
-                    if !applicationSearchText.isEmpty {
-                        Button {
-                            applicationSearchText = ""
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.secondary)
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundStyle(.secondary)
+                        TextField(
+                            L10n.text(.applicationSearch),
+                            text: $applicationSearchText
+                        )
+                        .textFieldStyle(.plain)
+                        if !applicationSearchText.isEmpty {
+                            Button {
+                                applicationSearchText = ""
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(L10n.text(.cleanupClearSelection))
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(L10n.text(.cleanupClearSelection))
+                        Divider()
+                            .frame(height: 18)
+                        Text(applications.count.formatted())
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
                     }
-                    Divider()
-                        .frame(height: 18)
-                    Text(applications.count.formatted())
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .frame(maxWidth: 360)
+                    .frame(height: 32)
+                    .background(
+                        .background.secondary,
+                        in: RoundedRectangle(cornerRadius: 8)
+                    )
+
+                    Spacer()
+
+                    Picker(
+                        L10n.text(.applicationSort),
+                        selection: $applicationSortOrder
+                    ) {
+                        ForEach(ApplicationSortOrder.allCases, id: \.self) { order in
+                            Text(order.localizedName).tag(order)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .fixedSize()
+                    .accessibilityLabel(L10n.text(.applicationSort))
                 }
-                .padding(.horizontal, 10)
-                .frame(maxWidth: 360)
-                .frame(height: 32)
-                .background(.background.secondary, in: RoundedRectangle(cornerRadius: 8))
-                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(12)
 
                 Divider()
@@ -213,4 +235,19 @@ private struct ApplicationDetail: View {
 
 private extension ApplicationRecord {
     var versionOrDash: String { version ?? "—" }
+}
+
+private extension ApplicationSortOrder {
+    var localizedName: String {
+        switch self {
+        case .totalSpace:
+            L10n.text(.applicationTotalSpace)
+        case .name:
+            L10n.text(.name)
+        case .relatedFiles:
+            L10n.text(.applicationRelated)
+        case .lastUsed:
+            L10n.text(.applicationLastUsed)
+        }
+    }
 }

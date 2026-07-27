@@ -20,12 +20,14 @@ enum L10n {
         static let aiStorageBreakdown = Self(key: "ai.storage-breakdown", english: "Space breakdown")
         static let aiTotalIndexedSpace = Self(key: "ai.total-indexed-space", english: "Total indexed space")
         static let application = Self(key: "app.application", english: "Application")
+        static let applicationLastUsed = Self(key: "app.last-used", english: "Last used")
         static let applicationOnlyHighConfidence = Self(key: "app.only-high-confidence", english: "Only high-confidence related files are preselected.")
         static let applicationRelated = Self(key: "app.related", english: "Related")
         static let applicationReset = Self(key: "app.reset", english: "Reset…")
         static let applicationReviewReset = Self(key: "app.review-reset", english: "Review Reset…")
         static let applicationReviewUninstall = Self(key: "app.review-uninstall", english: "Review Uninstall…")
         static let applicationSearch = Self(key: "app.search-applications", english: "Search applications")
+        static let applicationSort = Self(key: "app.sort", english: "Sort applications")
         static let applicationTotalSpace = Self(key: "app.total-space", english: "Total space")
         static let applicationUninstall = Self(key: "app.uninstall", english: "Uninstall…")
         static let cleanupConfirmSensitive = Self(key: "cleanup.confirm-sensitive", english: "Also move the sensitive conversation, project, or settings data listed above")
@@ -107,12 +109,12 @@ enum L10n {
         "ai.local-footprint", "ai.manage-in", "ai.no-content-indexed", "ai.plugins-managed",
         "ai.privacy", "ai.searching", "ai.section", "ai.select-application",
         "ai.skills-visible", "ai.storage-breakdown", "ai.total-indexed-space",
-        "app.application", "app.association-confidence",
+        "app.application", "app.association-confidence", "app.last-used",
         "app.evidence.bundle-id", "app.evidence.container-id", "app.evidence.known-rule",
         "app.evidence.name", "app.evidence.signed-helper", "app.only-high-confidence",
         "app.ownership.owned", "app.ownership.possible", "app.ownership.shared",
         "app.related", "app.reset", "app.review-reset", "app.review-uninstall",
-        "app.search-applications", "app.total-space",
+        "app.search-applications", "app.sort", "app.total-space",
         "app.uninstall", "cleanup.clear-selection", "cleanup.confirm-sensitive", "cleanup.confirm-trash",
         "cleanup.history-empty", "cleanup.history-empty-description", "cleanup.move-selected-trash",
         "cleanup.move-trash", "cleanup.moved-count", "cleanup.moving", "cleanup.review",

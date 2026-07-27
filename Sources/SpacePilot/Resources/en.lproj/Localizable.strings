@@ -55,6 +55,7 @@
 "app.evidence.known-rule" = "Known application rule";
 "app.evidence.name" = "Application name";
 "app.evidence.signed-helper" = "Signed helper";
+"app.last-used" = "Last used";
 "app.only-high-confidence" = "Only high-confidence related files are preselected.";
 "app.ownership.owned" = "Application-owned";
 "app.ownership.possible" = "Possible association";
@@ -64,6 +65,7 @@
 "app.review-reset" = "Review Reset…";
 "app.review-uninstall" = "Review Uninstall…";
 "app.search-applications" = "Search applications";
+"app.sort" = "Sort applications";
 "app.total-space" = "Total space";
 "app.uninstall" = "Uninstall…";
 "cleanup.confirm-sensitive" = "Also move the sensitive conversation, project, or settings data listed above";

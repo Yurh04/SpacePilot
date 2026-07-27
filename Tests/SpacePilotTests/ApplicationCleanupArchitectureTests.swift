@@ -65,7 +65,10 @@ final class ApplicationCleanupArchitectureTests: XCTestCase {
 
         XCTAssertTrue(applicationsSource.contains("@State private var applicationSearchText"))
         XCTAssertTrue(applicationsSource.contains(
-            "projection.filtered(by: applicationSearchText)"
+            "matching: applicationSearchText"
+        ))
+        XCTAssertTrue(applicationsSource.contains(
+            "sortedBy: applicationSortOrder"
         ))
         XCTAssertTrue(applicationsSource.contains(
             "let relatedFileSearchText: String"

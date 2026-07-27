@@ -954,13 +954,16 @@ final class ViewProjectionTests: XCTestCase {
     }
 
     func testApplicationListProjectionFiltersPreviouslyAggregatedApplications() {
+        let olderDate = Date(timeIntervalSince1970: 1_000)
+        let newerDate = Date(timeIntervalSince1970: 2_000)
         let alpha = ApplicationRecord(
             name: "Alpha",
             bundleIdentifier: nil,
             version: nil,
             url: URL(fileURLWithPath: "/Applications/Alpha.app"),
             executableURL: nil,
-            allocatedSize: 100
+            allocatedSize: 100,
+            lastUsedDate: newerDate
         )
         let beta = ApplicationRecord(
             name: "Beta",
@@ -968,13 +971,22 @@ final class ViewProjectionTests: XCTestCase {
             version: nil,
             url: URL(fileURLWithPath: "/Applications/Beta.app"),
             executableURL: nil,
-            allocatedSize: 200
+            allocatedSize: 200,
+            lastUsedDate: olderDate
+        )
+        let gamma = ApplicationRecord(
+            name: "Gamma",
+            bundleIdentifier: "com.example.gamma",
+            version: nil,
+            url: URL(fileURLWithPath: "/Applications/Gamma.app"),
+            executableURL: nil,
+            allocatedSize: 150
         )
         let snapshot = ScanSnapshot(
             completedAt: .now,
             volume: nil,
             items: [],
-            applications: [alpha, beta],
+            applications: [alpha, beta, gamma],
             aiApplications: [],
             plugins: [],
             skills: [],
@@ -983,12 +995,28 @@ final class ViewProjectionTests: XCTestCase {
 
         let projection = ApplicationListProjection(snapshot: snapshot, searchText: "ignored")
 
-        XCTAssertEqual(projection.applications.map(\.id), [beta.id, alpha.id])
+        XCTAssertEqual(projection.applications.map(\.id), [beta.id, gamma.id, alpha.id])
         XCTAssertEqual(projection.filtered(by: "alp").map(\.id), [alpha.id])
         XCTAssertEqual(projection.filtered(by: "EXAMPLE.BETA").map(\.id), [beta.id])
         XCTAssertEqual(projection.filtered(by: "Applications/Beta").map(\.id), [beta.id])
-        XCTAssertEqual(projection.filtered(by: "   ").map(\.id), [beta.id, alpha.id])
-        XCTAssertEqual(projection.filtered(by: "").map(\.id), [beta.id, alpha.id])
+        XCTAssertEqual(projection.filtered(by: "   ").map(\.id), [beta.id, gamma.id, alpha.id])
+        XCTAssertEqual(projection.filtered(by: "").map(\.id), [beta.id, gamma.id, alpha.id])
+        XCTAssertEqual(
+            projection.results(matching: "", sortedBy: .totalSpace).map(\.id),
+            [beta.id, gamma.id, alpha.id]
+        )
+        XCTAssertEqual(
+            projection.results(matching: "", sortedBy: .name).map(\.id),
+            [alpha.id, beta.id, gamma.id]
+        )
+        XCTAssertEqual(
+            projection.results(matching: "", sortedBy: .lastUsed).map(\.id),
+            [alpha.id, beta.id, gamma.id]
+        )
+        XCTAssertEqual(
+            projection.results(matching: "example", sortedBy: .name).map(\.id),
+            [beta.id, gamma.id]
+        )
     }
 
     func testApplicationProjectionPairsAssociationsWithIndexedItems() throws {

@@ -1653,6 +1653,22 @@
         }
       }
     },
+    "app.sort": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sort applications"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "应用排序"
+          }
+        }
+      }
+    },
     "explanation.application-name-match": {
       "localizations": {
         "en": {
@@ -2673,6 +2689,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "总空间"
+          }
+        }
+      }
+    },
+    "app.last-used": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last used"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近使用"
           }
         }
       }

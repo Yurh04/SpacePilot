@@ -55,6 +55,7 @@
 "app.evidence.known-rule" = "已知应用规则";
 "app.evidence.name" = "应用名称";
 "app.evidence.signed-helper" = "已签名辅助程序";
+"app.last-used" = "最近使用";
 "app.only-high-confidence" = "仅预选高置信度的关联文件。";
 "app.ownership.owned" = "应用程序专属";
 "app.ownership.possible" = "可能关联";
@@ -64,6 +65,7 @@
 "app.review-reset" = "检查重置项…";
 "app.review-uninstall" = "检查卸载项…";
 "app.search-applications" = "搜索应用程序";
+"app.sort" = "应用排序";
 "app.total-space" = "总空间";
 "app.uninstall" = "卸载…";
 "cleanup.confirm-sensitive" = "同时移除上方列出的敏感对话、项目或设置数据";

@@ -403,6 +403,13 @@ public struct ApplicationProjection: Identifiable, Sendable {
     public let associations: [ApplicationAssociationProjection]
 }
 
+public enum ApplicationSortOrder: String, CaseIterable, Sendable {
+    case totalSpace
+    case name
+    case relatedFiles
+    case lastUsed
+}
+
 public struct ApplicationListProjection: Sendable {
     public let applications: [ApplicationProjection]
     private let totalSizes: [UUID: Int64]
@@ -499,6 +506,56 @@ public struct ApplicationListProjection: Sendable {
                     .localizedCaseInsensitiveContains(query) == true
                 || application.url.path
                     .localizedCaseInsensitiveContains(query)
+        }
+    }
+
+    public func results(
+        matching searchText: String,
+        sortedBy sortOrder: ApplicationSortOrder
+    ) -> [ApplicationProjection] {
+        filtered(by: searchText).sorted { left, right in
+            switch sortOrder {
+            case .totalSpace:
+                if left.totalSize != right.totalSize {
+                    return left.totalSize > right.totalSize
+                }
+            case .name:
+                let comparison = left.application.name.localizedStandardCompare(
+                    right.application.name
+                )
+                if comparison != .orderedSame {
+                    return comparison == .orderedAscending
+                }
+            case .relatedFiles:
+                if left.associations.count != right.associations.count {
+                    return left.associations.count > right.associations.count
+                }
+                if left.totalSize != right.totalSize {
+                    return left.totalSize > right.totalSize
+                }
+            case .lastUsed:
+                switch (
+                    left.application.lastUsedDate,
+                    right.application.lastUsedDate
+                ) {
+                case let (leftDate?, rightDate?) where leftDate != rightDate:
+                    return leftDate > rightDate
+                case (_?, nil):
+                    return true
+                case (nil, _?):
+                    return false
+                default:
+                    break
+                }
+            }
+
+            let nameComparison = left.application.name.localizedStandardCompare(
+                right.application.name
+            )
+            if nameComparison != .orderedSame {
+                return nameComparison == .orderedAscending
+            }
+            return left.id.uuidString < right.id.uuidString
         }
     }
 
