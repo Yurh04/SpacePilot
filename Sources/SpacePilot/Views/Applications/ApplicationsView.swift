@@ -5,17 +5,51 @@ import SwiftUI
 struct ApplicationsView: View {
     let projection: ApplicationListProjection?
     let hasSnapshot: Bool
-    let searchText: String
+    let relatedFileSearchText: String
     let analyzingApplicationID: UUID?
     let analyze: (ApplicationProjection) -> Void
     let uninstall: (ApplicationProjection) -> Void
     let reset: (ApplicationProjection) -> Void
     @State private var selectedApplicationID: UUID?
+    @State private var applicationSearchText = ""
 
     var body: some View {
         if let projection {
-            let applications = projection.filtered(by: searchText)
+            let applications = projection.filtered(by: applicationSearchText)
             VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.secondary)
+                    TextField(
+                        L10n.text(.applicationSearch),
+                        text: $applicationSearchText
+                    )
+                    .textFieldStyle(.plain)
+                    if !applicationSearchText.isEmpty {
+                        Button {
+                            applicationSearchText = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(L10n.text(.cleanupClearSelection))
+                    }
+                    Divider()
+                        .frame(height: 18)
+                    Text(applications.count.formatted())
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 10)
+                .frame(maxWidth: 360)
+                .frame(height: 32)
+                .background(.background.secondary, in: RoundedRectangle(cornerRadius: 8))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+
+                Divider()
+
                 Table(applications, selection: $selectedApplicationID) {
                     TableColumn(L10n.text(.application)) { projection in
                         let application = projection.application
@@ -49,6 +83,7 @@ struct ApplicationsView: View {
                     ApplicationDetail(
                         projection: application,
                         isAnalyzing: analyzingApplicationID == application.id,
+                        searchText: relatedFileSearchText,
                         uninstall: { uninstall(application) },
                         reset: { reset(application) }
                     )
@@ -95,10 +130,19 @@ struct ApplicationsView: View {
 private struct ApplicationDetail: View {
     let projection: ApplicationProjection
     let isAnalyzing: Bool
+    let searchText: String
     let uninstall: () -> Void
     let reset: () -> Void
 
     private var application: ApplicationRecord { projection.application }
+    private var visibleAssociations: [ApplicationAssociationProjection] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return projection.associations }
+        return projection.associations.filter { pair in
+            pair.item.url.path.localizedCaseInsensitiveContains(query)
+                || pair.item.explanation.localizedCaseInsensitiveContains(query)
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -114,7 +158,7 @@ private struct ApplicationDetail: View {
             }
             .padding(.horizontal)
 
-            List(projection.associations) { pair in
+            List(visibleAssociations) { pair in
                 let ownership = pair.association.ownership
                 let risk = max(pair.item.risk, pair.association.risk)
                 HStack(alignment: .top) {
@@ -152,6 +196,8 @@ private struct ApplicationDetail: View {
             .overlay {
                 if isAnalyzing {
                     ProgressView()
+                } else if !searchText.isEmpty && visibleAssociations.isEmpty {
+                    ContentUnavailableView.search(text: searchText)
                 } else if projection.associations.isEmpty {
                     ContentUnavailableView(
                         L10n.text(.applicationOnlyHighConfidence),

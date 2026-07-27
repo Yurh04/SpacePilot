@@ -63,6 +63,7 @@
 "app.reset" = "Reset…";
 "app.review-reset" = "Review Reset…";
 "app.review-uninstall" = "Review Uninstall…";
+"app.search-applications" = "Search applications";
 "app.total-space" = "Total space";
 "app.uninstall" = "Uninstall…";
 "cleanup.confirm-sensitive" = "Also move the sensitive conversation, project, or settings data listed above";

@@ -63,6 +63,7 @@
 "app.reset" = "重置…";
 "app.review-reset" = "检查重置项…";
 "app.review-uninstall" = "检查卸载项…";
+"app.search-applications" = "搜索应用程序";
 "app.total-space" = "总空间";
 "app.uninstall" = "卸载…";
 "cleanup.confirm-sensitive" = "同时移除上方列出的敏感对话、项目或设置数据";

@@ -964,7 +964,7 @@ final class ViewProjectionTests: XCTestCase {
         )
         let beta = ApplicationRecord(
             name: "Beta",
-            bundleIdentifier: nil,
+            bundleIdentifier: "com.example.beta",
             version: nil,
             url: URL(fileURLWithPath: "/Applications/Beta.app"),
             executableURL: nil,
@@ -985,6 +985,9 @@ final class ViewProjectionTests: XCTestCase {
 
         XCTAssertEqual(projection.applications.map(\.id), [beta.id, alpha.id])
         XCTAssertEqual(projection.filtered(by: "alp").map(\.id), [alpha.id])
+        XCTAssertEqual(projection.filtered(by: "EXAMPLE.BETA").map(\.id), [beta.id])
+        XCTAssertEqual(projection.filtered(by: "Applications/Beta").map(\.id), [beta.id])
+        XCTAssertEqual(projection.filtered(by: "   ").map(\.id), [beta.id, alpha.id])
         XCTAssertEqual(projection.filtered(by: "").map(\.id), [beta.id, alpha.id])
     }
 

@@ -57,6 +57,27 @@ final class ApplicationCleanupArchitectureTests: XCTestCase {
         )
     }
 
+    func testApplicationAndRelatedFileSearchesUseIndependentState() throws {
+        let applicationsSource = try source(
+            at: "Sources/SpacePilot/Views/Applications/ApplicationsView.swift"
+        )
+        let root = try source(at: "Sources/SpacePilot/Views/AppRootView.swift")
+
+        XCTAssertTrue(applicationsSource.contains("@State private var applicationSearchText"))
+        XCTAssertTrue(applicationsSource.contains(
+            "projection.filtered(by: applicationSearchText)"
+        ))
+        XCTAssertTrue(applicationsSource.contains(
+            "let relatedFileSearchText: String"
+        ))
+        XCTAssertTrue(applicationsSource.contains(
+            "pair.item.url.path.localizedCaseInsensitiveContains(query)"
+        ))
+        XCTAssertTrue(root.contains(
+            "relatedFileSearchText: model.searchText"
+        ))
+    }
+
     func testAppModelAdaptsReviewRowsWithoutBroadeningCleanupPlannerSelection() throws {
         let source = try source(at: "Sources/SpacePilot/App/AppModel.swift")
 

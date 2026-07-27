@@ -490,8 +490,16 @@ public struct ApplicationListProjection: Sendable {
     }
 
     public func filtered(by searchText: String) -> [ApplicationProjection] {
-        guard !searchText.isEmpty else { return applications }
-        return applications.filter { $0.application.name.localizedCaseInsensitiveContains(searchText) }
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return applications }
+        return applications.filter { projection in
+            let application = projection.application
+            return application.name.localizedCaseInsensitiveContains(query)
+                || application.bundleIdentifier?
+                    .localizedCaseInsensitiveContains(query) == true
+                || application.url.path
+                    .localizedCaseInsensitiveContains(query)
+        }
     }
 
     public func totalSize(for applicationID: UUID) -> Int64 {

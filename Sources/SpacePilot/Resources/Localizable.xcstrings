@@ -1637,6 +1637,22 @@
         }
       }
     },
+    "app.search-applications": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search applications"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索应用程序"
+          }
+        }
+      }
+    },
     "explanation.application-name-match": {
       "localizations": {
         "en": {
