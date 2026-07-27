@@ -45,6 +45,7 @@
 "ai.searching" = "Searching…";
 "ai.section" = "Section";
 "ai.select-application" = "Select an AI application";
+"ai.storage-breakdown" = "Space breakdown";
 "ai.skills-visible" = "Skills visible to %@";
 "ai.total-indexed-space" = "Total indexed space";
 "app.application" = "Application";

@@ -661,6 +661,22 @@
         }
       }
     },
+    "ai.storage-breakdown": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Space breakdown"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "空间构成"
+          }
+        }
+      }
+    },
     "ai.total-indexed-space": {
       "localizations": {
         "en": {

@@ -45,6 +45,7 @@
 "ai.searching" = "正在搜索…";
 "ai.section" = "分区";
 "ai.select-application" = "选择一个 AI 应用";
+"ai.storage-breakdown" = "空间构成";
 "ai.skills-visible" = "%@ 可见的技能";
 "ai.total-indexed-space" = "已索引总空间";
 "app.application" = "应用程序";

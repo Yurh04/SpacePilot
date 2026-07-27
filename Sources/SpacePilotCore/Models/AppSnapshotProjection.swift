@@ -82,19 +82,33 @@ public struct AIApplicationProjection: Identifiable, Sendable {
     public let dataItems: [ScannedItem]
     public let plugins: [PluginRecord]
     public let skills: [SkillRecord]
+    public let storageComponents: [AIStorageComponentProjection]
 
     public init(
         application: AIApplicationRecord,
         totalSize: Int64,
         dataItems: [ScannedItem],
         plugins: [PluginRecord],
-        skills: [SkillRecord]
+        skills: [SkillRecord],
+        storageComponents: [AIStorageComponentProjection] = []
     ) {
         self.application = application
         self.totalSize = totalSize
         self.dataItems = dataItems
         self.plugins = plugins
         self.skills = skills
+        self.storageComponents = storageComponents
+    }
+}
+
+public struct AIStorageComponentProjection: Identifiable, Sendable, Equatable {
+    public var id: ItemCategory { category }
+    public let category: ItemCategory
+    public let allocatedSize: Int64
+
+    public init(category: ItemCategory, allocatedSize: Int64) {
+        self.category = category
+        self.allocatedSize = max(0, allocatedSize)
     }
 }
 
@@ -246,12 +260,34 @@ public struct DeveloperAIProjection: Sendable {
                 ownedPluginIDs: application.pluginIDs,
                 checkCancellation: checkCancellation
             )
+            var componentBytes = byteBreakdown.dataItemBytesByCategory
+            componentBytes[.application, default: 0]
+                += byteBreakdown.applicationBytes
+            componentBytes[.plugin, default: 0]
+                += byteBreakdown.pluginBytes
+            componentBytes[.skill, default: 0]
+                += byteBreakdown.standaloneSkillBytes
+            let storageComponents = componentBytes
+                .filter { $0.value > 0 }
+                .map {
+                    AIStorageComponentProjection(
+                        category: $0.key,
+                        allocatedSize: $0.value
+                    )
+                }
+                .sorted {
+                    if $0.allocatedSize != $1.allocatedSize {
+                        return $0.allocatedSize > $1.allocatedSize
+                    }
+                    return $0.category.rawValue < $1.category.rawValue
+                }
             applicationProjections.append(AIApplicationProjection(
                 application: application,
                 totalSize: byteBreakdown.total,
                 dataItems: dataItems,
                 plugins: plugins,
-                skills: skills
+                skills: skills,
+                storageComponents: storageComponents
             ))
             try checkCancellation()
         }

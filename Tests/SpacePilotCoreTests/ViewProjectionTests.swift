@@ -326,6 +326,15 @@ final class ViewProjectionTests: XCTestCase {
         XCTAssertEqual(application.plugins.map(\.id), [plugin.id])
         XCTAssertEqual(Set(application.skills.map(\.id)), [childSkill.id, standaloneSkill.id])
         XCTAssertEqual(application.totalSize, 670)
+        XCTAssertEqual(
+            application.storageComponents,
+            [
+                AIStorageComponentProjection(category: .plugin, allocatedSize: 500),
+                AIStorageComponentProjection(category: .cache, allocatedSize: 100),
+                AIStorageComponentProjection(category: .skill, allocatedSize: 60),
+                AIStorageComponentProjection(category: .application, allocatedSize: 10)
+            ]
+        )
     }
 
     func testDeveloperAIProjectionAssignsCodexManagedBytesToExactlyOneComponent() throws {
@@ -399,6 +408,16 @@ final class ViewProjectionTests: XCTestCase {
             300
         )
         XCTAssertEqual(application.totalSize, 1_180, "10 app + 170 generic + 700 plugin + 300 skill")
+        XCTAssertEqual(
+            application.storageComponents.reduce(0) { $0 + $1.allocatedSize },
+            application.totalSize
+        )
+        XCTAssertEqual(
+            application.storageComponents.first {
+                $0.category == .plugin
+            }?.allocatedSize,
+            700
+        )
     }
 
     func testDeveloperAIProjectionCanonicalizesSymlinkedManagedRoots() throws {

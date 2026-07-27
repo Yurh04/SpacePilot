@@ -3,6 +3,7 @@ import Foundation
 struct AIAssetByteBreakdown: Sendable, Equatable {
     let applicationBytes: Int64
     let dataItemBytes: Int64
+    let dataItemBytesByCategory: [ItemCategory: Int64]
     let pluginBytes: Int64
     let standaloneSkillBytes: Int64
 
@@ -84,18 +85,22 @@ enum AIAssetByteOwnership {
             checkCancellation: checkCancellation
         )
         var dataItemBytes: Int64 = 0
+        var dataItemBytesByCategory: [ItemCategory: Int64] = [:]
         for item in items {
             try checkpoint.checkPeriodically()
             if item.category != .plugin,
                item.category != .skill,
                !managedAssets.contains(item.url) {
                 dataItemBytes += item.allocatedSize
+                dataItemBytesByCategory[item.category, default: 0]
+                    += item.allocatedSize
             }
         }
         try checkCancellation()
         return AIAssetByteBreakdown(
             applicationBytes: applicationBytes,
             dataItemBytes: dataItemBytes,
+            dataItemBytesByCategory: dataItemBytesByCategory,
             pluginBytes: managedAssets.pluginBytes,
             standaloneSkillBytes: managedAssets.standaloneSkillBytes
         )

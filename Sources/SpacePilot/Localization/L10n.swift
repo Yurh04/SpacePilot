@@ -17,6 +17,7 @@ enum L10n {
         static let aiSearching = Self(key: "ai.searching", english: "Searching…")
         static let aiSection = Self(key: "ai.section", english: "Section")
         static let aiSelectApplication = Self(key: "ai.select-application", english: "Select an AI application")
+        static let aiStorageBreakdown = Self(key: "ai.storage-breakdown", english: "Space breakdown")
         static let aiTotalIndexedSpace = Self(key: "ai.total-indexed-space", english: "Total indexed space")
         static let application = Self(key: "app.application", english: "Application")
         static let applicationOnlyHighConfidence = Self(key: "app.only-high-confidence", english: "Only high-confidence related files are preselected.")
@@ -104,7 +105,8 @@ enum L10n {
         "ai.basic-footprint", "ai.data-items", "ai.deep-analysis", "ai.developer-storage",
         "ai.local-footprint", "ai.manage-in", "ai.no-content-indexed", "ai.plugins-managed",
         "ai.privacy", "ai.searching", "ai.section", "ai.select-application",
-        "ai.skills-visible", "ai.total-indexed-space", "app.application", "app.association-confidence",
+        "ai.skills-visible", "ai.storage-breakdown", "ai.total-indexed-space",
+        "app.application", "app.association-confidence",
         "app.evidence.bundle-id", "app.evidence.container-id", "app.evidence.known-rule",
         "app.evidence.name", "app.evidence.signed-helper", "app.only-high-confidence",
         "app.ownership.owned", "app.ownership.possible", "app.ownership.shared",

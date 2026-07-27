@@ -44,6 +44,28 @@ struct AIApplicationDetailView: View {
                     LabeledContent(L10n.plugins(), value: projection.plugins.count.formatted())
                     LabeledContent(L10n.skillsVisible(to: application.name), value: projection.skills.count.formatted())
                 }
+                if !projection.storageComponents.isEmpty {
+                    Section(L10n.text(.aiStorageBreakdown)) {
+                        ForEach(projection.storageComponents) { component in
+                            VStack(alignment: .leading, spacing: 5) {
+                                HStack {
+                                    Label(
+                                        storageName(for: component.category),
+                                        systemImage: storageIcon(for: component.category)
+                                    )
+                                    Spacer()
+                                    Text(ByteCount.string(component.allocatedSize))
+                                        .monospacedDigit()
+                                }
+                                ProgressView(
+                                    value: Double(component.allocatedSize),
+                                    total: Double(max(1, projection.totalSize))
+                                )
+                            }
+                            .padding(.vertical, 2)
+                        }
+                    }
+                }
                 Section(L10n.text(.aiPrivacy)) {
                     Label(L10n.text(.aiNoContentIndexed), systemImage: "hand.raised")
                         .foregroundStyle(.secondary)
@@ -151,5 +173,25 @@ struct AIApplicationDetailView: View {
 
     private var sanitizedDiagnosticSummaries: [String] {
         PluginDiagnosticPresentation.summaries(pluginDiagnostics)
+    }
+
+    private func storageIcon(for category: ItemCategory) -> String {
+        switch category {
+        case .application: "app.dashed"
+        case .conversation: "bubble.left.and.bubble.right"
+        case .cache: "arrow.trianglehead.2.clockwise.rotate.90"
+        case .log: "doc.text.magnifyingglass"
+        case .model: "shippingbox"
+        case .plugin: "puzzlepiece.extension"
+        case .skill: "sparkles"
+        case .aiData: "brain"
+        default: "folder"
+        }
+    }
+
+    private func storageName(for category: ItemCategory) -> String {
+        category == .application
+            ? L10n.text(.application)
+            : L10n.name(for: category)
     }
 }
