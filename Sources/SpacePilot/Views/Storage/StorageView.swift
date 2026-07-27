@@ -66,7 +66,7 @@ struct StorageView: View {
                 .tag(StorageCategorySelection.category(summary.category))
             }
         }
-        .listStyle(.sidebar)
+        .listStyle(.inset)
         .safeAreaInset(edge: .top) {
             HStack {
                 Text(verbatim: L10n.text(.storageCategories))

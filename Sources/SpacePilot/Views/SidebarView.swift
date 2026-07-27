@@ -12,6 +12,7 @@ struct SidebarView: View {
                 .tag(destination)
         }
         .listStyle(.sidebar)
+        .frame(width: Self.stableWidth)
         .navigationTitle("SpacePilot")
         .navigationSplitViewColumnWidth(
             min: Self.stableWidth,
