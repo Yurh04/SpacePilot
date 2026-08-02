@@ -163,6 +163,10 @@ public struct SpotlightApplicationCandidateFinder: Sendable {
 
     private static let maximumComponentIdentifiers = 32
     private static let maximumApplicationGroups = 16
+    private static let ambiguousApplicationNames: Set<String> = [
+        "code", "finder", "mail", "music", "notes", "photos", "preview",
+        "xcode"
+    ]
 
     private let query: any SpotlightApplicationCandidateQuerying
     private let maximumCandidates: Int
@@ -189,6 +193,10 @@ public struct SpotlightApplicationCandidateFinder: Sendable {
     ) async throws -> [SpotlightApplicationCandidate] {
         let safeRoots = Self.safeSearchRoots(homeDirectory: homeDirectory)
         guard !safeRoots.isEmpty else { return [] }
+        let trustedNamespaces = Self.trustedBundleNamespaces(
+            application: application,
+            identity: identity
+        )
 
         var candidatesByPath: [String: SpotlightApplicationCandidate] = [:]
         for lookup in lookups(for: application, identity: identity) {
@@ -203,7 +211,11 @@ public struct SpotlightApplicationCandidateFinder: Sendable {
             )
             for url in urls {
                 guard candidatesByPath.count < maximumCandidates,
-                      let safeURL = Self.safeURL(url, within: safeRoots)
+                      let safeURL = Self.safeURL(url, within: safeRoots),
+                      !Self.isNestedInsideUnrelatedBundleDirectory(
+                          safeURL,
+                          trustedNamespaces: trustedNamespaces
+                      )
                 else {
                     continue
                 }
@@ -286,7 +298,9 @@ public struct SpotlightApplicationCandidateFinder: Sendable {
         let name = application.name.trimmingCharacters(
             in: .whitespacesAndNewlines
         )
-        if includesFuzzyNameMatch, name.count >= 3 {
+        if includesFuzzyNameMatch,
+           name.count >= 3,
+           !Self.ambiguousApplicationNames.contains(name.lowercased()) {
             result.append(
                 Lookup(
                     query: .nameFragment(name),
@@ -338,6 +352,48 @@ public struct SpotlightApplicationCandidateFinder: Sendable {
             return nil
         }
         return canonicalURL
+    }
+
+    private static func trustedBundleNamespaces(
+        application: ApplicationRecord,
+        identity: ApplicationIdentity
+    ) -> Set<String> {
+        let identifiers = [
+            identity.mainBundleIdentifier,
+            application.bundleIdentifier
+        ] + identity.componentBundleIdentifiers.map(Optional.some)
+        return Set(identifiers.compactMap { identifier in
+            guard let components = identifier?
+                .lowercased()
+                .split(separator: "."),
+                  components.count >= 2
+            else {
+                return nil
+            }
+            return components.prefix(2).joined(separator: ".")
+        })
+    }
+
+    /// Spotlight can surface copies of another application's metadata, such as
+    /// an uninstaller's private application catalog. Those files mention the
+    /// target bundle identifier but are owned by the cataloging application.
+    private static func isNestedInsideUnrelatedBundleDirectory(
+        _ url: URL,
+        trustedNamespaces: Set<String>
+    ) -> Bool {
+        guard !trustedNamespaces.isEmpty else { return false }
+        return url.pathComponents.dropLast().contains { component in
+            let parts = component.lowercased().split(separator: ".")
+            guard parts.count >= 3,
+                  let first = parts.first,
+                  (2...4).contains(first.count),
+                  first.allSatisfy(\.isLetter)
+            else {
+                return false
+            }
+            let namespace = parts.prefix(2).joined(separator: ".")
+            return !trustedNamespaces.contains(namespace)
+        }
     }
 
     private static func isStrictDescendant(_ candidate: URL, of root: URL) -> Bool {

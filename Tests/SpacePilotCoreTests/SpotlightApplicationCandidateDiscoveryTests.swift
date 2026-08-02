@@ -89,6 +89,40 @@ final class SpotlightApplicationCandidateDiscoveryTests: XCTestCase {
         XCTAssertEqual(candidates.map(\.url), [allowed])
     }
 
+    func testRejectsMetadataMirroredInsideAnotherApplicationsBundleDirectory()
+        async throws
+    {
+        let home = URL(fileURLWithPath: "/Users/tester")
+        let mirrored = home.appending(
+            path: "Library/Application Support/com.vendor.Cleaner/AppCatalog/com.example.Editor.plist"
+        )
+        let relatedVendor = home.appending(
+            path: "Library/Application Support/com.example.Updater/com.example.Editor.plist"
+        )
+        let direct = home.appending(
+            path: "Library/Preferences/com.example.Editor.plist"
+        )
+        let query = StubSpotlightCandidateQuery(results: [
+            .bundleIdentifier("com.example.Editor"): [
+                mirrored, relatedVendor, direct
+            ]
+        ])
+        let application = makeApplication(
+            name: "Editor",
+            bundleID: "com.example.Editor"
+        )
+
+        let candidates = try await SpotlightApplicationCandidateFinder(
+            query: query
+        ).candidates(
+            for: application,
+            identity: makeIdentity(for: application),
+            homeDirectory: home
+        )
+
+        XCTAssertEqual(candidates.map(\.url), [relatedVendor, direct])
+    }
+
     func testAppliesHardCandidateLimitAcrossQueries() async throws {
         let home = URL(fileURLWithPath: "/Users/tester")
         let mainResults = (0..<4).map {
@@ -134,6 +168,28 @@ final class SpotlightApplicationCandidateDiscoveryTests: XCTestCase {
 
         XCTAssertTrue(candidates.isEmpty)
         XCTAssertTrue(calls.isEmpty)
+    }
+
+    func testAmbiguousApplicationNameDoesNotProduceFuzzyQuery() async throws {
+        let home = URL(fileURLWithPath: "/Users/tester")
+        let query = RecordingSpotlightCandidateQuery(results: [:])
+        let application = makeApplication(
+            name: "Code",
+            bundleID: "com.microsoft.VSCode"
+        )
+
+        _ = try await SpotlightApplicationCandidateFinder(
+            query: query
+        ).candidates(
+            for: application,
+            identity: makeIdentity(for: application),
+            homeDirectory: home
+        )
+        let calls = await query.recordedCalls()
+
+        XCTAssertEqual(calls.map(\.query), [
+            .bundleIdentifier("com.microsoft.VSCode")
+        ])
     }
 
     func testCanDisableFuzzyNameMatching() async throws {
