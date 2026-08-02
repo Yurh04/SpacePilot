@@ -173,6 +173,75 @@ final class ApplicationDetailAnalyzerTests: XCTestCase {
         XCTAssertEqual(association.confidence, .low)
         XCTAssertEqual(association.ownership, .possible)
     }
+
+    func testKnowledgeParentReplacesNarrowerStandardCandidates() async throws {
+        let home = try TemporaryTree(files: [
+            "Library/Application Support/Vendor/com.example.Example/state.db": 31
+        ])
+        let built = try TestAppBuilder.make(
+            name: "Example",
+            bundleID: "com.example.Example",
+            version: "1.0",
+            executableBytes: 16
+        )
+        let application = ApplicationRecord(
+            name: "Example",
+            bundleIdentifier: "com.example.Example",
+            version: "1.0",
+            url: built.appURL,
+            executableURL: nil,
+            allocatedSize: 16
+        )
+        let knowledgeBase = ApplicationAssociationKnowledgeBase(
+            schemaVersion: 1,
+            contentVersion: "test",
+            rules: [
+                ApplicationAssociationKnowledgeRule(
+                    id: "vendor.shared-root.v1",
+                    match: ApplicationAssociationKnowledgeMatch(
+                        bundleIdentifiers: ["com.example.Example"]
+                    ),
+                    paths: [
+                        ApplicationAssociationPathRule(
+                            scope: .homeDirectory,
+                            template: "Library/Application Support/Vendor",
+                            category: .application,
+                            risk: .rebuildable,
+                            confidence: .medium,
+                            ownership: .shared
+                        )
+                    ]
+                )
+            ]
+        )
+        let analyzer = ApplicationDetailAnalyzer(
+            spotlightFinder: SpotlightApplicationCandidateFinder(
+                query: FixedSpotlightCandidateQuery(urls: [])
+            ),
+            knowledgeBase: knowledgeBase
+        )
+
+        let result = try await analyzer.analyze(
+            application: application,
+            homeDirectory: home.url
+        )
+        let expectedRoot = home.url.appending(
+            path: "Library/Application Support/Vendor",
+            directoryHint: .isDirectory
+        ).standardizedFileURL
+        let item = try XCTUnwrap(result.items.first {
+            $0.url.standardizedFileURL == expectedRoot
+        })
+        XCTAssertFalse(result.items.contains {
+            $0.url.path.hasSuffix("Vendor/com.example.Example")
+        })
+        let association = try XCTUnwrap(result.associations.first {
+            $0.itemID == item.id
+        })
+        XCTAssertEqual(association.evidence, .knownRule)
+        XCTAssertEqual(association.confidence, .medium)
+        XCTAssertEqual(association.ownership, .shared)
+    }
 }
 
 private struct FixedSpotlightCandidateQuery:

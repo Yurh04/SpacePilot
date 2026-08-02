@@ -185,8 +185,7 @@ final class AppModel {
     }
 
     func analyzeApplication(_ projection: ApplicationProjection) {
-        guard needsApplicationAnalysis(projection),
-              !analyzedApplicationIDs.contains(projection.id),
+        guard !analyzedApplicationIDs.contains(projection.id),
               analyzingApplicationID != projection.id,
               let runtime,
               let currentSnapshot = latestSnapshot else {
@@ -233,27 +232,6 @@ final class AppModel {
                 analyzingApplicationID = nil
                 applicationAnalysisTask = nil
             }
-        }
-    }
-
-    private func needsApplicationAnalysis(
-        _ projection: ApplicationProjection
-    ) -> Bool {
-        guard !projection.associations.isEmpty else { return true }
-        guard projection.application.bundleIdentifier == "com.openai.codex",
-              latestSnapshot?.aiApplications.contains(where: {
-                  $0.bundleIdentifier == "com.openai.codex"
-                      && !$0.itemIDs.isEmpty
-              }) == true
-        else {
-            return false
-        }
-        return !projection.associations.contains {
-            $0.item.url.standardizedFileURL.path.hasPrefix(
-                FileManager.default.homeDirectoryForCurrentUser
-                    .appending(path: ".codex")
-                    .standardizedFileURL.path
-            )
         }
     }
 

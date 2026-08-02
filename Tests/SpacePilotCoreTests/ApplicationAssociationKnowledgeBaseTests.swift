@@ -11,8 +11,8 @@ final class ApplicationAssociationKnowledgeBaseTests: XCTestCase {
 
         XCTAssertEqual(decoded, original)
         XCTAssertEqual(decoded.schemaVersion, 1)
-        XCTAssertEqual(decoded.contentVersion, "1.1.0")
-        XCTAssertEqual(decoded.rules.count, 5)
+        XCTAssertEqual(decoded.contentVersion, "1.2.0")
+        XCTAssertEqual(decoded.rules.count, 10)
     }
 
     func testMatchesExactBundleAndTeamIdentifiers() throws {
@@ -293,6 +293,96 @@ final class ApplicationAssociationKnowledgeBaseTests: XCTestCase {
         XCTAssertEqual(homebrew.ownership, .shared)
         XCTAssertEqual(homebrew.risk, .sensitive)
         XCTAssertEqual(homebrew.disposition, .inspectOnly)
+    }
+
+    func testBuiltInEditorRulesFindHiddenUserDataConservatively() throws {
+        let fixture = try Fixture()
+        let vscodeCandidates = try ApplicationAssociationKnowledgeBase.builtInV1
+            .candidates(
+                for: fixture.context(
+                    bundleIdentifier: "com.microsoft.VSCode",
+                    teamIdentifier: nil
+                ),
+                homeDirectory: fixture.home
+            )
+        let vscode = try XCTUnwrap(vscodeCandidates.first {
+            $0.url.lastPathComponent == ".vscode"
+        })
+        XCTAssertEqual(vscode.category, .developer)
+        XCTAssertEqual(vscode.risk, .sensitive)
+        XCTAssertEqual(vscode.confidence, .high)
+        XCTAssertEqual(vscode.ownership, .owned)
+
+        let vscodeShared = try XCTUnwrap(vscodeCandidates.first {
+            $0.url.lastPathComponent == ".vscode-shared"
+        })
+        XCTAssertEqual(vscodeShared.confidence, .medium)
+        XCTAssertEqual(vscodeShared.ownership, .possible)
+
+        let cursorCandidates = try ApplicationAssociationKnowledgeBase.builtInV1
+            .candidates(
+                for: fixture.context(
+                    bundleIdentifier: "com.todesktop.230313mzl4w4u92",
+                    teamIdentifier: nil
+                ),
+                homeDirectory: fixture.home
+            )
+        let cursor = try XCTUnwrap(cursorCandidates.first {
+            $0.url.lastPathComponent == ".cursor"
+        })
+        XCTAssertEqual(cursor.category, .aiData)
+        XCTAssertEqual(cursor.risk, .sensitive)
+        XCTAssertEqual(cursor.confidence, .high)
+        XCTAssertEqual(cursor.ownership, .owned)
+    }
+
+    func testBuiltInSharedServiceRulesNeverClaimExclusiveOwnership() throws {
+        let fixture = try Fixture()
+        let dockerCandidates = try ApplicationAssociationKnowledgeBase.builtInV1
+            .candidates(
+                for: fixture.context(
+                    bundleIdentifier: "com.docker.docker",
+                    teamIdentifier: nil
+                ),
+                homeDirectory: fixture.home
+            )
+        let dockerCLI = try XCTUnwrap(dockerCandidates.first {
+            $0.ruleID == "product.docker.cli-data.v1"
+        })
+        XCTAssertEqual(dockerCLI.risk, .sensitive)
+        XCTAssertEqual(dockerCLI.confidence, .medium)
+        XCTAssertEqual(dockerCLI.ownership, .shared)
+
+        let edgeCandidates = try ApplicationAssociationKnowledgeBase.builtInV1
+            .candidates(
+                for: fixture.context(
+                    bundleIdentifier: "com.microsoft.edgemac",
+                    teamIdentifier: nil
+                ),
+                homeDirectory: fixture.home
+            )
+        let edgeUpdater = try XCTUnwrap(edgeCandidates.first {
+            $0.ruleID == "service.microsoft.edge-updater.v1"
+        })
+        XCTAssertEqual(edgeUpdater.risk, .rebuildable)
+        XCTAssertEqual(edgeUpdater.confidence, .medium)
+        XCTAssertEqual(edgeUpdater.ownership, .shared)
+
+        let jetBrainsCandidates = try ApplicationAssociationKnowledgeBase.builtInV1
+            .candidates(
+                for: fixture.context(
+                    bundleIdentifier: "com.jetbrains.intellij.ce",
+                    teamIdentifier: nil
+                ),
+                homeDirectory: fixture.home
+            )
+            .filter { $0.ruleID == "vendor.jetbrains.shared-data.v1" }
+        XCTAssertEqual(jetBrainsCandidates.count, 3)
+        XCTAssertTrue(jetBrainsCandidates.allSatisfy {
+            $0.confidence == .medium
+                && $0.ownership == .shared
+                && $0.disposition == .inspectOnly
+        })
     }
 
     private func knowledgeBase(

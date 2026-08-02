@@ -85,10 +85,9 @@ public struct ApplicationDetailAnalyzer: Sendable {
             identities: [identity],
             homeDirectory: homeDirectory
         )
-        let standardItems = standardResolution.items
-        let standardAssociations =
+        let unresolvedStandardItems = standardResolution.items
+        let unresolvedStandardAssociations =
             standardResolution.resolutions.first?.associations ?? []
-        let occupiedURLs = standardItems.map(\.url)
 
         let spotlightCandidates: [SpotlightApplicationCandidate]
         if Self.usesSpotlightCandidates(for: application) {
@@ -110,6 +109,25 @@ public struct ApplicationDetailAnalyzer: Sendable {
             ),
             homeDirectory: homeDirectory
         )
+        let knowledgeURLs = knowledgeCandidates.map {
+            $0.url.standardizedFileURL.resolvingSymlinksInPath()
+        }
+        let supersededStandardItemIDs = Set(
+            unresolvedStandardItems.compactMap { item -> UUID? in
+                let itemURL = item.url.standardizedFileURL
+                    .resolvingSymlinksInPath()
+                return knowledgeURLs.contains(where: {
+                    Self.isStrictDescendant(itemURL, of: $0)
+                }) ? item.id : nil
+            }
+        )
+        let standardItems = unresolvedStandardItems.filter {
+            !supersededStandardItemIDs.contains($0.id)
+        }
+        let standardAssociations = unresolvedStandardAssociations.filter {
+            !supersededStandardItemIDs.contains($0.itemID)
+        }
+        let occupiedURLs = standardItems.map(\.url)
         let candidates = mergeCandidates(
             spotlight: spotlightCandidates,
             knowledge: knowledgeCandidates,
@@ -343,6 +361,11 @@ public struct ApplicationDetailAnalyzer: Sendable {
 
     private static func overlaps(_ lhs: URL, _ rhs: URL) -> Bool {
         isSameOrDescendant(lhs, of: rhs) || isSameOrDescendant(rhs, of: lhs)
+    }
+
+    private static func isStrictDescendant(_ url: URL, of root: URL) -> Bool {
+        url.standardizedFileURL.path != root.standardizedFileURL.path
+            && isSameOrDescendant(url, of: root)
     }
 
     private static func isSameOrDescendant(_ url: URL, of root: URL) -> Bool {

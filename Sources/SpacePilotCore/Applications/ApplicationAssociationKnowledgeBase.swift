@@ -448,7 +448,7 @@ public extension ApplicationAssociationKnowledgeBase {
     /// Built-in version 1 examples. All results are deliberately inspect-only.
     static let builtInV1 = ApplicationAssociationKnowledgeBase(
         schemaVersion: 1,
-        contentVersion: "1.1.0",
+        contentVersion: "1.2.0",
         rules: [
             ApplicationAssociationKnowledgeRule(
                 id: "product.openai.chatgpt-codex.v1",
@@ -565,6 +565,113 @@ public extension ApplicationAssociationKnowledgeBase {
                         category: .cache,
                         risk: .sensitive,
                         confidence: .low,
+                        ownership: .shared
+                    )
+                ]
+            ),
+            ApplicationAssociationKnowledgeRule(
+                id: "product.vscode.user-data.v1",
+                match: ApplicationAssociationKnowledgeMatch(
+                    bundleIdentifiers: ["com.microsoft.VSCode"]
+                ),
+                paths: [
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: ".vscode",
+                        category: .developer,
+                        risk: .sensitive,
+                        confidence: .high,
+                        ownership: .owned
+                    ),
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: ".vscode-shared",
+                        category: .developer,
+                        risk: .sensitive,
+                        confidence: .medium,
+                        ownership: .possible
+                    )
+                ]
+            ),
+            ApplicationAssociationKnowledgeRule(
+                id: "product.cursor.user-data.v1",
+                match: ApplicationAssociationKnowledgeMatch(
+                    bundleIdentifiers: ["com.todesktop.230313mzl4w4u92"]
+                ),
+                paths: [
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: ".cursor",
+                        category: .aiData,
+                        risk: .sensitive,
+                        confidence: .high,
+                        ownership: .owned
+                    )
+                ]
+            ),
+            ApplicationAssociationKnowledgeRule(
+                id: "product.docker.cli-data.v1",
+                match: ApplicationAssociationKnowledgeMatch(
+                    bundleIdentifiers: ["com.docker.docker"]
+                ),
+                paths: [
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: ".docker",
+                        category: .developer,
+                        risk: .sensitive,
+                        confidence: .medium,
+                        ownership: .shared
+                    )
+                ]
+            ),
+            ApplicationAssociationKnowledgeRule(
+                id: "service.microsoft.edge-updater.v1",
+                match: ApplicationAssociationKnowledgeMatch(
+                    bundleIdentifiers: ["com.microsoft.edgemac"]
+                ),
+                paths: [
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: "Library/Application Support/Microsoft/EdgeUpdater",
+                        category: .application,
+                        risk: .rebuildable,
+                        confidence: .medium,
+                        ownership: .shared
+                    )
+                ]
+            ),
+            ApplicationAssociationKnowledgeRule(
+                id: "vendor.jetbrains.shared-data.v1",
+                match: ApplicationAssociationKnowledgeMatch(
+                    bundleIdentifiers: [
+                        "com.jetbrains.intellij.ce",
+                        "com.jetbrains.pycharm.ce"
+                    ]
+                ),
+                paths: [
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: "Library/Application Support/JetBrains",
+                        category: .developer,
+                        risk: .sensitive,
+                        confidence: .medium,
+                        ownership: .shared
+                    ),
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: "Library/Caches/JetBrains",
+                        category: .cache,
+                        risk: .rebuildable,
+                        confidence: .medium,
+                        ownership: .shared
+                    ),
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: "Library/Logs/JetBrains",
+                        category: .log,
+                        risk: .rebuildable,
+                        confidence: .medium,
                         ownership: .shared
                     )
                 ]
