@@ -23,6 +23,7 @@ struct FileSystemApplicationArtifactSizeResolver:
         let keys: Set<URLResourceKey> = [
             .fileSizeKey,
             .totalFileAllocatedSizeKey,
+            .fileResourceIdentifierKey,
             .isRegularFileKey,
             .isSymbolicLinkKey
         ]
@@ -45,6 +46,7 @@ struct FileSystemApplicationArtifactSizeResolver:
         var logical: Int64 = 0
         var allocated: Int64 = 0
         var processed = 0
+        var countedResourceIdentifiers = Set<String>()
         for case let url as URL in enumerator {
             processed += 1
             if processed.isMultiple(of: 128) {
@@ -54,6 +56,11 @@ struct FileSystemApplicationArtifactSizeResolver:
                   values.isRegularFile == true,
                   values.isSymbolicLink != true
             else {
+                continue
+            }
+            if let identifier = values.fileResourceIdentifier.map({
+                String(describing: $0)
+            }), !countedResourceIdentifiers.insert(identifier).inserted {
                 continue
             }
             logical += Int64(values.fileSize ?? 0)

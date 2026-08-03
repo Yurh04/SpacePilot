@@ -340,6 +340,52 @@ final class SQLiteIndexStoreTests: XCTestCase {
         XCTAssertNotNil(refreshedStat)
     }
 
+    func testOpeningStoreInvalidatesLegacyDirectorySizeCaches() async throws {
+        let url = temporaryDatabaseURL()
+        let directory = URL(
+            filePath: "/Users/test/anaconda3",
+            directoryHint: .isDirectory
+        )
+        do {
+            let store = try SQLiteIndexStore(url: url)
+            let item = ScannedItem(
+                url: directory,
+                logicalSize: 2_000,
+                allocatedSize: 2_000,
+                category: .developer,
+                risk: .sensitive,
+                explanation: "Legacy size"
+            )
+            try await store.save(snapshot: ScanSnapshot(
+                completedAt: .now,
+                volume: nil,
+                items: [item],
+                applications: [],
+                aiApplications: [],
+                plugins: [],
+                skills: [],
+                coverage: .complete
+            ))
+            let initialStat = try await store.cachedDirectoryStat(at: directory)
+            XCTAssertNotNil(initialStat)
+        }
+        try executeSQL(
+            "DELETE FROM metadata WHERE key = 'directory_size_algorithm';",
+            at: url
+        )
+
+        let reopened = try SQLiteIndexStore(url: url)
+
+        let invalidatedStat = try await reopened.cachedDirectoryStat(
+            at: directory
+        )
+        XCTAssertNil(invalidatedStat)
+        XCTAssertEqual(
+            try metadataValue(key: "directory_size_algorithm", at: url),
+            "2"
+        )
+    }
+
     func testFileSystemEventCursorRoundTripsByVolume() async throws {
         let store = try SQLiteIndexStore(url: temporaryDatabaseURL())
         let cursor = FileSystemEventCursor(

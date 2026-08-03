@@ -448,7 +448,7 @@ public extension ApplicationAssociationKnowledgeBase {
     /// Built-in version 1 examples. All results are deliberately inspect-only.
     static let builtInV1 = ApplicationAssociationKnowledgeBase(
         schemaVersion: 1,
-        contentVersion: "1.2.0",
+        contentVersion: "1.3.0",
         rules: [
             ApplicationAssociationKnowledgeRule(
                 id: "product.openai.chatgpt-codex.v1",
@@ -637,6 +637,121 @@ public extension ApplicationAssociationKnowledgeBase {
                         category: .application,
                         risk: .rebuildable,
                         confidence: .medium,
+                        ownership: .shared
+                    )
+                ]
+            ),
+            ApplicationAssociationKnowledgeRule(
+                id: "product.anaconda.environment.v1",
+                match: ApplicationAssociationKnowledgeMatch(
+                    bundleIdentifiers: ["com.anaconda.io"]
+                ),
+                paths: [
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: "anaconda3",
+                        category: .developer,
+                        risk: .sensitive,
+                        confidence: .high,
+                        ownership: .shared
+                    ),
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: ".conda",
+                        category: .developer,
+                        risk: .sensitive,
+                        confidence: .medium,
+                        ownership: .shared
+                    ),
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: ".continuum",
+                        category: .developer,
+                        risk: .sensitive,
+                        confidence: .medium,
+                        ownership: .shared
+                    )
+                ]
+            ),
+            ApplicationAssociationKnowledgeRule(
+                id: "product.dbeaver.workspace.v1",
+                match: ApplicationAssociationKnowledgeMatch(
+                    bundleIdentifiers: ["org.jkiss.dbeaver.core.product"]
+                ),
+                paths: [
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: "Library/DBeaverData",
+                        category: .developer,
+                        risk: .sensitive,
+                        confidence: .high,
+                        ownership: .owned
+                    )
+                ]
+            ),
+            ApplicationAssociationKnowledgeRule(
+                id: "product.ghostty.configuration.v1",
+                match: ApplicationAssociationKnowledgeMatch(
+                    bundleIdentifiers: ["com.mitchellh.ghostty"]
+                ),
+                paths: [
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: ".config/ghostty",
+                        category: .developer,
+                        risk: .sensitive,
+                        confidence: .high,
+                        ownership: .owned
+                    )
+                ]
+            ),
+            ApplicationAssociationKnowledgeRule(
+                id: "product.google.gemini-data.v1",
+                match: ApplicationAssociationKnowledgeMatch(
+                    bundleIdentifiers: [
+                        "com.google.GeminiMacOS",
+                        "com.google.antigravity"
+                    ]
+                ),
+                paths: [
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: ".gemini",
+                        category: .aiData,
+                        risk: .sensitive,
+                        confidence: .medium,
+                        ownership: .shared
+                    )
+                ]
+            ),
+            ApplicationAssociationKnowledgeRule(
+                id: "product.google.antigravity-data.v1",
+                match: ApplicationAssociationKnowledgeMatch(
+                    bundleIdentifiers: ["com.google.antigravity"]
+                ),
+                paths: [
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: ".antigravity",
+                        category: .aiData,
+                        risk: .sensitive,
+                        confidence: .high,
+                        ownership: .owned
+                    )
+                ]
+            ),
+            ApplicationAssociationKnowledgeRule(
+                id: "product.anthropic.claude-code.v1",
+                match: ApplicationAssociationKnowledgeMatch(
+                    bundleIdentifiers: ["com.anthropic.claudefordesktop"]
+                ),
+                paths: [
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: ".claude",
+                        category: .aiData,
+                        risk: .sensitive,
+                        confidence: .high,
                         ownership: .shared
                     )
                 ]

@@ -11,6 +11,7 @@ public protocol SnapshotStoring: Sendable {
 public actor SQLiteIndexStore: SnapshotStoring {
     static let maximumDatabaseBytes: Int64 = 128 * 1024 * 1024
     static let maximumSnapshotItems = ScanSnapshot.maximumRetainedItems
+    private static let directorySizeAlgorithmVersion = "2"
 
     private let connection: SQLiteConnection
     private let encoder: JSONEncoder
@@ -781,6 +782,7 @@ public actor SQLiteIndexStore: SnapshotStoring {
         for statement in IndexSchema.statements {
             try connection.execute(statement)
         }
+        try invalidateLegacySizeCachesIfNeeded(on: connection)
         try connection.statement("PRAGMA quick_check;") { statement in
             guard try connection.step(statement) == SQLITE_ROW else {
                 throw SQLiteStoreError(message: "SQLite integrity check returned no result")
@@ -792,6 +794,36 @@ public actor SQLiteIndexStore: SnapshotStoring {
                     confirmedCorruption: true
                 )
             }
+        }
+    }
+
+    private static func invalidateLegacySizeCachesIfNeeded(
+        on connection: SQLiteConnection
+    ) throws {
+        let storedVersion: String? = try connection.statement(
+            "SELECT value FROM metadata WHERE key = 'directory_size_algorithm';"
+        ) { statement in
+            guard try connection.step(statement) == SQLITE_ROW else {
+                return nil
+            }
+            return Self.text(at: 0, in: statement)
+        }
+        guard storedVersion != directorySizeAlgorithmVersion else { return }
+
+        try connection.execute("BEGIN IMMEDIATE;")
+        do {
+            try connection.execute("UPDATE directory_stats SET dirty = 1;")
+            try connection.execute("UPDATE scan_caches SET dirty = 1;")
+            try connection.statement(
+                "INSERT OR REPLACE INTO metadata(key, value) VALUES ('directory_size_algorithm', ?);"
+            ) { statement in
+                try connection.bind(directorySizeAlgorithmVersion, to: 1, in: statement)
+                try connection.stepDone(statement)
+            }
+            try connection.execute("COMMIT;")
+        } catch {
+            try? connection.execute("ROLLBACK;")
+            throw error
         }
     }
 

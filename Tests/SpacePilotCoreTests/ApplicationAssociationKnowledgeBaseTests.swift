@@ -11,8 +11,8 @@ final class ApplicationAssociationKnowledgeBaseTests: XCTestCase {
 
         XCTAssertEqual(decoded, original)
         XCTAssertEqual(decoded.schemaVersion, 1)
-        XCTAssertEqual(decoded.contentVersion, "1.2.0")
-        XCTAssertEqual(decoded.rules.count, 10)
+        XCTAssertEqual(decoded.contentVersion, "1.3.0")
+        XCTAssertEqual(decoded.rules.count, 16)
     }
 
     func testMatchesExactBundleAndTeamIdentifiers() throws {
@@ -383,6 +383,95 @@ final class ApplicationAssociationKnowledgeBaseTests: XCTestCase {
                 && $0.ownership == .shared
                 && $0.disposition == .inspectOnly
         })
+    }
+
+    func testBuiltInDeveloperAndAIToolRulesPreserveSensitiveOwnership() throws {
+        let fixture = try Fixture()
+        let anaconda = try ApplicationAssociationKnowledgeBase.builtInV1
+            .candidates(
+                for: fixture.context(
+                    bundleIdentifier: "com.anaconda.io",
+                    teamIdentifier: nil
+                ),
+                homeDirectory: fixture.home
+            )
+            .filter { $0.ruleID == "product.anaconda.environment.v1" }
+        XCTAssertEqual(anaconda.count, 3)
+        XCTAssertTrue(anaconda.allSatisfy {
+            $0.category == .developer
+                && $0.risk == .sensitive
+                && $0.ownership == .shared
+        })
+        XCTAssertEqual(
+            anaconda.first { $0.url.lastPathComponent == "anaconda3" }?
+                .confidence,
+            .high
+        )
+
+        let dbeaver = try XCTUnwrap(
+            ApplicationAssociationKnowledgeBase.builtInV1
+                .candidates(
+                    for: fixture.context(
+                        bundleIdentifier: "org.jkiss.dbeaver.core.product",
+                        teamIdentifier: nil
+                    ),
+                    homeDirectory: fixture.home
+                )
+                .first { $0.ruleID == "product.dbeaver.workspace.v1" }
+        )
+        XCTAssertEqual(dbeaver.confidence, .high)
+        XCTAssertEqual(dbeaver.ownership, .owned)
+        XCTAssertEqual(dbeaver.risk, .sensitive)
+
+        let gemini = try ApplicationAssociationKnowledgeBase.builtInV1
+            .candidates(
+                for: fixture.context(
+                    bundleIdentifier: "com.google.GeminiMacOS",
+                    teamIdentifier: nil
+                ),
+                homeDirectory: fixture.home
+            )
+        XCTAssertTrue(gemini.contains {
+            $0.url.lastPathComponent == ".gemini"
+                && $0.ownership == .shared
+        })
+        XCTAssertFalse(gemini.contains {
+            $0.url.lastPathComponent == ".antigravity"
+        })
+
+        let antigravity = try ApplicationAssociationKnowledgeBase.builtInV1
+            .candidates(
+                for: fixture.context(
+                    bundleIdentifier: "com.google.antigravity",
+                    teamIdentifier: nil
+                ),
+                homeDirectory: fixture.home
+            )
+        XCTAssertTrue(antigravity.contains {
+            $0.url.lastPathComponent == ".gemini"
+                && $0.ownership == .shared
+        })
+        XCTAssertTrue(antigravity.contains {
+            $0.url.lastPathComponent == ".antigravity"
+                && $0.confidence == .high
+                && $0.ownership == .owned
+        })
+
+        let claude = try XCTUnwrap(
+            ApplicationAssociationKnowledgeBase.builtInV1
+                .candidates(
+                    for: fixture.context(
+                        bundleIdentifier: "com.anthropic.claudefordesktop",
+                        teamIdentifier: nil
+                    ),
+                    homeDirectory: fixture.home
+                )
+                .first { $0.ruleID == "product.anthropic.claude-code.v1" }
+        )
+        XCTAssertEqual(claude.category, .aiData)
+        XCTAssertEqual(claude.risk, .sensitive)
+        XCTAssertEqual(claude.confidence, .high)
+        XCTAssertEqual(claude.ownership, .shared)
     }
 
     private func knowledgeBase(

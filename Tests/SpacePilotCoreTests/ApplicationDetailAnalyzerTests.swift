@@ -69,6 +69,101 @@ final class ApplicationDetailAnalyzerTests: XCTestCase {
         XCTAssertFalse(result.items.contains { $0.id == codexData.id })
     }
 
+    func testKnowledgeRuleAndProductFamilyDoNotDuplicateTheSamePath()
+        async throws
+    {
+        let home = try TemporaryTree(files: [
+            ".claude/settings.json": 31
+        ])
+        let built = try TestAppBuilder.make(
+            name: "Claude",
+            bundleID: "com.anthropic.claudefordesktop",
+            version: "1.0",
+            executableBytes: 16
+        )
+        let application = ApplicationRecord(
+            name: "Claude",
+            bundleIdentifier: "com.anthropic.claudefordesktop",
+            version: "1.0",
+            url: built.appURL,
+            executableURL: nil,
+            allocatedSize: 16
+        )
+        let claudeRoot = home.url.appending(
+            path: ".claude",
+            directoryHint: .isDirectory
+        )
+        let indexedClaude = ScannedItem(
+            url: claudeRoot,
+            logicalSize: 31,
+            allocatedSize: 31,
+            category: .aiData,
+            risk: .sensitive,
+            explanation: "Claude data"
+        )
+        let aiApplication = AIApplicationRecord(
+            name: "Claude",
+            bundleIdentifier: application.bundleIdentifier,
+            applicationURL: application.url,
+            rootURLs: [claudeRoot],
+            itemIDs: [indexedClaude.id],
+            pluginIDs: [],
+            skillIDs: [],
+            applicationAllocatedSize: 0,
+            supportLevel: .deep
+        )
+        let knowledgeBase = ApplicationAssociationKnowledgeBase(
+            schemaVersion: 1,
+            contentVersion: "test",
+            rules: [
+                ApplicationAssociationKnowledgeRule(
+                    id: "claude.v1",
+                    match: ApplicationAssociationKnowledgeMatch(
+                        bundleIdentifiers: [
+                            "com.anthropic.claudefordesktop"
+                        ]
+                    ),
+                    paths: [
+                        ApplicationAssociationPathRule(
+                            scope: .homeDirectory,
+                            template: ".claude",
+                            category: .aiData,
+                            risk: .sensitive,
+                            confidence: .high,
+                            ownership: .shared
+                        )
+                    ]
+                )
+            ]
+        )
+        let analyzer = ApplicationDetailAnalyzer(
+            spotlightFinder: SpotlightApplicationCandidateFinder(
+                query: FixedSpotlightCandidateQuery(urls: [])
+            ),
+            knowledgeBase: knowledgeBase
+        )
+
+        let result = try await analyzer.analyze(
+            application: application,
+            homeDirectory: home.url,
+            indexedItems: [indexedClaude],
+            indexedAIApplications: [aiApplication]
+        )
+        let itemsByID = Dictionary(
+            uniqueKeysWithValues: (result.items + [indexedClaude]).map {
+                ($0.id, $0)
+            }
+        )
+        let matchingAssociations = result.associations.filter {
+            itemsByID[$0.itemID]?.url.standardizedFileURL
+                == claudeRoot.standardizedFileURL
+        }
+
+        XCTAssertEqual(matchingAssociations.count, 1)
+        XCTAssertEqual(matchingAssociations.first?.evidence, .knownRule)
+        XCTAssertEqual(matchingAssociations.first?.ownership, .shared)
+    }
+
     func testUsesSpotlightForDeepCandidateWithoutRescanningApplicationList()
         async throws
     {

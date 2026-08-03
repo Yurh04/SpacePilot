@@ -178,7 +178,13 @@ public struct ApplicationDetailAnalyzer: Sendable {
         let indexedItemsByID = Dictionary(
             uniqueKeysWithValues: indexedItems.map { ($0.id, $0) }
         )
+        let analysisItemsByID = Dictionary(
+            uniqueKeysWithValues: items.map { ($0.id, $0) }
+        )
         let existingAssociationItemIDs = Set(associations.map(\.itemID))
+        var existingAssociationPaths = Set(associations.compactMap {
+            analysisItemsByID[$0.itemID]?.url.standardizedFileURL.path
+        })
         let productFamilyItemIDs = Self.productFamilyItemIDs(
             for: application,
             aiApplications: indexedAIApplications
@@ -187,6 +193,11 @@ public struct ApplicationDetailAnalyzer: Sendable {
             $0.uuidString < $1.uuidString
         }) where !existingAssociationItemIDs.contains(itemID) {
             guard let item = indexedItemsByID[itemID] else { continue }
+            guard existingAssociationPaths.insert(
+                item.url.standardizedFileURL.path
+            ).inserted else {
+                continue
+            }
             associations.append(ArtifactAssociation(
                 itemID: itemID,
                 applicationID: application.id,
