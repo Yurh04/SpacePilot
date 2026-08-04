@@ -2,6 +2,39 @@ import AppKit
 import SpacePilotCore
 import SwiftUI
 
+struct ApplicationAssociationGroup: Identifiable {
+    var id: ItemCategory { category }
+    let category: ItemCategory
+    let pairs: [ApplicationAssociationProjection]
+    let allocatedSize: Int64
+
+    static func grouped(
+        _ pairs: [ApplicationAssociationProjection]
+    ) -> [ApplicationAssociationGroup] {
+        let pairsByCategory = Dictionary(grouping: pairs) { $0.item.category }
+        return ItemCategory.allCases.compactMap { category in
+            guard let categoryPairs = pairsByCategory[category] else {
+                return nil
+            }
+            let orderedPairs = categoryPairs.sorted {
+                if $0.item.allocatedSize != $1.item.allocatedSize {
+                    return $0.item.allocatedSize > $1.item.allocatedSize
+                }
+                return $0.item.url.path.localizedStandardCompare(
+                    $1.item.url.path
+                ) == .orderedAscending
+            }
+            return ApplicationAssociationGroup(
+                category: category,
+                pairs: orderedPairs,
+                allocatedSize: orderedPairs.reduce(Int64(0)) {
+                    $0 + $1.item.allocatedSize
+                }
+            )
+        }
+    }
+}
+
 struct ApplicationsView: View {
     let projection: ApplicationListProjection?
     let hasSnapshot: Bool
@@ -217,6 +250,7 @@ private struct ApplicationDetail: View {
     let searchText: String
     let uninstall: () -> Void
     let reset: () -> Void
+    @State private var collapsedCategories: Set<ItemCategory> = []
 
     private var application: ApplicationRecord { projection.application }
     private var visibleAssociations: [ApplicationAssociationProjection] {
@@ -229,6 +263,10 @@ private struct ApplicationDetail: View {
     }
 
     var body: some View {
+        let associationGroups = ApplicationAssociationGroup.grouped(
+            visibleAssociations
+        )
+
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .center, spacing: 14) {
@@ -303,11 +341,23 @@ private struct ApplicationDetail: View {
 
             Divider()
 
-            List(visibleAssociations) { pair in
-                ApplicationAssociationRow(pair: pair)
-                    .contextMenu {
-                        Button(L10n.text(.revealFinder)) { reveal(pair.item.url) }
+            List {
+                ForEach(associationGroups) { group in
+                    DisclosureGroup(
+                        isExpanded: expansionBinding(for: group.category)
+                    ) {
+                        ForEach(group.pairs) { pair in
+                            ApplicationAssociationRow(pair: pair)
+                                .contextMenu {
+                                    Button(L10n.text(.revealFinder)) {
+                                        reveal(pair.item.url)
+                                    }
+                                }
+                        }
+                    } label: {
+                        ApplicationAssociationGroupHeader(group: group)
                     }
+                }
             }
             .listStyle(.inset)
             .overlay {
@@ -323,6 +373,46 @@ private struct ApplicationDetail: View {
                 }
             }
         }
+    }
+
+    private func expansionBinding(
+        for category: ItemCategory
+    ) -> Binding<Bool> {
+        guard searchText.isEmpty else { return .constant(true) }
+        return Binding(
+            get: { !collapsedCategories.contains(category) },
+            set: { isExpanded in
+                if isExpanded {
+                    collapsedCategories.remove(category)
+                } else {
+                    collapsedCategories.insert(category)
+                }
+            }
+        )
+    }
+}
+
+private struct ApplicationAssociationGroupHeader: View {
+    let group: ApplicationAssociationGroup
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Label(
+                L10n.name(for: group.category),
+                systemImage: group.category.systemImage
+            )
+            Spacer(minLength: 12)
+            Text(
+                "\(group.pairs.count.formatted()) · "
+                    + ByteCount.string(group.allocatedSize)
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .monospacedDigit()
+        }
+        .textCase(nil)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -438,6 +528,25 @@ private extension RiskLevel {
             .orange
         case .managed:
             .secondary
+        }
+    }
+}
+
+private extension ItemCategory {
+    var systemImage: String {
+        switch self {
+        case .application: "app"
+        case .personal: "person.crop.circle"
+        case .developer: "hammer"
+        case .aiData: "sparkles.rectangle.stack"
+        case .cache: "internaldrive"
+        case .log: "doc.text.magnifyingglass"
+        case .conversation: "bubble.left.and.bubble.right"
+        case .model: "cpu"
+        case .plugin: "puzzlepiece.extension"
+        case .skill: "wand.and.stars"
+        case .system: "gearshape.2"
+        case .unclassified: "questionmark.folder"
         }
     }
 }
