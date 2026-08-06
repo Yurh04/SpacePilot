@@ -32,7 +32,13 @@ struct DeveloperAIView: View {
                     }
                     .frame(minWidth: 190, idealWidth: 230, maxWidth: 280)
 
-                    if let application = selectedApplication(in: projection.applications) {
+                    if projection.applications.isEmpty {
+                        ContentUnavailableView(
+                            L10n.developerAI(),
+                            systemImage: "sparkles.rectangle.stack",
+                            description: Text(verbatim: L10n.noData())
+                        )
+                    } else if let application = selectedApplication(in: projection.applications) {
                         AIApplicationDetailView(
                             projection: application,
                             queryProjection: model.aiQueryProjection,
@@ -49,9 +55,10 @@ struct DeveloperAIView: View {
                 }
             }
             .navigationTitle(L10n.developerAI())
-            .onAppear {
-                if !projection.applications.contains(where: { $0.id == model.selectedAIApplicationID }) {
-                    model.selectedAIApplicationID = projection.applications.first?.id
+            .onChange(of: projection.applications.map(\.id), initial: true) {
+                _, applicationIDs in
+                if !applicationIDs.contains(where: { $0 == model.selectedAIApplicationID }) {
+                    model.selectedAIApplicationID = applicationIDs.first
                 }
             }
         } else if hasSnapshot {

@@ -24,6 +24,22 @@ final class FileSystemChangeMonitorTests: XCTestCase {
         )
     }
 
+    func testReducerRetainsAllDistinctPathsInMaximumBatch() {
+        let root = URL(fileURLWithPath: "/Users/test", isDirectory: true)
+        let paths = (0..<FileSystemChangeMonitor.maximumChangedPathsPerBatch)
+            .map { index in
+                root.appending(path: "Library/Caches/tool-\(index)/state.json")
+            }
+
+        let reduced = ChangedPathReducer.reduce(paths, within: root)
+
+        XCTAssertEqual(reduced.count, paths.count)
+        XCTAssertEqual(
+            Set(reduced.map(\.path)),
+            Set(paths.map(\.path))
+        )
+    }
+
     func testDroppedEventsRequireFullInvalidation() {
         XCTAssertTrue(FileSystemChangeMonitor.requiresFullInvalidation(
             FSEventStreamEventFlags(kFSEventStreamEventFlagKernelDropped)
