@@ -63,7 +63,7 @@ struct ApplicationsView: View {
                     uninstall: uninstall,
                     reset: reset
                 )
-                .frame(minWidth: 230, idealWidth: 280, maxWidth: 340)
+                .frame(width: 280)
 
                 if let application = selectedApplication(in: applications) {
                     ApplicationDetail(

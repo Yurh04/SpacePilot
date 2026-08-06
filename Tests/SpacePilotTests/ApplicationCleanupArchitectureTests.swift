@@ -92,9 +92,13 @@ final class ApplicationCleanupArchitectureTests: XCTestCase {
 
         XCTAssertLessThan(splitIndex.lowerBound, listIndex.lowerBound)
         XCTAssertLessThan(listIndex.lowerBound, detailIndex.lowerBound)
-        XCTAssertTrue(source.contains(
-            ".frame(minWidth: 230, idealWidth: 280, maxWidth: 340)"
-        ))
+        XCTAssertTrue(source.contains(".frame(width: 280)"))
+        XCTAssertFalse(
+            source.contains(
+                ".frame(minWidth: 230, idealWidth: 280, maxWidth: 340)"
+            ),
+            "The application list must not resize when detail analysis changes its ideal size"
+        )
         XCTAssertTrue(source.contains(
             ".frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)"
         ))
