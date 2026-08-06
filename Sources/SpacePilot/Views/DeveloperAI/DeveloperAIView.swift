@@ -61,8 +61,10 @@ struct DeveloperAIView: View {
                             ),
                             selectedTab: $model.selectedAIApplicationTab
                         )
+                        .frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity)
                     } else {
                         ContentUnavailableView(L10n.text(.aiSelectApplication), systemImage: "sparkles.rectangle.stack")
+                            .frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity)
                     }
                 }
             }

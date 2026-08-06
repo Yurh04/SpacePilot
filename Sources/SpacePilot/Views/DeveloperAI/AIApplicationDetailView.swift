@@ -91,9 +91,12 @@ struct AIApplicationDetailView: View {
                     TableColumn(L10n.title(for: .dataStorage)) { item in
                         VStack(alignment: .leading) {
                             Text(item.url.lastPathComponent)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
                             Text(verbatim: L10n.name(for: item.category))
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                                .lineLimit(1)
                         }
                         .onDoubleClickRevealInFinder(item.url)
                         .contextMenu { Button(L10n.text(.revealFinder)) { FinderReveal.reveal(item.url) } }
@@ -148,18 +151,40 @@ struct AIApplicationDetailView: View {
                         TableColumn(L10n.text(.plugin)) { plugin in
                             VStack(alignment: .leading) {
                                 Text(plugin.name)
-                                Text(plugin.source).font(.caption).foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                                Text(plugin.source)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
                             }
                             .onDoubleClickRevealInFinder(plugin.url)
                             .contextMenu { Button(L10n.text(.revealFinder)) { FinderReveal.reveal(plugin.url) } }
                         }
-                        TableColumn(L10n.version()) { Text($0.version ?? "—") }.width(90)
-                        TableColumn(L10n.skills()) { Text($0.skillCount.formatted()) }.width(70)
-                        TableColumn(L10n.management()) { _ in Text(verbatim: L10n.officialHandoff()) }.width(130)
-                        TableColumn(L10n.space()) {
-                            Text(ByteCount.string($0.allocatedSize)).monospacedDigit()
+                        TableColumn(L10n.version()) {
+                            Text($0.version ?? "—")
+                                .lineLimit(1)
+                                .truncationMode(.tail)
                         }
-                        .width(100)
+                        .width(min: 64, ideal: 76, max: 88)
+                        TableColumn(L10n.skills()) {
+                            Text($0.skillCount.formatted())
+                                .lineLimit(1)
+                        }
+                        .width(min: 52, ideal: 64, max: 76)
+                        TableColumn(L10n.management()) { _ in
+                            Text(verbatim: L10n.officialHandoff())
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                        }
+                        .width(min: 88, ideal: 110, max: 124)
+                        TableColumn(L10n.space()) {
+                            Text(ByteCount.string($0.allocatedSize))
+                                .monospacedDigit()
+                                .lineLimit(1)
+                        }
+                        .width(min: 76, ideal: 92, max: 104)
                     }
                 }
             }
@@ -172,7 +197,13 @@ struct AIApplicationDetailView: View {
                     TableColumn(L10n.text(.skill)) { skill in
                         VStack(alignment: .leading) {
                             Text(skill.name)
-                            Text(skill.summary).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                            Text(skill.summary)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
                         }
                         .onDoubleClickRevealInFinder(skill.url)
                         .contextMenu { Button(L10n.text(.revealFinder)) { FinderReveal.reveal(skill.url) } }

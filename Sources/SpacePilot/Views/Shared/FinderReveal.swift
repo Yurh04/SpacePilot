@@ -36,9 +36,10 @@ private struct DoubleClickRevealInFinderModifier: ViewModifier {
         if let url {
             content
                 .contentShape(Rectangle())
-                .onTapGesture(count: 2) {
-                    FinderReveal.reveal(url)
-                }
+                .simultaneousGesture(
+                    TapGesture(count: 2)
+                        .onEnded { FinderReveal.reveal(url) }
+                )
         } else {
             content
         }

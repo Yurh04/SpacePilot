@@ -101,8 +101,31 @@ final class FinderRevealArchitectureTests: XCTestCase {
         let source = try source(at: "Sources/SpacePilot/Views/Shared/FinderReveal.swift")
 
         XCTAssertTrue(source.contains("activateFileViewerSelecting([url])"))
-        XCTAssertTrue(source.contains("onTapGesture(count: 2)"))
+        XCTAssertTrue(source.contains("simultaneousGesture("))
+        XCTAssertTrue(source.contains("TapGesture(count: 2)"))
+        XCTAssertFalse(source.contains(".onTapGesture(count: 2)"))
         XCTAssertTrue(source.contains("func onDoubleClickRevealInFinder(_ url: URL?)"))
+    }
+
+    func testDeveloperAITablesConstrainLongContentAndPluginColumns() throws {
+        let detail = try source(
+            at: "Sources/SpacePilot/Views/DeveloperAI/AIApplicationDetailView.swift"
+        )
+        let workspace = try source(
+            at: "Sources/SpacePilot/Views/DeveloperAI/DeveloperAIView.swift"
+        )
+
+        XCTAssertGreaterThanOrEqual(
+            detail.components(separatedBy: ".lineLimit(1)").count - 1,
+            9
+        )
+        XCTAssertTrue(detail.contains(".truncationMode(.middle)"))
+        XCTAssertTrue(detail.contains(".truncationMode(.tail)"))
+        XCTAssertTrue(detail.contains(".width(min: 64, ideal: 76, max: 88)"))
+        XCTAssertTrue(detail.contains(".width(min: 52, ideal: 64, max: 76)"))
+        XCTAssertTrue(detail.contains(".width(min: 88, ideal: 110, max: 124)"))
+        XCTAssertTrue(detail.contains(".width(min: 76, ideal: 92, max: 104)"))
+        XCTAssertTrue(workspace.contains(".frame(minWidth: 520, maxWidth: .infinity"))
     }
 
     func testEveryFileBackedSurfaceUsesSharedDoubleClickHelper() throws {
