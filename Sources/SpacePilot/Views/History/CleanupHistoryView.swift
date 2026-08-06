@@ -16,11 +16,18 @@ struct CleanupHistoryView: View {
             List(transactions) { transaction in
                 DisclosureGroup {
                     ForEach(transaction.outcomes) { outcome in
-                        if let sourceURL = outcome.sourceURL {
+                        let revealURL = FinderReveal.cleanupHistoryURL(
+                            resultingURL: outcome.resultingURL,
+                            sourceURL: outcome.sourceURL
+                        )
+                        let displayURL = revealURL
+                            ?? outcome.sourceURL
+                            ?? outcome.resultingURL
+                        if let displayURL {
                             HStack(alignment: .top, spacing: 12) {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(sourceURL.lastPathComponent)
-                                    let parentPath = sourceURL.deletingLastPathComponent()
+                                    Text(displayURL.lastPathComponent)
+                                    let parentPath = displayURL.deletingLastPathComponent()
                                         .path(percentEncoded: false)
                                     Text(parentPath)
                                         .font(.caption)
@@ -41,6 +48,7 @@ struct CleanupHistoryView: View {
                                     Text(verbatim: L10n.name(for: outcome.status))
                                 }
                             }
+                            .onDoubleClickRevealInFinder(revealURL)
                         } else {
                             LabeledContent(
                                 L10n.cleanupOutcomeMessage(outcome.message, status: outcome.status),

@@ -28,6 +28,18 @@ struct DeveloperAIView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
+                        .onDoubleClickRevealInFinder(
+                            FinderReveal.applicationURL(for: application.application)
+                        )
+                        .contextMenu {
+                            if let url = FinderReveal.applicationURL(
+                                for: application.application
+                            ) {
+                                Button(L10n.text(.revealFinder)) {
+                                    FinderReveal.reveal(url)
+                                }
+                            }
+                        }
                         .tag(application.id)
                     }
                     .frame(minWidth: 190, idealWidth: 230, maxWidth: 280)

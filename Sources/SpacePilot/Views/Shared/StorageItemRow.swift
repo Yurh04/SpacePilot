@@ -19,7 +19,8 @@ struct StorageItemRow: View {
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
         }
-        .contextMenu { Button(L10n.text(.revealFinder)) { reveal(item.url) } }
+        .onDoubleClickRevealInFinder(item.url)
+        .contextMenu { Button(L10n.text(.revealFinder)) { FinderReveal.reveal(item.url) } }
         .accessibilityLabel("\(item.url.lastPathComponent), \(ByteCount.string(item.allocatedSize)), \(L10n.name(for: item.risk))")
     }
 }

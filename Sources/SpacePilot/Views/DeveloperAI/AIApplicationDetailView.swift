@@ -10,12 +10,23 @@ struct AIApplicationDetailView: View {
     @Binding var selectedTab: AIApplicationTab
 
     private var application: AIApplicationRecord { projection.application }
+    private var applicationRevealURL: URL? {
+        FinderReveal.applicationURL(for: application)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 10) {
                 Text(application.name)
                     .font(.title2.weight(.semibold))
+                    .onDoubleClickRevealInFinder(applicationRevealURL)
+                    .contextMenu {
+                        if let applicationRevealURL {
+                            Button(L10n.text(.revealFinder)) {
+                                FinderReveal.reveal(applicationRevealURL)
+                            }
+                        }
+                    }
                 Picker(L10n.text(.aiSection), selection: $selectedTab) {
                     ForEach(AIApplicationTab.allCases) { tab in
                         Text(verbatim: L10n.title(for: tab)).tag(tab)
@@ -84,7 +95,8 @@ struct AIApplicationDetailView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
-                        .contextMenu { Button(L10n.text(.revealFinder)) { reveal(item.url) } }
+                        .onDoubleClickRevealInFinder(item.url)
+                        .contextMenu { Button(L10n.text(.revealFinder)) { FinderReveal.reveal(item.url) } }
                         .accessibilityLabel("\(item.url.lastPathComponent), \(ByteCount.string(item.allocatedSize)), \(L10n.name(for: item.risk))")
                     }
                     TableColumn(L10n.risk()) { Text(verbatim: L10n.name(for: $0.risk)) }.width(120)
@@ -138,7 +150,8 @@ struct AIApplicationDetailView: View {
                                 Text(plugin.name)
                                 Text(plugin.source).font(.caption).foregroundStyle(.secondary)
                             }
-                            .contextMenu { Button(L10n.text(.revealFinder)) { reveal(plugin.url) } }
+                            .onDoubleClickRevealInFinder(plugin.url)
+                            .contextMenu { Button(L10n.text(.revealFinder)) { FinderReveal.reveal(plugin.url) } }
                         }
                         TableColumn(L10n.version()) { Text($0.version ?? "—") }.width(90)
                         TableColumn(L10n.skills()) { Text($0.skillCount.formatted()) }.width(70)
@@ -161,7 +174,8 @@ struct AIApplicationDetailView: View {
                             Text(skill.name)
                             Text(skill.summary).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                         }
-                        .contextMenu { Button(L10n.text(.revealFinder)) { reveal(skill.url) } }
+                        .onDoubleClickRevealInFinder(skill.url)
+                        .contextMenu { Button(L10n.text(.revealFinder)) { FinderReveal.reveal(skill.url) } }
                     }
                     TableColumn(L10n.text(.source)) { Text(verbatim: L10n.name(for: $0.scope)) }.width(130)
                     TableColumn(L10n.management()) { Text(verbatim: L10n.name(for: $0.managementStatus)) }.width(120)

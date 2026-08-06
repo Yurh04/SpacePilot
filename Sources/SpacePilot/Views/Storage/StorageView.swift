@@ -1,4 +1,3 @@
-import AppKit
 import SpacePilotCore
 import SwiftUI
 
@@ -127,9 +126,10 @@ struct StorageView: View {
                     ) { item in
                         Text(item.url.lastPathComponent)
                             .lineLimit(1)
+                            .onDoubleClickRevealInFinder(item.url)
                             .contextMenu {
                                 Button(L10n.text(.revealFinder)) {
-                                    reveal(item.url)
+                                    FinderReveal.reveal(item.url)
                                 }
                                 if item.risk == .safe {
                                     Button(L10n.text(.cleanupReview)) {
@@ -143,6 +143,7 @@ struct StorageView: View {
                         Text(item.url.deletingLastPathComponent().path(percentEncoded: false))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
+                            .onDoubleClickRevealInFinder(item.url)
                     }
                     .width(min: 120, ideal: 190)
                     TableColumn(L10n.risk()) { item in
@@ -339,6 +340,7 @@ private struct StorageItemDetail: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            .onDoubleClickRevealInFinder(item.url)
 
             Spacer()
 
@@ -347,7 +349,7 @@ private struct StorageItemDetail: View {
                     .font(.headline)
                     .monospacedDigit()
                 Button(L10n.text(.revealFinder)) {
-                    reveal(item.url)
+                    FinderReveal.reveal(item.url)
                 }
                 if item.risk == .safe {
                     Button(L10n.text(.cleanupReview)) {
@@ -377,10 +379,6 @@ private enum StorageItemMode: String, CaseIterable, Identifiable {
     case old
 
     var id: Self { self }
-}
-
-func reveal(_ url: URL) {
-    NSWorkspace.shared.activateFileViewerSelecting([url])
 }
 
 @ViewBuilder

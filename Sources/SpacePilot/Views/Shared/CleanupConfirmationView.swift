@@ -49,7 +49,12 @@ struct CleanupConfirmationView: View {
             List(items) { reviewItem in
                 let item = reviewItem.item
                 let risk = reviewItem.effectiveRisk
-                Toggle(isOn: binding(for: reviewItem)) {
+                HStack(alignment: .top, spacing: 8) {
+                    Toggle("", isOn: binding(for: reviewItem))
+                        .labelsHidden()
+                        .toggleStyle(.checkbox)
+                        .disabled(isExecuting)
+
                     HStack(alignment: .top, spacing: 8) {
                         FileSystemItemIcon(url: item.url)
                         VStack(alignment: .leading, spacing: 4) {
@@ -81,10 +86,9 @@ struct CleanupConfirmationView: View {
                                 reviewItem.ownership == .shared ? .orange : .secondary
                             )
                         }
+                        .onDoubleClickRevealInFinder(item.url)
                     }
                 }
-                .toggleStyle(.checkbox)
-                .disabled(isExecuting)
             }
             .frame(minHeight: 220)
 

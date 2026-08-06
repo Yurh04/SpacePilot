@@ -1,4 +1,3 @@
-import AppKit
 import SpacePilotCore
 import SwiftUI
 
@@ -147,8 +146,9 @@ private struct ApplicationListPane: View {
                 let application = projection.application
                 ApplicationListRow(projection: projection)
                     .tag(projection.id)
+                    .onDoubleClickRevealInFinder(application.url)
                     .contextMenu {
-                        Button(L10n.text(.revealFinder)) { reveal(application.url) }
+                        Button(L10n.text(.revealFinder)) { FinderReveal.reveal(application.url) }
                         Divider()
                         Button(L10n.text(.applicationReviewReset)) { reset(projection) }
                         Button(L10n.text(.applicationReviewUninstall)) {
@@ -251,6 +251,7 @@ private struct ApplicationDetail: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .onDoubleClickRevealInFinder(application.url)
 
                 HStack(spacing: 8) {
                     Spacer()
@@ -305,8 +306,9 @@ private struct ApplicationDetail: View {
 
             List(visibleAssociations) { pair in
                 ApplicationAssociationRow(pair: pair)
+                    .onDoubleClickRevealInFinder(pair.item.url)
                     .contextMenu {
-                        Button(L10n.text(.revealFinder)) { reveal(pair.item.url) }
+                        Button(L10n.text(.revealFinder)) { FinderReveal.reveal(pair.item.url) }
                     }
             }
             .listStyle(.inset)
