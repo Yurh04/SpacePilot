@@ -146,7 +146,6 @@ private struct ApplicationListPane: View {
                 let application = projection.application
                 ApplicationListRow(projection: projection)
                     .tag(projection.id)
-                    .onDoubleClickRevealInFinder(application.url)
                     .contextMenu {
                         Button(L10n.text(.revealFinder)) { FinderReveal.reveal(application.url) }
                         Divider()
@@ -158,6 +157,11 @@ private struct ApplicationListPane: View {
                     .accessibilityLabel(
                         "\(application.name), \(ByteCount.string(projection.totalSize))"
                     )
+            }
+            .nativeTableDoubleClickReveal { row in
+                applications.indices.contains(row)
+                    ? applications[row].application.url
+                    : nil
             }
             .listStyle(.sidebar)
             .overlay {
@@ -217,6 +221,7 @@ private struct ApplicationDetail: View {
     let searchText: String
     let uninstall: () -> Void
     let reset: () -> Void
+    @State private var selectedAssociationID: UUID?
 
     private var application: ApplicationRecord { projection.application }
     private var visibleAssociations: [ApplicationAssociationProjection] {
@@ -304,12 +309,17 @@ private struct ApplicationDetail: View {
 
             Divider()
 
-            List(visibleAssociations) { pair in
+            List(visibleAssociations, selection: $selectedAssociationID) { pair in
                 ApplicationAssociationRow(pair: pair)
-                    .onDoubleClickRevealInFinder(pair.item.url)
+                    .tag(pair.id)
                     .contextMenu {
                         Button(L10n.text(.revealFinder)) { FinderReveal.reveal(pair.item.url) }
                     }
+            }
+            .nativeTableDoubleClickReveal { row in
+                visibleAssociations.indices.contains(row)
+                    ? visibleAssociations[row].item.url
+                    : nil
             }
             .listStyle(.inset)
             .overlay {

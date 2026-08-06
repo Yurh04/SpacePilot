@@ -126,7 +126,6 @@ struct StorageView: View {
                     ) { item in
                         Text(item.url.lastPathComponent)
                             .lineLimit(1)
-                            .onDoubleClickRevealInFinder(item.url)
                             .contextMenu {
                                 Button(L10n.text(.revealFinder)) {
                                     FinderReveal.reveal(item.url)
@@ -143,7 +142,6 @@ struct StorageView: View {
                         Text(item.url.deletingLastPathComponent().path(percentEncoded: false))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
-                            .onDoubleClickRevealInFinder(item.url)
                     }
                     .width(min: 120, ideal: 190)
                     TableColumn(L10n.risk()) { item in
@@ -157,6 +155,9 @@ struct StorageView: View {
                     .width(min: 80, ideal: 95)
                 } rows: {
                     ForEach(visibleItems)
+                }
+                .nativeTableDoubleClickReveal { row in
+                    visibleItems.indices.contains(row) ? visibleItems[row].url : nil
                 }
             }
 

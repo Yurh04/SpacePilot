@@ -28,9 +28,6 @@ struct DeveloperAIView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
-                        .onDoubleClickRevealInFinder(
-                            FinderReveal.applicationURL(for: application.application)
-                        )
                         .contextMenu {
                             if let url = FinderReveal.applicationURL(
                                 for: application.application
@@ -41,6 +38,14 @@ struct DeveloperAIView: View {
                             }
                         }
                         .tag(application.id)
+                    }
+                    .nativeTableDoubleClickReveal { row in
+                        guard projection.applications.indices.contains(row) else {
+                            return nil
+                        }
+                        return FinderReveal.applicationURL(
+                            for: projection.applications[row].application
+                        )
                     }
                     .frame(minWidth: 190, idealWidth: 230, maxWidth: 280)
 

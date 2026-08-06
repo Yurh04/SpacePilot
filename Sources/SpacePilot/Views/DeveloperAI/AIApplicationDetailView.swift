@@ -2,12 +2,26 @@ import AppKit
 import SpacePilotCore
 import SwiftUI
 
+enum PluginTableLayoutMode: Equatable {
+    case compact
+    case regular
+
+    static let compactBreakpoint: CGFloat = 620
+
+    init(availableWidth: CGFloat) {
+        self = availableWidth < Self.compactBreakpoint ? .compact : .regular
+    }
+}
+
 struct AIApplicationDetailView: View {
     let projection: AIApplicationProjection
     let queryProjection: AIApplicationQueryProjection?
     let isPreparingQuery: Bool
     let pluginDiagnostics: [String]
     @Binding var selectedTab: AIApplicationTab
+    @State private var selectedDataItemID: UUID?
+    @State private var selectedPluginID: UUID?
+    @State private var selectedSkillID: UUID?
 
     private var application: AIApplicationRecord { projection.application }
     private var applicationRevealURL: URL? {
@@ -87,7 +101,8 @@ struct AIApplicationDetailView: View {
                 ProgressView(L10n.text(.aiSearching))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                Table(queryProjection?.dataItems ?? projection.dataItems) {
+                let dataItems = queryProjection?.dataItems ?? projection.dataItems
+                Table(dataItems, selection: $selectedDataItemID) {
                     TableColumn(L10n.title(for: .dataStorage)) { item in
                         VStack(alignment: .leading) {
                             Text(item.url.lastPathComponent)
@@ -98,102 +113,29 @@ struct AIApplicationDetailView: View {
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                         }
-                        .onDoubleClickRevealInFinder(item.url)
                         .contextMenu { Button(L10n.text(.revealFinder)) { FinderReveal.reveal(item.url) } }
                         .accessibilityLabel("\(item.url.lastPathComponent), \(ByteCount.string(item.allocatedSize)), \(L10n.name(for: item.risk))")
                     }
                     TableColumn(L10n.risk()) { Text(verbatim: L10n.name(for: $0.risk)) }.width(120)
                     TableColumn(L10n.space()) { Text(ByteCount.string($0.allocatedSize)).monospacedDigit() }.width(100)
                 }
+                .nativeTableDoubleClickReveal { row in
+                    dataItems.indices.contains(row) ? dataItems[row].url : nil
+                }
             }
         case .plugins:
-            VStack(spacing: 0) {
-                HStack {
-                    Text(verbatim: L10n.text(.aiPluginsManaged))
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    if let applicationURL = application.applicationURL {
-                        Button(L10n.manageIn(application.name)) {
-                            NSWorkspace.shared.openApplication(
-                                at: applicationURL,
-                                configuration: .init()
-                            )
-                        }
-                    }
-                }
-                .padding(12)
-                Divider()
-                if projection.plugins.isEmpty {
-                    if pluginDiagnostics.isEmpty {
-                        ContentUnavailableView(
-                            L10n.noPluginsInstalled(),
-                            systemImage: "puzzlepiece.extension"
-                        )
-                    } else {
-                        VStack(spacing: 12) {
-                            ContentUnavailableView(
-                                L10n.pluginDiscoveryFailed(),
-                                systemImage: "exclamationmark.triangle"
-                            )
-                            VStack(alignment: .leading, spacing: 6) {
-                                ForEach(sanitizedDiagnosticSummaries, id: \.self) { summary in
-                                    Label(summary, systemImage: "exclamationmark.circle")
-                                }
-                            }
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        }
-                        .padding(.horizontal)
-                        .padding(.bottom)
-                    }
-                } else {
-                    Table(projection.plugins) {
-                        TableColumn(L10n.text(.plugin)) { plugin in
-                            VStack(alignment: .leading) {
-                                Text(plugin.name)
-                                    .lineLimit(1)
-                                    .truncationMode(.tail)
-                                Text(plugin.source)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                                    .truncationMode(.middle)
-                            }
-                            .onDoubleClickRevealInFinder(plugin.url)
-                            .contextMenu { Button(L10n.text(.revealFinder)) { FinderReveal.reveal(plugin.url) } }
-                        }
-                        TableColumn(L10n.version()) {
-                            Text($0.version ?? "—")
-                                .lineLimit(1)
-                                .truncationMode(.tail)
-                        }
-                        .width(min: 64, ideal: 76, max: 88)
-                        TableColumn(L10n.skills()) {
-                            Text($0.skillCount.formatted())
-                                .lineLimit(1)
-                        }
-                        .width(min: 52, ideal: 64, max: 76)
-                        TableColumn(L10n.management()) { _ in
-                            Text(verbatim: L10n.officialHandoff())
-                                .lineLimit(1)
-                                .truncationMode(.tail)
-                        }
-                        .width(min: 88, ideal: 110, max: 124)
-                        TableColumn(L10n.space()) {
-                            Text(ByteCount.string($0.allocatedSize))
-                                .monospacedDigit()
-                                .lineLimit(1)
-                        }
-                        .width(min: 76, ideal: 92, max: 104)
-                    }
-                }
+            GeometryReader { geometry in
+                pluginContent(
+                    layout: PluginTableLayoutMode(availableWidth: geometry.size.width)
+                )
             }
         case .skills:
             if isPreparingQuery {
                 ProgressView(L10n.text(.aiSearching))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                Table(queryProjection?.skills ?? projection.skills) {
+                let skills = queryProjection?.skills ?? projection.skills
+                Table(skills, selection: $selectedSkillID) {
                     TableColumn(L10n.text(.skill)) { skill in
                         VStack(alignment: .leading) {
                             Text(skill.name)
@@ -205,15 +147,161 @@ struct AIApplicationDetailView: View {
                                 .lineLimit(1)
                                 .truncationMode(.tail)
                         }
-                        .onDoubleClickRevealInFinder(skill.url)
                         .contextMenu { Button(L10n.text(.revealFinder)) { FinderReveal.reveal(skill.url) } }
                     }
                     TableColumn(L10n.text(.source)) { Text(verbatim: L10n.name(for: $0.scope)) }.width(130)
                     TableColumn(L10n.management()) { Text(verbatim: L10n.name(for: $0.managementStatus)) }.width(120)
                     TableColumn(L10n.space()) { Text(ByteCount.string($0.allocatedSize)).monospacedDigit() }.width(100)
                 }
+                .nativeTableDoubleClickReveal { row in
+                    skills.indices.contains(row) ? skills[row].url : nil
+                }
             }
         }
+    }
+
+    @ViewBuilder
+    private func pluginContent(layout: PluginTableLayoutMode) -> some View {
+        VStack(spacing: 0) {
+            pluginHeader(layout: layout)
+                .padding(12)
+            Divider()
+            if projection.plugins.isEmpty {
+                pluginEmptyState
+            } else if layout == .compact {
+                compactPluginTable
+            } else {
+                regularPluginTable
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func pluginHeader(layout: PluginTableLayoutMode) -> some View {
+        if layout == .compact {
+            VStack(alignment: .leading, spacing: 8) {
+                pluginManagedText
+                pluginManagementButton
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            HStack {
+                pluginManagedText
+                Spacer()
+                pluginManagementButton
+            }
+        }
+    }
+
+    private var pluginManagedText: some View {
+        Text(verbatim: L10n.text(.aiPluginsManaged))
+            .foregroundStyle(.secondary)
+            .lineLimit(2)
+    }
+
+    @ViewBuilder
+    private var pluginManagementButton: some View {
+        if let applicationURL = application.applicationURL {
+            Button(L10n.manageIn(application.name)) {
+                NSWorkspace.shared.openApplication(
+                    at: applicationURL,
+                    configuration: .init()
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var pluginEmptyState: some View {
+        if pluginDiagnostics.isEmpty {
+            ContentUnavailableView(
+                L10n.noPluginsInstalled(),
+                systemImage: "puzzlepiece.extension"
+            )
+        } else {
+            VStack(spacing: 12) {
+                ContentUnavailableView(
+                    L10n.pluginDiscoveryFailed(),
+                    systemImage: "exclamationmark.triangle"
+                )
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(sanitizedDiagnosticSummaries, id: \.self) { summary in
+                        Label(summary, systemImage: "exclamationmark.circle")
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal)
+            .padding(.bottom)
+        }
+    }
+
+    private var compactPluginTable: some View {
+        Table(projection.plugins, selection: $selectedPluginID) {
+            TableColumn(L10n.text(.plugin)) { plugin in
+                pluginNameCell(plugin)
+            }
+            TableColumn(L10n.space()) {
+                Text(ByteCount.string($0.allocatedSize))
+                    .monospacedDigit()
+                    .lineLimit(1)
+            }
+            .width(min: 76, ideal: 92, max: 104)
+        }
+        .nativeTableDoubleClickReveal(urlAtRow: urlForPluginRow)
+    }
+
+    private var regularPluginTable: some View {
+        Table(projection.plugins, selection: $selectedPluginID) {
+            TableColumn(L10n.text(.plugin)) { plugin in
+                pluginNameCell(plugin)
+            }
+            TableColumn(L10n.version()) {
+                Text($0.version ?? "—")
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            .width(min: 64, ideal: 76, max: 88)
+            TableColumn(L10n.skills()) {
+                Text($0.skillCount.formatted())
+                    .lineLimit(1)
+            }
+            .width(min: 52, ideal: 64, max: 76)
+            TableColumn(L10n.management()) { _ in
+                Text(verbatim: L10n.officialHandoff())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            .width(min: 88, ideal: 110, max: 124)
+            TableColumn(L10n.space()) {
+                Text(ByteCount.string($0.allocatedSize))
+                    .monospacedDigit()
+                    .lineLimit(1)
+            }
+            .width(min: 76, ideal: 92, max: 104)
+        }
+        .nativeTableDoubleClickReveal(urlAtRow: urlForPluginRow)
+    }
+
+    private func pluginNameCell(_ plugin: PluginRecord) -> some View {
+        VStack(alignment: .leading) {
+            Text(plugin.name)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Text(plugin.source)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
+        .contextMenu {
+            Button(L10n.text(.revealFinder)) { FinderReveal.reveal(plugin.url) }
+        }
+    }
+
+    private func urlForPluginRow(_ row: Int) -> URL? {
+        projection.plugins.indices.contains(row) ? projection.plugins[row].url : nil
     }
 
     private var sanitizedDiagnosticSummaries: [String] {
