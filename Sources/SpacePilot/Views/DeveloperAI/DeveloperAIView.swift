@@ -37,6 +37,12 @@ struct DeveloperAIView: View {
                                 }
                             }
                         }
+                        .contentShape(Rectangle())
+                        .simultaneousGesture(
+                            TapGesture().onEnded {
+                                model.selectedAIApplicationID = application.id
+                            }
+                        )
                         .tag(application.id)
                     }
                     .nativeTableDoubleClickReveal { row in

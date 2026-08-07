@@ -112,6 +112,7 @@ struct AIApplicationDetailView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
+                                .truncationMode(.tail)
                         }
                         .contextMenu { Button(L10n.text(.revealFinder)) { FinderReveal.reveal(item.url) } }
                         .accessibilityLabel("\(item.url.lastPathComponent), \(ByteCount.string(item.allocatedSize)), \(L10n.name(for: item.risk))")
@@ -293,7 +294,7 @@ struct AIApplicationDetailView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-                .truncationMode(.middle)
+                .truncationMode(.tail)
         }
         .contextMenu {
             Button(L10n.text(.revealFinder)) { FinderReveal.reveal(plugin.url) }

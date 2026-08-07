@@ -145,6 +145,12 @@ private struct ApplicationListPane: View {
             List(applications, selection: $selection) { projection in
                 let application = projection.application
                 ApplicationListRow(projection: projection)
+                    .contentShape(Rectangle())
+                    .simultaneousGesture(
+                        TapGesture().onEnded {
+                            selection = projection.id
+                        }
+                    )
                     .tag(projection.id)
                     .contextMenu {
                         Button(L10n.text(.revealFinder)) { FinderReveal.reveal(application.url) }
