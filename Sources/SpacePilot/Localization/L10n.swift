@@ -16,6 +16,22 @@ enum L10n {
         static let aiPrivacy = Self(key: "ai.privacy", english: "Privacy")
         static let aiSearching = Self(key: "ai.searching", english: "Searching…")
         static let aiSection = Self(key: "ai.section", english: "Section")
+        static let aiSectionApps = Self(key: "ai.section.apps", english: "AI Apps")
+        static let aiSectionCLI = Self(key: "ai.section.cli", english: "CLI Tools")
+        static let aiOverviewApps = Self(key: "ai.overview.apps", english: "AI apps")
+        static let aiOverviewCLIs = Self(key: "ai.overview.clis", english: "CLI tools")
+        static let aiOverviewPartialCoverage = Self(key: "ai.overview.partial-coverage", english: "Partial coverage")
+        static let aiOverviewDiscovering = Self(key: "ai.overview.discovering", english: "Discovering AI tools…")
+        static let aiOverviewDiscoveryIssue = Self(key: "ai.overview.discovery-issue", english: "Discovery issue")
+        static let aiCLIExecutable = Self(key: "ai.cli.executable", english: "Executable")
+        static let aiCLIOwner = Self(key: "ai.cli.owner", english: "Owner")
+        static let aiCLIStatus = Self(key: "ai.cli.status", english: "Status")
+        static let aiCLIAvailable = Self(key: "ai.cli.available", english: "Available")
+        static let aiCLIEmpty = Self(key: "ai.cli.empty", english: "No CLI tools found")
+        static let aiSkillsEmpty = Self(key: "ai.skills.empty", english: "No skills indexed")
+        static let aiAppsDiscovered = Self(key: "ai.apps.discovered", english: "Discovered")
+        static let aiStateNotScanned = Self(key: "ai.state.not-scanned", english: "Run a scan to discover AI tools.")
+        static let aiStateNoResults = Self(key: "ai.state.no-results", english: "No results")
         static let aiSelectApplication = Self(key: "ai.select-application", english: "Select an AI application")
         static let aiStorageBreakdown = Self(key: "ai.storage-breakdown", english: "Space breakdown")
         static let aiTotalIndexedSpace = Self(key: "ai.total-indexed-space", english: "Total indexed space")
@@ -109,6 +125,13 @@ enum L10n {
         "ai.local-footprint", "ai.manage-in", "ai.no-content-indexed", "ai.plugins-managed",
         "ai.privacy", "ai.searching", "ai.section", "ai.select-application",
         "ai.skills-visible", "ai.storage-breakdown", "ai.total-indexed-space",
+        "ai.section.apps", "ai.section.cli", "ai.overview.apps", "ai.overview.clis",
+        "ai.overview.partial-coverage", "ai.overview.discovering", "ai.overview.discovery-issue",
+        "ai.cli.executable", "ai.cli.owner", "ai.cli.status", "ai.cli.available",
+        "ai.cli.empty", "ai.skills.empty", "ai.apps.discovered",
+        "ai.state.not-scanned", "ai.state.no-results",
+        "ai.coverage.permission-denied", "ai.coverage.timeout", "ai.coverage.output-truncated",
+        "ai.coverage.invalid-output", "ai.coverage.unavailable", "ai.owner.shared",
         "app.application", "app.association-confidence", "app.last-used",
         "app.evidence.bundle-id", "app.evidence.container-id", "app.evidence.known-rule",
         "app.evidence.name", "app.evidence.signed-helper", "app.only-high-confidence",
@@ -435,6 +458,33 @@ enum L10n {
         case .standalone: value("skill.status.standalone", default: "Standalone", locale: locale)
         case .parentManaged: value("skill.status.parent-managed", default: "Plugin managed", locale: locale)
         case .systemReadOnly: value("skill.status.read-only", default: "Read only", locale: locale)
+        }
+    }
+
+    static func name(for failure: AIToolCoverageFailure, locale: Locale? = nil) -> String {
+        switch failure {
+        case .permissionDenied: value("ai.coverage.permission-denied", default: "Permission denied", locale: locale)
+        case .timeout: value("ai.coverage.timeout", default: "Timed out", locale: locale)
+        case .outputTruncated: value("ai.coverage.output-truncated", default: "Output truncated", locale: locale)
+        case .invalidOutput: value("ai.coverage.invalid-output", default: "Invalid output", locale: locale)
+        case .unavailable: value("ai.coverage.unavailable", default: "Unavailable", locale: locale)
+        }
+    }
+
+    static func name(for owner: AIToolOwner, locale: Locale? = nil) -> String {
+        switch owner {
+        case .shared: value("ai.owner.shared", default: "Shared", locale: locale)
+        case .tool(let definitionID): definitionID
+        }
+    }
+
+    static func aiSectionTitle(for section: AIManagementSection, locale: Locale? = nil) -> String {
+        switch section {
+        case .overview: overview(locale: locale)
+        case .apps: value("ai.section.apps", default: "AI Apps", locale: locale)
+        case .skills: skills(locale: locale)
+        case .plugins: plugins(locale: locale)
+        case .cli: value("ai.section.cli", default: "CLI Tools", locale: locale)
         }
     }
 

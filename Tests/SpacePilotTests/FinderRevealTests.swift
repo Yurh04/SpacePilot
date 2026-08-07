@@ -119,7 +119,7 @@ final class FinderRevealArchitectureTests: XCTestCase {
             at: "Sources/SpacePilot/Views/DeveloperAI/AIApplicationDetailView.swift"
         )
         let workspace = try source(
-            at: "Sources/SpacePilot/Views/DeveloperAI/DeveloperAIView.swift"
+            at: "Sources/SpacePilot/Views/DeveloperAI/AIAppsSectionView.swift"
         )
 
         XCTAssertGreaterThanOrEqual(
@@ -132,7 +132,7 @@ final class FinderRevealArchitectureTests: XCTestCase {
         XCTAssertTrue(detail.contains(".width(min: 52, ideal: 64, max: 76)"))
         XCTAssertTrue(detail.contains(".width(min: 88, ideal: 110, max: 124)"))
         XCTAssertTrue(detail.contains(".width(min: 76, ideal: 92, max: 104)"))
-        XCTAssertTrue(workspace.contains(".frame(minWidth: 520, maxWidth: .infinity"))
+        XCTAssertTrue(workspace.contains(".frame(minWidth: 420, maxWidth: .infinity"))
         XCTAssertTrue(detail.contains("GeometryReader { geometry in"))
         XCTAssertTrue(detail.contains("PluginTableLayoutMode(availableWidth: geometry.size.width)"))
         XCTAssertTrue(detail.contains("private var compactPluginTable"))
@@ -147,6 +147,9 @@ final class FinderRevealArchitectureTests: XCTestCase {
             at: "Sources/SpacePilot/Views/Applications/ApplicationsView.swift"
         )
         let developerAI = try source(
+            at: "Sources/SpacePilot/Views/DeveloperAI/AIAppsSectionView.swift"
+        )
+        let developerAIShell = try source(
             at: "Sources/SpacePilot/Views/DeveloperAI/DeveloperAIView.swift"
         )
         let detail = try source(
@@ -164,9 +167,13 @@ final class FinderRevealArchitectureTests: XCTestCase {
         XCTAssertTrue(applications.contains(".simultaneousGesture("))
         XCTAssertTrue(applications.contains("selection = projection.id"))
         XCTAssertTrue(applications.contains("List(visibleAssociations, selection: $selectedAssociationID)"))
-        XCTAssertTrue(developerAI.contains("selection: $model.selectedAIApplicationID"))
-        XCTAssertTrue(developerAI.contains(".simultaneousGesture("))
-        XCTAssertTrue(developerAI.contains("model.selectedAIApplicationID = application.id"))
+        // AI Apps sidebar uses a single flat List with a unified selection and no
+        // per-row tap gesture; the native adapter maps clickedRow to entries[row]
+        // and the unified selection is synced back to the model.
+        XCTAssertTrue(developerAI.contains("List(entries, selection: $selectedEntryID)"))
+        XCTAssertTrue(developerAI.contains("model.selectedAIApplicationID = deepID"))
+        XCTAssertFalse(developerAI.contains(".simultaneousGesture("))
+        XCTAssertFalse(developerAI.contains(".onTapGesture(count: 2)"))
         XCTAssertTrue(storage.contains("selection: $selectedItemIDs"))
         XCTAssertTrue(detail.contains("Table(dataItems, selection: $selectedDataItemID)"))
         XCTAssertTrue(detail.contains("Table(skills, selection: $selectedSkillID)"))
@@ -175,6 +182,7 @@ final class FinderRevealArchitectureTests: XCTestCase {
             2
         )
         XCTAssertFalse(developerAI.contains(".onDoubleClickRevealInFinder("))
+        XCTAssertFalse(developerAIShell.contains(".onDoubleClickRevealInFinder("))
         XCTAssertEqual(
             applications.components(separatedBy: ".onDoubleClickRevealInFinder(").count - 1,
             1
@@ -216,7 +224,7 @@ final class FinderRevealArchitectureTests: XCTestCase {
     }
 
     func testFallbackHelpersAreUsedAtAIDisplayAndHistorySurfaces() throws {
-        let aiList = try source(at: "Sources/SpacePilot/Views/DeveloperAI/DeveloperAIView.swift")
+        let aiList = try source(at: "Sources/SpacePilot/Views/DeveloperAI/AIAppsSectionView.swift")
         let aiDetail = try source(at: "Sources/SpacePilot/Views/DeveloperAI/AIApplicationDetailView.swift")
         let history = try source(at: "Sources/SpacePilot/Views/History/CleanupHistoryView.swift")
 

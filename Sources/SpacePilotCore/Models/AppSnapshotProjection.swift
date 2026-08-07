@@ -166,6 +166,13 @@ public struct DeveloperAIProjection: Sendable {
     public let developerBytes: Int64
     public let applications: [AIApplicationProjection]
     public let pluginDiagnostics: [String]
+    /// All skills discovered in the snapshot, including shared and unowned
+    /// records, sorted deterministically. Used by the global Skills page.
+    public let allSkills: [SkillRecord]
+    /// All plugins discovered in the snapshot, including those not attached to
+    /// a single application, sorted deterministically. Used by the global
+    /// Plugins page.
+    public let allPlugins: [PluginRecord]
 
     public init(snapshot: ScanSnapshot) {
         self = try! Self(snapshot: snapshot, checkCancellation: {})
@@ -292,7 +299,91 @@ public struct DeveloperAIProjection: Sendable {
             try checkCancellation()
         }
         applications = applicationProjections
+
+        allSkills = try ProjectionCancellationAwareOrdering.sorted(
+            Self.deduplicatedByCanonicalURL(
+                snapshot.skills,
+                url: { $0.url },
+                name: { $0.name },
+                id: { $0.id },
+                checkCancellation: checkCancellation
+            ),
+            by: {
+                let order = $0.name.localizedCaseInsensitiveCompare($1.name)
+                if order != .orderedSame {
+                    return order == .orderedAscending
+                }
+                return $0.id.uuidString < $1.id.uuidString
+            },
+            checkCancellation: checkCancellation
+        )
+        allPlugins = try ProjectionCancellationAwareOrdering.sorted(
+            Self.deduplicatedByCanonicalURL(
+                snapshot.plugins,
+                url: { $0.url },
+                name: { $0.name },
+                id: { $0.id },
+                checkCancellation: checkCancellation
+            ),
+            by: {
+                let order = $0.name.localizedCaseInsensitiveCompare($1.name)
+                if order != .orderedSame {
+                    return order == .orderedAscending
+                }
+                return $0.id.uuidString < $1.id.uuidString
+            },
+            checkCancellation: checkCancellation
+        )
+
         pluginDiagnostics = snapshot.pluginDiagnostics ?? []
         try checkCancellation()
+    }
+
+    /// Deduplicates records that resolve to the same canonical (standardized,
+    /// symlink-resolved) URL so overlapping roots do not produce duplicate rows
+    /// in the global Skills/Plugins pages.
+    ///
+    /// The survivor for a given canonical URL is deterministic regardless of
+    /// snapshot input order: records are first placed in a stable total order
+    /// (canonical path → case-insensitive name → UUID) and the first record for
+    /// each canonical path wins. Callers apply their own display sort afterwards.
+    private static func deduplicatedByCanonicalURL<Record>(
+        _ records: [Record],
+        url: (Record) -> URL,
+        name: (Record) -> String,
+        id: (Record) -> UUID,
+        checkCancellation: @escaping @Sendable () throws -> Void
+    ) throws -> [Record] {
+        var checkpoint = ProjectionCancellationCheckpoint(checkCancellation: checkCancellation)
+
+        // Precompute canonical paths once, then order by a stable total order so
+        // the survivor of a duplicate canonical URL never depends on input order.
+        var annotated: [(record: Record, canonicalPath: String)] = []
+        annotated.reserveCapacity(records.count)
+        for record in records {
+            try checkpoint.checkPeriodically()
+            let canonicalPath = url(record).standardizedFileURL.resolvingSymlinksInPath().path
+            annotated.append((record, canonicalPath))
+        }
+        annotated.sort { lhs, rhs in
+            if lhs.canonicalPath != rhs.canonicalPath {
+                return lhs.canonicalPath < rhs.canonicalPath
+            }
+            let nameOrder = name(lhs.record).localizedCaseInsensitiveCompare(name(rhs.record))
+            if nameOrder != .orderedSame {
+                return nameOrder == .orderedAscending
+            }
+            return id(lhs.record).uuidString < id(rhs.record).uuidString
+        }
+
+        var seenPaths = Set<String>()
+        var result: [Record] = []
+        result.reserveCapacity(annotated.count)
+        for entry in annotated {
+            try checkpoint.checkPeriodically()
+            guard seenPaths.insert(entry.canonicalPath).inserted else { continue }
+            result.append(entry.record)
+        }
+        return result
     }
 }

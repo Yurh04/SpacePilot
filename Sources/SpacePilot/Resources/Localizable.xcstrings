@@ -131,134 +131,354 @@
     },
     "cleanup.clear-selection": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Clear" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "清除" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除"
+          }
+        }
       }
     },
     "cleanup.move-selected-trash": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Move Selected to Trash" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "将所选项目移到废纸篓" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move Selected to Trash"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将所选项目移到废纸篓"
+          }
+        }
       }
     },
     "cleanup.select-all": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Select All" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "全选" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select All"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全选"
+          }
+        }
       }
     },
     "cleanup.selected-summary": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "%lld selected · %@" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已选 %lld 项，共 %@" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld selected · %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已选 %lld 项，共 %@"
+          }
+        }
       }
     },
     "cleanup.reason.changed-identity": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "The item changed after the scan and was not moved." } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "项目在扫描后发生变化，因此未移动。" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The item changed after the scan and was not moved."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "项目在扫描后发生变化，因此未移动。"
+          }
+        }
       }
     },
     "cleanup.reason.missing-source": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "The item no longer exists at the source path." } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "源路径中的项目已不存在。" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The item no longer exists at the source path."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "源路径中的项目已不存在。"
+          }
+        }
       }
     },
     "cleanup.reason.move-failed": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "The item could not be moved to Trash." } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法将项目移到废纸篓。" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The item could not be moved to Trash."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法将项目移到废纸篓。"
+          }
+        }
       }
     },
     "cleanup.reason.permission-denied": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Permission was denied while moving the item to Trash." } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "将项目移到废纸篓时权限被拒绝。" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permission was denied while moving the item to Trash."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将项目移到废纸篓时权限被拒绝。"
+          }
+        }
       }
     },
     "cleanup.reason.protected-path": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "The source path is protected and was not moved." } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "源路径受保护，因此未移动。" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The source path is protected and was not moved."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "源路径受保护，因此未移动。"
+          }
+        }
       }
     },
     "cleanup.source-path": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Source path" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "源路径" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source path"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "源路径"
+          }
+        }
       }
     },
     "common.item-count": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "%lld items" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "%lld 项" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld items"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 项"
+          }
+        }
       }
     },
     "storage.all-analyzed": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "All Analyzed Items" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "全部已分析项目" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All Analyzed Items"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全部已分析项目"
+          }
+        }
       }
     },
     "storage.available": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Available" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "可用" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Available"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可用"
+          }
+        }
       }
     },
     "storage.categories": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Categories" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "类别" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Categories"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "类别"
+          }
+        }
       }
     },
     "storage.internal-disk": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Internal Disk" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "内置磁盘" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Internal Disk"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "内置磁盘"
+          }
+        }
       }
     },
     "storage.no-matching": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "No Matching Items" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "没有匹配的项目" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Matching Items"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有匹配的项目"
+          }
+        }
       }
     },
     "storage.no-matching-description": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Choose another category or display mode." } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请选择其他类别或显示方式。" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose another category or display mode."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择其他类别或显示方式。"
+          }
+        }
       }
     },
     "storage.review-safe-cleanup": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Review Safe Cleanup" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "检查安全清理" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Review Safe Cleanup"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "检查安全清理"
+          }
+        }
       }
     },
     "storage.total-capacity": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Total Capacity" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "总容量" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Total Capacity"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "总容量"
+          }
+        }
       }
     },
     "storage.used": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Used" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已使用" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Used"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已使用"
+          }
+        }
       }
     },
     "storage.used-of": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "%@ of %@" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已使用 %@，共 %@" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ of %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已使用 %@，共 %@"
+          }
+        }
       }
     },
     "storage.visible-items": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "%lld visible items" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "显示 %lld 项" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld visible items"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示 %lld 项"
+          }
+        }
       }
     },
     "common.search-current": {
@@ -2945,6 +3165,358 @@
           "stringUnit": {
             "state": "translated",
             "value": "共享组件"
+          }
+        }
+      }
+    },
+    "ai.section.apps": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI Apps"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI 应用"
+          }
+        }
+      }
+    },
+    "ai.section.cli": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CLI Tools"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "命令行工具"
+          }
+        }
+      }
+    },
+    "ai.overview.apps": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI apps"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI 应用"
+          }
+        }
+      }
+    },
+    "ai.overview.clis": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CLI tools"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "命令行工具"
+          }
+        }
+      }
+    },
+    "ai.overview.partial-coverage": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Partial coverage"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "部分覆盖"
+          }
+        }
+      }
+    },
+    "ai.overview.discovering": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discovering AI tools…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在发现 AI 工具…"
+          }
+        }
+      }
+    },
+    "ai.overview.discovery-issue": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discovery issue"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "发现问题"
+          }
+        }
+      }
+    },
+    "ai.cli.executable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Executable"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可执行文件"
+          }
+        }
+      }
+    },
+    "ai.cli.owner": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Owner"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "归属"
+          }
+        }
+      }
+    },
+    "ai.cli.status": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Status"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "状态"
+          }
+        }
+      }
+    },
+    "ai.cli.available": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Available"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可用"
+          }
+        }
+      }
+    },
+    "ai.cli.empty": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No CLI tools found"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到命令行工具"
+          }
+        }
+      }
+    },
+    "ai.skills.empty": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No skills indexed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未索引技能"
+          }
+        }
+      }
+    },
+    "ai.apps.discovered": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discovered"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已发现"
+          }
+        }
+      }
+    },
+    "ai.state.not-scanned": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run a scan to discover AI tools."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "运行扫描以发现 AI 工具。"
+          }
+        }
+      }
+    },
+    "ai.state.no-results": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No results"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无结果"
+          }
+        }
+      }
+    },
+    "ai.coverage.permission-denied": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permission denied"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "权限被拒绝"
+          }
+        }
+      }
+    },
+    "ai.coverage.timeout": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Timed out"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已超时"
+          }
+        }
+      }
+    },
+    "ai.coverage.output-truncated": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Output truncated"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "输出被截断"
+          }
+        }
+      }
+    },
+    "ai.coverage.invalid-output": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invalid output"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "输出无效"
+          }
+        }
+      }
+    },
+    "ai.coverage.unavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unavailable"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不可用"
+          }
+        }
+      }
+    },
+    "ai.owner.shared": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shared"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "共享"
           }
         }
       }
