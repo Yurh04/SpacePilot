@@ -15,6 +15,10 @@ final class SkillScannerTests: XCTestCase {
         XCTAssertEqual(records.first(named: "imagegen")?.scope, .agentSpecific(agent: "Codex"))
         XCTAssertEqual(records.first(named: "smart-debug")?.scope, .agentSpecific(agent: "Claude"))
         XCTAssertEqual(records.first(named: "lark-doc")?.summary, "Fixture skill lark-doc")
+        XCTAssertEqual(records.first(named: "lark-doc")?.owner, .shared)
+        XCTAssertEqual(records.first(named: "imagegen")?.owner, .tool(definitionID: "codex"))
+        XCTAssertEqual(records.first(named: "smart-debug")?.owner, .tool(definitionID: "claude"))
+        XCTAssertTrue(records.allSatisfy { $0.locationScope == .userGlobal })
     }
 
     func testScannerDoesNotTreatFolderWithoutManifestAsSkill() async throws {

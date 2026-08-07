@@ -601,6 +601,101 @@ final class SQLiteIndexStoreTests: XCTestCase {
         XCTAssertNil(try JSONDecoder().decode(ScanSnapshot.self, from: oldSnapshotData).pluginDiagnostics)
     }
 
+    func testLegacySkillRecordPayloadMigratesOwnerAndLocationScope() throws {
+        let json = """
+        {
+          "id":"00000000-0000-0000-0000-000000000101",
+          "name":"legacy-codex-skill",
+          "summary":"Legacy skill",
+          "url":"file:///Users/test/.codex/skills/legacy-codex-skill",
+          "allocatedSize":42,
+          "scope":{"agentSpecific":{"agent":"Codex"}},
+          "visibleAgents":["Codex"],
+          "parentPluginID":null,
+          "fingerprint":"legacy-fingerprint",
+          "conflict":null,
+          "managementStatus":"standalone"
+        }
+        """.data(using: .utf8)!
+
+        let skill = try JSONDecoder().decode(SkillRecord.self, from: json)
+
+        XCTAssertEqual(skill.scope, .agentSpecific(agent: "Codex"))
+        XCTAssertEqual(skill.owner, .tool(definitionID: "codex"))
+        XCTAssertEqual(skill.locationScope, .userGlobal)
+    }
+
+    func testLegacySnapshotPayloadMigratesAllSkillScopesAndPluginDefaults() throws {
+        let snapshot = try JSONDecoder().decode(ScanSnapshot.self, from: Self.legacySnapshotJSON)
+
+        XCTAssertEqual(snapshot.skills.map(\.name), [
+            "shared-skill", "codex-skill", "plugin-skill", "system-skill"
+        ])
+        XCTAssertEqual(snapshot.skills[0].owner, .shared)
+        XCTAssertEqual(snapshot.skills[0].locationScope, .userGlobal)
+        XCTAssertEqual(snapshot.skills[1].owner, .tool(definitionID: "codex"))
+        XCTAssertEqual(snapshot.skills[1].locationScope, .userGlobal)
+        XCTAssertEqual(snapshot.skills[2].owner, .plugin(pluginID: "not-a-uuid"))
+        XCTAssertEqual(snapshot.skills[2].locationScope, .bundled)
+        XCTAssertEqual(snapshot.skills[3].owner, .unknown)
+        XCTAssertEqual(snapshot.skills[3].locationScope, .system)
+        XCTAssertEqual(snapshot.plugins.first?.owner, .unknown)
+        XCTAssertEqual(snapshot.plugins.first?.locationScope, .userGlobal)
+    }
+
+    func testNewSnapshotPayloadRoundTripsOwnerAndLocationScope() throws {
+        let decoded = try JSONDecoder().decode(ScanSnapshot.self, from: Self.legacySnapshotJSON)
+        let roundTripped = try JSONDecoder().decode(ScanSnapshot.self, from: JSONEncoder().encode(decoded))
+
+        XCTAssertEqual(roundTripped.skills.map(\.owner), decoded.skills.map(\.owner))
+        XCTAssertEqual(roundTripped.skills.map(\.locationScope), decoded.skills.map(\.locationScope))
+        XCTAssertEqual(roundTripped.plugins.map(\.owner), decoded.plugins.map(\.owner))
+        XCTAssertEqual(roundTripped.plugins.map(\.locationScope), decoded.plugins.map(\.locationScope))
+    }
+
+    func testUnknownFutureOwnerKindDecodesAsUnknownWithoutMisattribution() throws {
+        let json = """
+        {
+          "id":"00000000-0000-0000-0000-000000000301",
+          "name":"future-plugin",
+          "version":null,
+          "url":"file:///Users/test/plugin",
+          "source":"plugins",
+          "allocatedSize":1,
+          "skillIDs":[],
+          "dependencies":[],
+          "managementCapability":"officialHandoff",
+          "owner":{"kind":"futureOwner","definitionID":"codex"},
+          "locationScope":{"kind":"userGlobal"}
+        }
+        """.data(using: .utf8)!
+
+        let plugin = try JSONDecoder().decode(PluginRecord.self, from: json)
+
+        XCTAssertEqual(plugin.owner, .unknown)
+        XCTAssertEqual(plugin.locationScope, .userGlobal)
+    }
+
+    func testUnknownFutureLocationScopeDoesNotSilentlyMisattribute() throws {
+        let json = """
+        {
+          "id":"00000000-0000-0000-0000-000000000302",
+          "name":"future-plugin",
+          "version":null,
+          "url":"file:///Users/test/plugin",
+          "source":"plugins",
+          "allocatedSize":1,
+          "skillIDs":[],
+          "dependencies":[],
+          "managementCapability":"officialHandoff",
+          "owner":{"kind":"unknown"},
+          "locationScope":{"kind":"futureScope"}
+        }
+        """.data(using: .utf8)!
+
+        XCTAssertThrowsError(try JSONDecoder().decode(PluginRecord.self, from: json))
+    }
+
     func testCleanupHistoryRoundTrips() async throws {
         let store = try SQLiteIndexStore(url: temporaryDatabaseURL())
         let sourceURL = URL(fileURLWithPath: "/Users/test/Library/Caches/app/file")
@@ -720,6 +815,87 @@ final class SQLiteIndexStoreTests: XCTestCase {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory.appending(path: "index.sqlite")
     }
+
+    private static let legacySnapshotJSON = """
+    {
+      "id":"00000000-0000-0000-0000-000000000400",
+      "completedAt":1,
+      "volume":null,
+      "items":[],
+      "applications":[],
+      "aiApplications":[],
+      "plugins":[
+        {
+          "id":"00000000-0000-0000-0000-000000000500",
+          "name":"legacy-plugin",
+          "version":"1.2.3",
+          "url":"file:///Users/test/.codex/plugins/plugin",
+          "source":"plugins",
+          "allocatedSize":99,
+          "skillIDs":["00000000-0000-0000-0000-000000000503"],
+          "dependencies":["dep"],
+          "managementCapability":"officialHandoff"
+        }
+      ],
+      "skills":[
+        {
+          "id":"00000000-0000-0000-0000-000000000501",
+          "name":"shared-skill",
+          "summary":"Shared",
+          "url":"file:///Users/test/.agents/skills/shared-skill",
+          "allocatedSize":1,
+          "scope":{"sharedAgents":{}},
+          "visibleAgents":["Codex","Claude"],
+          "parentPluginID":null,
+          "fingerprint":"shared",
+          "conflict":null,
+          "managementStatus":"standalone"
+        },
+        {
+          "id":"00000000-0000-0000-0000-000000000502",
+          "name":"codex-skill",
+          "summary":"Codex",
+          "url":"file:///Users/test/.codex/skills/codex-skill",
+          "allocatedSize":2,
+          "scope":{"agentSpecific":{"agent":"Codex"}},
+          "visibleAgents":["Codex"],
+          "parentPluginID":null,
+          "fingerprint":"codex",
+          "conflict":null,
+          "managementStatus":"standalone"
+        },
+        {
+          "id":"00000000-0000-0000-0000-000000000503",
+          "name":"plugin-skill",
+          "summary":"Plugin",
+          "url":"file:///Users/test/.codex/plugins/plugin/skills/plugin-skill",
+          "allocatedSize":3,
+          "scope":{"pluginProvided":{"pluginID":"not-a-uuid"}},
+          "visibleAgents":["Codex"],
+          "parentPluginID":null,
+          "fingerprint":"plugin",
+          "conflict":null,
+          "managementStatus":"parentManaged"
+        },
+        {
+          "id":"00000000-0000-0000-0000-000000000504",
+          "name":"system-skill",
+          "summary":"System",
+          "url":"file:///Users/test/.codex/skills/.system/system-skill",
+          "allocatedSize":4,
+          "scope":{"systemManaged":{}},
+          "visibleAgents":["Codex"],
+          "parentPluginID":null,
+          "fingerprint":"system",
+          "conflict":null,
+          "managementStatus":"systemReadOnly"
+        }
+      ],
+      "coverage":{"deniedPaths":[],"notes":[]},
+      "pluginDiagnostics":[],
+      "categoryAggregates":null
+    }
+    """.data(using: .utf8)!
 
     private func createValidDatabase(
         at url: URL,

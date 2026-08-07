@@ -56,9 +56,13 @@ final class PluginScannerTests: XCTestCase {
 
         XCTAssertEqual(result.plugins.first?.version, "0.1.52")
         XCTAssertEqual(result.plugins.first?.managementCapability, .officialHandoff)
+        XCTAssertEqual(result.plugins.first?.owner, .unknown)
+        XCTAssertEqual(result.plugins.first?.locationScope, .userGlobal)
         XCTAssertEqual(result.skills.count, 2)
         XCTAssertTrue(result.skills.allSatisfy { $0.managementStatus == .parentManaged })
         XCTAssertTrue(result.skills.allSatisfy { $0.parentPluginID == result.plugins.first?.id })
+        XCTAssertTrue(result.skills.allSatisfy { $0.owner == .plugin(pluginID: result.plugins.first?.id.uuidString ?? "") })
+        XCTAssertTrue(result.skills.allSatisfy { $0.locationScope == .bundled })
         XCTAssertEqual(result.plugins.first?.skillIDs.count, 2)
     }
 
