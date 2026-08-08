@@ -28,6 +28,32 @@ public struct AIToolRootDescriptor: Hashable, Sendable {
     }
 }
 
+public enum AIToolPackageManager: String, Codable, Hashable, Sendable {
+    case brew
+    case npm
+    case pnpm
+    case pipx
+}
+
+/// A fixed package receipt/metadata location that can establish an install fact.
+/// These paths are code constants owned by the definition table; executable or
+/// script fields found inside the metadata are never trusted or executed.
+public struct AIToolPackageDescriptor: Hashable, Sendable {
+    public let manager: AIToolPackageManager
+    public let packageName: String
+    public let metadataRelativePaths: [String]
+
+    public init(
+        manager: AIToolPackageManager,
+        packageName: String,
+        metadataRelativePaths: [String]
+    ) {
+        self.manager = manager
+        self.packageName = packageName
+        self.metadataRelativePaths = metadataRelativePaths
+    }
+}
+
 /// A pure, read-only description of a known AI tool. It carries no behavior:
 /// it does not import SwiftUI, touch the file system, or spawn processes. All
 /// discovery logic lives in `AIToolRegistry`; this type only says *what to look
@@ -54,11 +80,20 @@ public struct AIToolDefinition: Identifiable, Hashable, Sendable {
     /// Home-relative config directories worth surfacing (read-only).
     public let configRelativePaths: [String]
 
+    /// For AI-enabled hosts (for example VS Code), fixed home-relative evidence
+    /// paths that must exist before the host is considered AI-managed. This
+    /// prevents a generic host app from being surfaced merely because its bundle
+    /// is installed or its broad extensions directory exists.
+    public let hostEvidenceRelativePaths: [String]
+
     /// The whitelist probe identifier used to look up a CLI version, if any.
     /// The probe itself owns the concrete candidate paths and version argument;
     /// definitions only reference an identifier so no executable path is ever
     /// sourced from data.
     public let cliProbeID: String?
+
+    /// Fixed package receipt locations used only for read-only install facts.
+    public let packageDescriptors: [AIToolPackageDescriptor]
 
     public init(
         id: String,
@@ -68,7 +103,9 @@ public struct AIToolDefinition: Identifiable, Hashable, Sendable {
         skillRoots: [AIToolRootDescriptor] = [],
         pluginRoots: [AIToolRootDescriptor] = [],
         configRelativePaths: [String] = [],
-        cliProbeID: String? = nil
+        hostEvidenceRelativePaths: [String] = [],
+        cliProbeID: String? = nil,
+        packageDescriptors: [AIToolPackageDescriptor] = []
     ) {
         self.id = id
         self.displayName = displayName
@@ -77,6 +114,8 @@ public struct AIToolDefinition: Identifiable, Hashable, Sendable {
         self.skillRoots = skillRoots
         self.pluginRoots = pluginRoots
         self.configRelativePaths = configRelativePaths
+        self.hostEvidenceRelativePaths = hostEvidenceRelativePaths
         self.cliProbeID = cliProbeID
+        self.packageDescriptors = packageDescriptors
     }
 }

@@ -57,7 +57,33 @@ final class AIToolRegistryTests: XCTestCase {
         )
     }
 
+    private func makeExecutable(at url: URL) throws {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("#!/bin/sh\nexit 0\n".utf8).write(to: url)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+    }
+
     // MARK: - Hit / miss
+
+    func testKnownDefinitionsCoverRequired4BToolsWithStableIDs() {
+        let definitions = KnownAIToolDefinitions.all
+        let ids = definitions.map(\.id)
+
+        XCTAssertEqual(Set(ids).count, ids.count)
+        XCTAssertTrue(ids.allSatisfy { $0 == $0.lowercased() })
+        XCTAssertEqual(definitions.first { $0.id == "trae-cn" }?.applicationBundleIdentifiers, ["cn.trae.app"])
+        XCTAssertEqual(definitions.first { $0.id == "trae-solo-cn" }?.applicationBundleIdentifiers, ["cn.trae.solo.app"])
+        XCTAssertEqual(definitions.first { $0.id == "antigravity" }?.applicationBundleIdentifiers, ["com.google.antigravity"])
+        XCTAssertEqual(definitions.first { $0.id == "vscode" }?.applicationBundleIdentifiers, ["com.microsoft.VSCode"])
+        XCTAssertEqual(definitions.first { $0.id == "aiden" }?.cliProbeID, "aiden")
+        for required in [
+            "codex", "claude", "chatgpt", "cursor", "windsurf", "gemini-cli",
+            "opencode", "aider", "copilot", "continue", "cline", "roo",
+            "ollama", "lm-studio", "jan"
+        ] {
+            XCTAssertTrue(ids.contains(required), "Missing existing definition: \(required)")
+        }
+    }
 
     func testDiscoversApplicationWhenBundleInstalled() async throws {
         let home = URL(filePath: "/Users/test")
@@ -122,6 +148,85 @@ final class AIToolRegistryTests: XCTestCase {
         let records = try await registry.discover(homeDirectory: home)
 
         XCTAssertTrue(records.isEmpty)
+    }
+
+    func testVSCodeBundleAloneDoesNotEnterAIManagementWithoutFixedAIEvidence() async throws {
+        let home = URL(filePath: "/Users/test")
+        let vscode = try XCTUnwrap(KnownAIToolDefinitions.all.first { $0.id == "vscode" })
+        let registry = AIToolRegistry(
+            definitions: [vscode],
+            applicationLocator: StubApplicationLocator(
+                installed: ["com.microsoft.VSCode": URL(filePath: "/Applications/Visual Studio Code.app")]
+            ),
+            directoryProbe: StubDirectoryProbe(results: [
+                canonical(home, ".vscode/extensions"): .present
+            ]),
+            cliProbe: makeCLIProbe()
+        )
+
+        let records = try await registry.discover(homeDirectory: home)
+
+        XCTAssertTrue(records.isEmpty)
+    }
+
+    func testVSCodeEntersAIManagementOnlyWithFixedExtensionOrConfigEvidence() async throws {
+        let home = URL(filePath: "/Users/test")
+        let vscode = try XCTUnwrap(KnownAIToolDefinitions.all.first { $0.id == "vscode" })
+        let copilotStorage = "Library/Application Support/Code/User/globalStorage/github.copilot-chat"
+        let registry = AIToolRegistry(
+            definitions: [vscode],
+            applicationLocator: StubApplicationLocator(
+                installed: ["com.microsoft.VSCode": URL(filePath: "/Applications/Visual Studio Code.app")]
+            ),
+            directoryProbe: StubDirectoryProbe(results: [
+                canonical(home, copilotStorage): .present
+            ]),
+            cliProbe: makeCLIProbe()
+        )
+
+        let records = try await registry.discover(homeDirectory: home)
+
+        let record = try XCTUnwrap(records.first)
+        XCTAssertEqual(record.owner, .tool(definitionID: "vscode"))
+        XCTAssertEqual(record.evidence.bundleIdentifier, "com.microsoft.VSCode")
+        XCTAssertEqual(record.evidence.configDirectories.map { AIToolRegistry.canonicalKey($0) }, [canonical(home, copilotStorage)])
+    }
+
+    func testRealInstalledCLILayoutsProduceNonEmptyAIManagementProjectionCLIs() async throws {
+        let tree = try TemporaryTree(files: [:])
+        try makeExecutable(at: tree.url.appending(
+            path: ".local/share/fnm/node-versions/v24.18.0/installation/bin/codex",
+            directoryHint: .notDirectory
+        ))
+        try makeExecutable(at: tree.url.appending(
+            path: ".local/share/fnm/node-versions/v24.18.0/installation/bin/claude",
+            directoryHint: .notDirectory
+        ))
+        try makeExecutable(at: tree.url.appending(
+            path: "Library/pnpm/bin/aiden",
+            directoryHint: .notDirectory
+        ))
+        let definitions = KnownAIToolDefinitions.all.filter { ["codex", "claude", "aiden"].contains($0.id) }
+        let registry = AIToolRegistry(
+            definitions: definitions,
+            applicationLocator: StubApplicationLocator(installed: [:]),
+            directoryProbe: StubDirectoryProbe(results: [:]),
+            cliProbe: SafeCLIVersionProbe(
+                runner: StubCLIRunner(),
+                locator: LocalExecutableLocator()
+            )
+        )
+
+        let projection = AIManagementProjection(records: try await registry.discover(homeDirectory: tree.url))
+
+        XCTAssertEqual(Set(projection.clis.map(\.owner)), [
+            .tool(definitionID: "aiden"),
+            .tool(definitionID: "claude"),
+            .tool(definitionID: "codex")
+        ])
+        XCTAssertEqual(projection.clis.count, 3)
+        XCTAssertTrue(projection.clis.allSatisfy { $0.evidence.executableURL != nil })
+        XCTAssertTrue(projection.clis.allSatisfy { $0.coverageFailures.contains(.invalidOutput) })
     }
 
     // MARK: - Coverage failure retention

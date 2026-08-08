@@ -89,12 +89,37 @@ public struct SafeCLIVersionProbe: Sendable {
     /// A whitelisted probe: fixed candidate executable locations and fixed
     /// version arguments. No field here is ever sourced from external data.
     struct ProbeSpec: Sendable {
+        /// Fixed executable basename. Manager templates append this basename;
+        /// they never read package manifests or shell PATH.
+        let basename: String
         /// Absolute candidate paths, tried in order.
         let absoluteCandidatePaths: [String]
         /// Home-relative candidate paths, resolved against the home directory.
         let homeRelativeCandidatePaths: [String]
+        /// Fixed app-bundled executable paths, never discovered by display name
+        /// or filesystem search.
+        let appBundledAbsoluteCandidatePaths: [String]
         /// Fixed arguments used to request the version (for example `--version`).
         let versionArguments: [String]
+
+        init(
+            basename: String,
+            absoluteCandidatePaths: [String],
+            homeRelativeCandidatePaths: [String],
+            appBundledAbsoluteCandidatePaths: [String] = [],
+            versionArguments: [String]
+        ) {
+            self.basename = basename
+            self.absoluteCandidatePaths = absoluteCandidatePaths
+            self.homeRelativeCandidatePaths = homeRelativeCandidatePaths
+            self.appBundledAbsoluteCandidatePaths = appBundledAbsoluteCandidatePaths
+            self.versionArguments = versionArguments
+        }
+    }
+
+    private struct ProbeCandidate: Sendable {
+        let executableURL: URL
+        let environment: [String: String]
     }
 
     /// The only environment the child ever sees. Deliberately minimal, but the
@@ -109,46 +134,80 @@ public struct SafeCLIVersionProbe: Sendable {
     /// The whitelist. Keys must match `AIToolDefinition.cliProbeID`.
     static let whitelist: [String: ProbeSpec] = [
         "codex": ProbeSpec(
+            basename: "codex",
             absoluteCandidatePaths: ["/usr/local/bin/codex", "/opt/homebrew/bin/codex"],
             homeRelativeCandidatePaths: [".local/bin/codex"],
+            appBundledAbsoluteCandidatePaths: ["/Applications/ChatGPT.app/Contents/Resources/codex"],
             versionArguments: ["--version"]
         ),
         "claude": ProbeSpec(
+            basename: "claude",
             absoluteCandidatePaths: ["/usr/local/bin/claude", "/opt/homebrew/bin/claude"],
             homeRelativeCandidatePaths: [".local/bin/claude"],
             versionArguments: ["--version"]
         ),
         "cursor": ProbeSpec(
+            basename: "cursor",
             absoluteCandidatePaths: ["/usr/local/bin/cursor", "/opt/homebrew/bin/cursor"],
             homeRelativeCandidatePaths: [],
             versionArguments: ["--version"]
         ),
         "windsurf": ProbeSpec(
+            basename: "windsurf",
             absoluteCandidatePaths: ["/usr/local/bin/windsurf", "/opt/homebrew/bin/windsurf"],
             homeRelativeCandidatePaths: [],
             versionArguments: ["--version"]
         ),
         "gemini": ProbeSpec(
+            basename: "gemini",
             absoluteCandidatePaths: ["/usr/local/bin/gemini", "/opt/homebrew/bin/gemini"],
             homeRelativeCandidatePaths: [".local/bin/gemini"],
             versionArguments: ["--version"]
         ),
         "opencode": ProbeSpec(
+            basename: "opencode",
             absoluteCandidatePaths: ["/usr/local/bin/opencode", "/opt/homebrew/bin/opencode"],
             homeRelativeCandidatePaths: [".local/bin/opencode"],
             versionArguments: ["--version"]
         ),
         "aider": ProbeSpec(
+            basename: "aider",
             absoluteCandidatePaths: ["/usr/local/bin/aider", "/opt/homebrew/bin/aider"],
             homeRelativeCandidatePaths: [".local/bin/aider"],
             versionArguments: ["--version"]
         ),
+        "aiden": ProbeSpec(
+            basename: "aiden",
+            absoluteCandidatePaths: ["/usr/local/bin/aiden", "/opt/homebrew/bin/aiden"],
+            homeRelativeCandidatePaths: [".local/bin/aiden"],
+            versionArguments: ["--version"]
+        ),
+        "trae": ProbeSpec(
+            basename: "trae",
+            absoluteCandidatePaths: ["/usr/local/bin/trae", "/opt/homebrew/bin/trae"],
+            homeRelativeCandidatePaths: [".local/bin/trae"],
+            versionArguments: ["--version"]
+        ),
+        "traework": ProbeSpec(
+            basename: "traework",
+            absoluteCandidatePaths: ["/usr/local/bin/traework", "/opt/homebrew/bin/traework"],
+            homeRelativeCandidatePaths: [".local/bin/traework"],
+            versionArguments: ["--version"]
+        ),
+        "antigravity": ProbeSpec(
+            basename: "antigravity",
+            absoluteCandidatePaths: ["/usr/local/bin/antigravity", "/opt/homebrew/bin/antigravity"],
+            homeRelativeCandidatePaths: [".local/bin/antigravity"],
+            versionArguments: ["--version"]
+        ),
         "copilot": ProbeSpec(
+            basename: "copilot",
             absoluteCandidatePaths: ["/usr/local/bin/copilot", "/opt/homebrew/bin/copilot"],
             homeRelativeCandidatePaths: [],
             versionArguments: ["--version"]
         ),
         "ollama": ProbeSpec(
+            basename: "ollama",
             absoluteCandidatePaths: ["/usr/local/bin/ollama", "/opt/homebrew/bin/ollama"],
             homeRelativeCandidatePaths: [],
             versionArguments: ["--version"]
@@ -195,8 +254,8 @@ public struct SafeCLIVersionProbe: Sendable {
             throw UnknownProbeError(probeID: probeID)
         }
 
-        let candidates = candidateURLs(for: spec, homeDirectory: homeDirectory)
-        guard let executableURL = candidates.first(where: { locator.isExecutableFile(at: $0) }) else {
+        let candidates = probeCandidates(for: spec, homeDirectory: homeDirectory)
+        guard let candidate = candidates.first(where: { locator.isExecutableFile(at: $0.executableURL) }) else {
             return SafeCLIProbeResult(
                 executableURL: nil,
                 version: nil,
@@ -209,9 +268,9 @@ public struct SafeCLIVersionProbe: Sendable {
         let output: CLIProcessOutput
         do {
             output = try await runner.run(
-                executableURL: executableURL,
+                executableURL: candidate.executableURL,
                 arguments: spec.versionArguments,
-                environment: Self.fixedEnvironment,
+                environment: candidate.environment,
                 timeout: timeout,
                 maximumOutputBytes: maximumOutputBytes
             )
@@ -219,7 +278,7 @@ public struct SafeCLIVersionProbe: Sendable {
             throw CancellationError()
         } catch {
             return SafeCLIProbeResult(
-                executableURL: executableURL,
+                executableURL: candidate.executableURL,
                 version: nil,
                 coverageFailure: .unavailable
             )
@@ -231,7 +290,7 @@ public struct SafeCLIVersionProbe: Sendable {
 
         if output.didTimeout {
             return SafeCLIProbeResult(
-                executableURL: executableURL,
+                executableURL: candidate.executableURL,
                 version: nil,
                 coverageFailure: .timeout
             )
@@ -242,25 +301,99 @@ public struct SafeCLIVersionProbe: Sendable {
 
         if output.terminationStatus != 0 || parsed == nil {
             return SafeCLIProbeResult(
-                executableURL: executableURL,
+                executableURL: candidate.executableURL,
                 version: parsed,
                 coverageFailure: .invalidOutput
             )
         }
 
         return SafeCLIProbeResult(
-            executableURL: executableURL,
+            executableURL: candidate.executableURL,
             version: parsed,
             coverageFailure: output.outputTruncated ? .outputTruncated : nil
         )
     }
 
-    private func candidateURLs(for spec: ProbeSpec, homeDirectory: URL) -> [URL] {
-        let absolute = spec.absoluteCandidatePaths.map { URL(filePath: $0) }
-        let homeRelative = spec.homeRelativeCandidatePaths.map {
-            homeDirectory.appending(path: $0, directoryHint: .notDirectory)
+    private func probeCandidates(for spec: ProbeSpec, homeDirectory: URL) -> [ProbeCandidate] {
+        var candidates: [ProbeCandidate] = []
+        candidates.append(contentsOf: spec.absoluteCandidatePaths.map {
+            ProbeCandidate(executableURL: URL(filePath: $0), environment: Self.fixedEnvironment)
+        })
+        candidates.append(contentsOf: spec.homeRelativeCandidatePaths.map {
+            ProbeCandidate(
+                executableURL: homeDirectory.appending(path: $0, directoryHint: .notDirectory),
+                environment: Self.fixedEnvironment
+            )
+        })
+        candidates.append(ProbeCandidate(
+            executableURL: homeDirectory.appending(path: "Library/pnpm/bin/\(spec.basename)", directoryHint: .notDirectory),
+            environment: Self.fixedEnvironment
+        ))
+        candidates.append(contentsOf: versionedManagerCandidates(
+            homeDirectory: homeDirectory,
+            managerRootRelativePath: ".local/share/fnm/node-versions",
+            executableTail: "installation/bin/\(spec.basename)"
+        ))
+        candidates.append(contentsOf: versionedManagerCandidates(
+            homeDirectory: homeDirectory,
+            managerRootRelativePath: ".nvm/versions/node",
+            executableTail: "bin/\(spec.basename)"
+        ))
+        candidates.append(contentsOf: spec.appBundledAbsoluteCandidatePaths.map {
+            ProbeCandidate(executableURL: URL(filePath: $0), environment: Self.fixedEnvironment)
+        })
+
+        var seen = Set<String>()
+        return candidates.filter { candidate in
+            seen.insert(candidate.executableURL.standardizedFileURL.path).inserted
         }
-        return absolute + homeRelative
+    }
+
+    private func versionedManagerCandidates(
+        homeDirectory: URL,
+        managerRootRelativePath: String,
+        executableTail: String
+    ) -> [ProbeCandidate] {
+        let managerRoot = homeDirectory.appending(path: managerRootRelativePath, directoryHint: .isDirectory)
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
+        guard let versions = try? FileManager.default.contentsOfDirectory(
+            at: managerRoot,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+
+        return versions.compactMap { versionDirectory -> (candidate: ProbeCandidate, versionName: String)? in
+            let canonicalVersionDirectory = versionDirectory.standardizedFileURL.resolvingSymlinksInPath()
+            guard canonicalVersionDirectory.hasPathComponentPrefix(managerRoot),
+                  (try? canonicalVersionDirectory.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else {
+                return nil
+            }
+            let executableURL = canonicalVersionDirectory.appending(path: executableTail, directoryHint: .notDirectory)
+            let canonicalExecutable = executableURL.standardizedFileURL.resolvingSymlinksInPath()
+            let installBin = canonicalExecutable.deletingLastPathComponent()
+            guard canonicalExecutable.hasPathComponentPrefix(canonicalVersionDirectory),
+                  installBin.hasPathComponentPrefix(canonicalVersionDirectory) else {
+                return nil
+            }
+            return (ProbeCandidate(
+                executableURL: canonicalExecutable,
+                environment: Self.environment(prependingVerifiedBin: installBin)
+            ), canonicalVersionDirectory.lastPathComponent)
+        }
+        .sorted { lhs, rhs in
+            let lhsKey = VersionSortKey(lhs.versionName)
+            let rhsKey = VersionSortKey(rhs.versionName)
+            if lhsKey != rhsKey { return lhsKey > rhsKey }
+            return lhs.candidate.executableURL.path < rhs.candidate.executableURL.path
+        }
+        .map(\.candidate)
+    }
+
+    private static func environment(prependingVerifiedBin bin: URL) -> [String: String] {
+        var environment = fixedEnvironment
+        environment["PATH"] = bin.path + ":" + (fixedEnvironment["PATH"] ?? "")
+        return environment
     }
 
     /// Extracts a plausible version string from captured output. To reject
@@ -513,5 +646,43 @@ private extension Duration {
     var seconds: Double {
         let components = self.components
         return Double(components.seconds) + Double(components.attoseconds) / 1e18
+    }
+}
+
+private struct VersionSortKey: Comparable, Equatable {
+    let numericComponents: [Int]
+    let fallback: String
+
+    init(_ raw: String) {
+        let trimmed = raw.trimmingCharacters(in: CharacterSet(charactersIn: "vV"))
+        let parts = trimmed.split(separator: ".").map(String.init)
+        let parsed = parts.map { Int($0) }
+        if !parsed.isEmpty, parsed.allSatisfy({ $0 != nil }) {
+            self.numericComponents = parsed.map { $0 ?? 0 }
+        } else {
+            self.numericComponents = []
+        }
+        self.fallback = raw
+    }
+
+    static func < (lhs: VersionSortKey, rhs: VersionSortKey) -> Bool {
+        if !lhs.numericComponents.isEmpty || !rhs.numericComponents.isEmpty {
+            let count = max(lhs.numericComponents.count, rhs.numericComponents.count)
+            for index in 0..<count {
+                let lhsValue = index < lhs.numericComponents.count ? lhs.numericComponents[index] : 0
+                let rhsValue = index < rhs.numericComponents.count ? rhs.numericComponents[index] : 0
+                if lhsValue != rhsValue { return lhsValue < rhsValue }
+            }
+        }
+        return lhs.fallback < rhs.fallback
+    }
+}
+
+private extension URL {
+    func hasPathComponentPrefix(_ prefix: URL) -> Bool {
+        let components = pathComponents
+        let prefixComponents = prefix.pathComponents
+        guard prefixComponents.count <= components.count else { return false }
+        return Array(components.prefix(prefixComponents.count)) == prefixComponents
     }
 }

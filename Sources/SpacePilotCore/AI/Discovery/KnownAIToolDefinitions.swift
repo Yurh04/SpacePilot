@@ -27,7 +27,19 @@ public enum KnownAIToolDefinitions {
             skillRoots: [AIToolRootDescriptor(".codex/skills"), sharedAgentsSkillsRoot],
             pluginRoots: [AIToolRootDescriptor(".codex/plugins")],
             configRelativePaths: [".codex"],
-            cliProbeID: "codex"
+            cliProbeID: "codex",
+            packageDescriptors: [
+                AIToolPackageDescriptor(
+                    manager: .npm,
+                    packageName: "@openai/codex",
+                    metadataRelativePaths: [".npm/_spacepilot/receipts/@openai/codex/package.json"]
+                ),
+                AIToolPackageDescriptor(
+                    manager: .pnpm,
+                    packageName: "@openai/codex",
+                    metadataRelativePaths: [".local/share/pnpm/global/5/node_modules/@openai/codex/package.json"]
+                )
+            ]
         ),
         AIToolDefinition(
             id: "claude",
@@ -53,6 +65,51 @@ public enum KnownAIToolDefinitions {
             dataRootRelativePaths: [".cursor"],
             configRelativePaths: [".cursor"],
             cliProbeID: "cursor"
+        ),
+        AIToolDefinition(
+            id: "trae-cn",
+            displayName: "Trae CN",
+            applicationBundleIdentifiers: ["cn.trae.app"],
+            dataRootRelativePaths: [".trae"],
+            configRelativePaths: [".trae"],
+            cliProbeID: "trae"
+        ),
+        AIToolDefinition(
+            id: "trae-solo-cn",
+            displayName: "TRAE SOLO CN",
+            applicationBundleIdentifiers: ["cn.trae.solo.app"],
+            dataRootRelativePaths: [".trae-solo", ".traework"],
+            configRelativePaths: [".trae-solo", ".traework"],
+            cliProbeID: "traework"
+        ),
+        AIToolDefinition(
+            id: "antigravity",
+            displayName: "Antigravity",
+            applicationBundleIdentifiers: ["com.google.antigravity"],
+            dataRootRelativePaths: [".antigravity"],
+            configRelativePaths: [".antigravity"],
+            cliProbeID: "antigravity"
+        ),
+        AIToolDefinition(
+            id: "vscode",
+            displayName: "Visual Studio Code",
+            applicationBundleIdentifiers: ["com.microsoft.VSCode"],
+            configRelativePaths: [
+                "Library/Application Support/Code/User/globalStorage/github.copilot-chat",
+                "Library/Application Support/Code/User/globalStorage/continue.continue",
+                "Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev",
+                "Library/Application Support/Code/User/globalStorage/rooveterinaryinc.roo-cline"
+            ],
+            hostEvidenceRelativePaths: [
+                ".vscode/extensions/github.copilot-chat",
+                ".vscode/extensions/continue.continue",
+                ".vscode/extensions/saoudrizwan.claude-dev",
+                ".vscode/extensions/rooveterinaryinc.roo-cline",
+                "Library/Application Support/Code/User/globalStorage/github.copilot-chat",
+                "Library/Application Support/Code/User/globalStorage/continue.continue",
+                "Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev",
+                "Library/Application Support/Code/User/globalStorage/rooveterinaryinc.roo-cline"
+            ]
         ),
         AIToolDefinition(
             id: "windsurf",
@@ -81,7 +138,28 @@ public enum KnownAIToolDefinitions {
             displayName: "Aider",
             dataRootRelativePaths: [".aider"],
             configRelativePaths: [".aider"],
-            cliProbeID: "aider"
+            cliProbeID: "aider",
+            packageDescriptors: [
+                AIToolPackageDescriptor(
+                    manager: .pipx,
+                    packageName: "aider-chat",
+                    metadataRelativePaths: [".local/pipx/venvs/aider-chat/pipx_metadata.json"]
+                )
+            ]
+        ),
+        AIToolDefinition(
+            id: "aiden",
+            displayName: "Aiden CLI",
+            dataRootRelativePaths: [".aiden"],
+            configRelativePaths: [".aiden"],
+            cliProbeID: "aiden",
+            packageDescriptors: [
+                AIToolPackageDescriptor(
+                    manager: .pnpm,
+                    packageName: "@aiden-cli/core",
+                    metadataRelativePaths: [".local/share/pnpm/global/5/node_modules/@aiden-cli/core/package.json"]
+                )
+            ]
         ),
         AIToolDefinition(
             id: "copilot",

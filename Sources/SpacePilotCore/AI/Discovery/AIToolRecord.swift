@@ -58,13 +58,13 @@ public struct AIToolEvidence: Codable, Hashable, Sendable {
         applicationURL = applicationURL ?? other.applicationURL
         executableURL = executableURL ?? other.executableURL
         detectedVersion = detectedVersion ?? other.detectedVersion
-        dataRoots = Self.mergeURLs(dataRoots, other.dataRoots)
-        skillRoots = Self.mergeURLs(skillRoots, other.skillRoots)
-        pluginRoots = Self.mergeURLs(pluginRoots, other.pluginRoots)
-        configDirectories = Self.mergeURLs(configDirectories, other.configDirectories)
+        dataRoots = Self.mergeURLsForDiscovery(dataRoots, other.dataRoots)
+        skillRoots = Self.mergeURLsForDiscovery(skillRoots, other.skillRoots)
+        pluginRoots = Self.mergeURLsForDiscovery(pluginRoots, other.pluginRoots)
+        configDirectories = Self.mergeURLsForDiscovery(configDirectories, other.configDirectories)
     }
 
-    private static func mergeURLs(_ lhs: [URL], _ rhs: [URL]) -> [URL] {
+    static func mergeURLsForDiscovery(_ lhs: [URL], _ rhs: [URL]) -> [URL] {
         var seen = Set<String>()
         var result: [URL] = []
         for url in lhs + rhs {

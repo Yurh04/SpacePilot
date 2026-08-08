@@ -129,13 +129,19 @@ public struct AIToolRegistry: Sendable {
                 relativePaths: definition.configRelativePaths,
                 homeDirectory: homeDirectory
             )
+            let hostEvidenceRoots = existingDirectories(
+                relativePaths: definition.hostEvidenceRelativePaths,
+                homeDirectory: homeDirectory
+            )
 
             if let appRecord = applicationRecord(
                 for: definition,
                 owner: owner,
                 dataRoots: dataRoots.present,
                 configRoots: configRoots.present,
+                hostEvidenceRoots: hostEvidenceRoots.present,
                 coverageFailures: dataRoots.failures.union(configRoots.failures)
+                    .union(hostEvidenceRoots.failures)
             ) {
                 records.append(appRecord)
             }
@@ -179,11 +185,15 @@ public struct AIToolRegistry: Sendable {
         owner: AIToolOwner,
         dataRoots: [URL],
         configRoots: [URL],
+        hostEvidenceRoots: [URL],
         coverageFailures: Set<AIToolCoverageFailure>
     ) -> AIToolRecord? {
         var evidence = AIToolEvidence()
         evidence.dataRoots = dataRoots
-        evidence.configDirectories = configRoots
+        evidence.configDirectories = AIToolEvidence.mergeURLsForDiscovery(
+            configRoots,
+            hostEvidenceRoots
+        )
 
         for bundleID in definition.applicationBundleIdentifiers {
             if let url = applicationLocator.applicationURL(forBundleIdentifier: bundleID) {
@@ -191,6 +201,15 @@ public struct AIToolRegistry: Sendable {
                 evidence.applicationURL = url
                 break
             }
+        }
+
+        if !definition.hostEvidenceRelativePaths.isEmpty,
+           hostEvidenceRoots.isEmpty,
+           coverageFailures.isEmpty {
+            // A generic AI-enabled host (VS Code, etc.) requires fixed AI
+            // extension/config evidence. A bundle alone, or a broad extensions
+            // directory, is not enough to enter AI management.
+            return nil
         }
 
         let canonical: String

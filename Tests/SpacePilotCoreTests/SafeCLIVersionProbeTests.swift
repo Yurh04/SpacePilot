@@ -77,6 +77,15 @@ final class SafeCLIVersionProbeTests: XCTestCase {
 
     private let home = URL(filePath: "/Users/test")
 
+    private func makeExecutable(at url: URL) throws {
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data("#!/bin/sh\nexit 0\n".utf8).write(to: url)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+    }
+
     // MARK: - Whitelist / unknown ID
 
     func testKnownProbeRunsFixedExecutableAndArgumentsWithFixedEnvironment() async throws {
@@ -99,6 +108,129 @@ final class SafeCLIVersionProbeTests: XCTestCase {
         XCTAssertEqual(invocation.arguments, ["--version"])
         XCTAssertEqual(invocation.environment, SafeCLIVersionProbe.fixedEnvironment)
         XCTAssertFalse(invocation.environment.keys.contains("HOME"))
+    }
+
+    func testAidenProbeUsesOnlyFixedBasenameCandidatesAndVersionArgs() async throws {
+        let runner = RecordingRunner(output: output(stdout: "aiden 1.8.44\n"))
+        let probe = SafeCLIVersionProbe(
+            runner: runner,
+            locator: AlwaysExecutableLocator()
+        )
+
+        let result = try await probe.probeVersion(probeID: "aiden", homeDirectory: home)
+
+        XCTAssertEqual(result.version, "aiden 1.8.44")
+        let invocation = try XCTUnwrap(runner.invocations.first)
+        XCTAssertEqual(invocation.executableURL.lastPathComponent, "aiden")
+        XCTAssertEqual(invocation.arguments, ["--version"])
+        XCTAssertEqual(invocation.environment, SafeCLIVersionProbe.fixedEnvironment)
+    }
+
+    func testProbeFindsFNMInstallationBinWithVerifiedScopedEnvironment() async throws {
+        let tree = try TemporaryTree(files: [:])
+        let executable = tree.url.appending(
+            path: ".local/share/fnm/node-versions/v24.18.0/installation/bin/codex",
+            directoryHint: .notDirectory
+        )
+        try makeExecutable(at: executable)
+        let runner = RecordingRunner(output: output(stdout: "codex 0.42.0\n"))
+        let probe = SafeCLIVersionProbe(runner: runner, locator: LocalExecutableLocator())
+
+        let result = try await probe.probeVersion(probeID: "codex", homeDirectory: tree.url)
+
+        XCTAssertEqual(result.executableURL, executable.standardizedFileURL.resolvingSymlinksInPath())
+        let invocation = try XCTUnwrap(runner.invocations.first)
+        XCTAssertEqual(invocation.arguments, ["--version"])
+        XCTAssertTrue(invocation.environment["PATH"]?.hasPrefix(executable.deletingLastPathComponent().path + ":") == true)
+        XCTAssertFalse(invocation.environment.keys.contains("HOME"))
+        XCTAssertFalse(invocation.environment["PATH"]?.contains("fnm_multishells") == true)
+    }
+
+    func testProbeFindsLibraryPnpmBinForAiden() async throws {
+        let tree = try TemporaryTree(files: [:])
+        let executable = tree.url.appending(path: "Library/pnpm/bin/aiden", directoryHint: .notDirectory)
+        try makeExecutable(at: executable)
+        let runner = RecordingRunner(output: output(stdout: "aiden 1.8.44\n"))
+        let probe = SafeCLIVersionProbe(runner: runner, locator: LocalExecutableLocator())
+
+        let result = try await probe.probeVersion(probeID: "aiden", homeDirectory: tree.url)
+
+        XCTAssertEqual(result.executableURL, executable)
+        XCTAssertEqual(runner.invocations.first?.environment, SafeCLIVersionProbe.fixedEnvironment)
+    }
+
+    func testVersionFailureStillReturnsExecutableAndCoverageFailure() async throws {
+        let tree = try TemporaryTree(files: [:])
+        let executable = tree.url.appending(
+            path: ".local/share/fnm/node-versions/v24.18.0/installation/bin/claude",
+            directoryHint: .notDirectory
+        )
+        try makeExecutable(at: executable)
+        let runner = RecordingRunner(output: output(stdout: "not a version\n"))
+        let probe = SafeCLIVersionProbe(runner: runner, locator: LocalExecutableLocator())
+
+        let result = try await probe.probeVersion(probeID: "claude", homeDirectory: tree.url)
+
+        XCTAssertEqual(result.executableURL, executable.standardizedFileURL.resolvingSymlinksInPath())
+        XCTAssertEqual(result.coverageFailure, .invalidOutput)
+        XCTAssertNil(result.version)
+    }
+
+    func testNonExecutableManagedCandidateDoesNotCountAsInstalled() async throws {
+        let tree = try TemporaryTree(files: [:])
+        let executable = tree.url.appending(
+            path: ".local/share/fnm/node-versions/v24.18.0/installation/bin/claude",
+            directoryHint: .notDirectory
+        )
+        try FileManager.default.createDirectory(at: executable.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data().write(to: executable)
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: executable.path)
+        let runner = RecordingRunner(output: output(stdout: "claude 1.0.0\n"))
+        let probe = SafeCLIVersionProbe(runner: runner, locator: LocalExecutableLocator())
+
+        let result = try await probe.probeVersion(probeID: "claude", homeDirectory: tree.url)
+
+        XCTAssertNil(result.executableURL)
+        XCTAssertEqual(result.coverageFailure, .unavailable)
+        XCTAssertTrue(runner.invocations.isEmpty)
+    }
+
+    func testFNMVersionSelectionIsDeterministicAndPrefersHighestParsedVersion() async throws {
+        let tree = try TemporaryTree(files: [:])
+        let old = tree.url.appending(path: ".local/share/fnm/node-versions/v18.0.0/installation/bin/codex", directoryHint: .notDirectory)
+        let newest = tree.url.appending(path: ".local/share/fnm/node-versions/v24.18.0/installation/bin/codex", directoryHint: .notDirectory)
+        try makeExecutable(at: old)
+        try makeExecutable(at: newest)
+        let runner = RecordingRunner(output: output(stdout: "codex 1.0.0\n"))
+        let probe = SafeCLIVersionProbe(runner: runner, locator: LocalExecutableLocator())
+
+        let result = try await probe.probeVersion(probeID: "codex", homeDirectory: tree.url)
+
+        XCTAssertEqual(result.executableURL, newest.standardizedFileURL.resolvingSymlinksInPath())
+    }
+
+    func testFNMSymlinkEscapeIsRejectedButInternalSymlinkIsAllowed() async throws {
+        let tree = try TemporaryTree(files: [:])
+        let root = tree.url.appending(path: ".local/share/fnm/node-versions", directoryHint: .isDirectory)
+        let outside = tree.url.appending(path: "outside/bin", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)
+        let escape = root.appending(path: "v99.0.0", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: escape, withDestinationURL: outside)
+
+        let realBin = root.appending(path: "v24.18.0/installation/real-bin", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: realBin, withIntermediateDirectories: true)
+        let internalBin = root.appending(path: "v24.18.0/installation/bin", directoryHint: .isDirectory)
+        try FileManager.default.createSymbolicLink(at: internalBin, withDestinationURL: realBin)
+        let executable = realBin.appending(path: "codex", directoryHint: .notDirectory)
+        try makeExecutable(at: executable)
+        let runner = RecordingRunner(output: output(stdout: "codex 1.0.0\n"))
+        let probe = SafeCLIVersionProbe(runner: runner, locator: LocalExecutableLocator())
+
+        let result = try await probe.probeVersion(probeID: "codex", homeDirectory: tree.url)
+
+        XCTAssertEqual(result.executableURL, executable.standardizedFileURL.resolvingSymlinksInPath())
+        XCTAssertNotEqual(result.executableURL?.path, outside.appending(path: "installation/bin/codex").path)
     }
 
     func testUnknownProbeIDIsRejectedWithoutRunningProcess() async {
