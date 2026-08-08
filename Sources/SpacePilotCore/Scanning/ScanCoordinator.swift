@@ -281,7 +281,12 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
 
             let pluginDiscovery = PluginRootDiscovery(access: LocalFileSystemAccess())
                 .discover(homeDirectory: homeDirectory)
-            let pluginResult = try await PluginScanner(skillScanner: SkillScanner()).scan(roots: pluginDiscovery.roots)
+            let pluginResult = try await PluginScanner(skillScanner: SkillScanner()).scan(
+                roots: PluginRoot.production(
+                    homeDirectory: homeDirectory,
+                    discoveredRoots: pluginDiscovery.roots
+                )
+            )
             let indexedSkills = SkillConflictDetector().detect(in: standaloneSkills + pluginResult.skills)
 
             let resolver = ApplicationArtifactResolver(

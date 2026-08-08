@@ -21,7 +21,9 @@ struct DeveloperAIView: View {
     // subviews) so switching sections never resets a page's selection when
     // SwiftUI destroys/recreates the conditional child subtree.
     @State private var selectedAIEntryID: String?
+    @State private var selectedSkillGroupID: String?
     @State private var selectedSkillID: UUID?
+    @State private var selectedPluginGroupID: String?
     @State private var selectedPluginID: UUID?
     @State private var selectedCLIID: String?
 
@@ -89,13 +91,16 @@ struct DeveloperAIView: View {
         case .skills:
             GlobalSkillsView(
                 skills: projection.allSkills,
+                plugins: projection.allPlugins,
                 searchText: model.searchText,
+                selectedGroupID: $selectedSkillGroupID,
                 selection: $selectedSkillID
             )
         case .plugins:
             GlobalPluginsView(
                 plugins: projection.allPlugins,
                 searchText: model.searchText,
+                selectedGroupID: $selectedPluginGroupID,
                 selection: $selectedPluginID
             )
         case .cli:

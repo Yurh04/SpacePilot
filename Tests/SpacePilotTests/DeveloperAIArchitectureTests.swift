@@ -69,7 +69,9 @@ final class DeveloperAIArchitectureTests: XCTestCase {
             XCTAssertTrue(source.contains("layout == .compact"))
             XCTAssertTrue(source.contains(".nativeTableDoubleClickReveal(urlAtRow:"))
             XCTAssertTrue(source.contains(".truncationMode("))
-            XCTAssertTrue(source.contains("AISectionFilter."))
+            XCTAssertTrue(source.contains("HSplitView"))
+            XCTAssertTrue(source.contains("List(projection.groups"))
+            XCTAssertFalse(source.contains(".onTapGesture"))
         }
     }
 
@@ -95,12 +97,16 @@ final class DeveloperAIArchitectureTests: XCTestCase {
         // reset each page's selection.
         let shell = try source(at: "Sources/SpacePilot/Views/DeveloperAI/DeveloperAIView.swift")
         XCTAssertTrue(shell.contains("@State private var selectedAIEntryID: String?"))
+        XCTAssertTrue(shell.contains("@State private var selectedSkillGroupID: String?"))
         XCTAssertTrue(shell.contains("@State private var selectedSkillID: UUID?"))
+        XCTAssertTrue(shell.contains("@State private var selectedPluginGroupID: String?"))
         XCTAssertTrue(shell.contains("@State private var selectedPluginID: UUID?"))
         XCTAssertTrue(shell.contains("@State private var selectedCLIID: String?"))
         // The shell passes each selection down as a binding.
         XCTAssertTrue(shell.contains("selectedEntryID: $selectedAIEntryID"))
+        XCTAssertTrue(shell.contains("selectedGroupID: $selectedSkillGroupID"))
         XCTAssertTrue(shell.contains("selection: $selectedSkillID"))
+        XCTAssertTrue(shell.contains("selectedGroupID: $selectedPluginGroupID"))
         XCTAssertTrue(shell.contains("selection: $selectedPluginID"))
         XCTAssertTrue(shell.contains("selection: $selectedCLIID"))
 

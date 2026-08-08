@@ -60,6 +60,14 @@
 "ai.cli.status" = "状态";
 "ai.cli.available" = "可用";
 "ai.cli.empty" = "未找到命令行工具";
+"ai.group.bundled" = "内置";
+"ai.group.empty" = "没有归属分组";
+"ai.group.global" = "全局";
+"ai.group.no-items" = "此分组中没有项目";
+"ai.group.project" = "项目";
+"ai.group.select" = "选择一个分组";
+"ai.group.system" = "系统";
+"ai.group.unknown" = "未知";
 "ai.skills.empty" = "未索引技能";
 "ai.apps.discovered" = "已发现";
 "ai.state.not-scanned" = "运行扫描以发现 AI 工具。";

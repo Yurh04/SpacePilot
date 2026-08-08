@@ -12,8 +12,59 @@ public struct PluginScanResult: Sendable {
     }
 }
 
+public struct PluginRoot: Sendable {
+    public let url: URL
+    public let owner: AIAssetOwner
+    public let locationScope: AIAssetLocationScope
+
+    public init(
+        url: URL,
+        owner: AIAssetOwner = .unknown,
+        locationScope: AIAssetLocationScope = .userGlobal
+    ) {
+        self.url = url
+        self.owner = owner
+        self.locationScope = locationScope
+    }
+
+    public static func production(
+        homeDirectory: URL,
+        discoveredRoots: [URL],
+        definitions: [AIToolDefinition] = KnownAIToolDefinitions.all
+    ) -> [Self] {
+        var byRoot: [String: Self] = [:]
+        for definition in definitions {
+            for descriptor in definition.pluginRoots {
+                merge(Self(
+                    url: homeDirectory.appending(path: descriptor.relativePath, directoryHint: .isDirectory),
+                    owner: descriptor.ownership == .shared ? .shared : .tool(definitionID: definition.id),
+                    locationScope: .userGlobal
+                ), into: &byRoot)
+            }
+        }
+        for root in discoveredRoots {
+            merge(Self(url: root), into: &byRoot)
+        }
+        return byRoot.values.sorted { $0.url.path < $1.url.path }
+    }
+
+    private static func merge(_ root: Self, into roots: inout [String: Self]) {
+        let key = root.url.standardizedFileURL.resolvingSymlinksInPath().path
+        guard let existing = roots[key] else {
+            roots[key] = root
+            return
+        }
+        if existing.owner == root.owner, existing.locationScope == root.locationScope { return }
+        if existing.owner == .shared || root.owner == .shared {
+            roots[key] = Self(url: existing.url, owner: .shared, locationScope: .userGlobal)
+            return
+        }
+        roots[key] = Self(url: existing.url, owner: .unknown, locationScope: existing.locationScope)
+    }
+}
+
 public protocol PluginScanning: Sendable {
-    func scan(roots: [URL]) async throws -> PluginScanResult
+    func scan(roots: [PluginRoot]) async throws -> PluginScanResult
 }
 
 public struct PluginScanner<Scanner: SkillScanning>: PluginScanning {
@@ -23,13 +74,14 @@ public struct PluginScanner<Scanner: SkillScanning>: PluginScanning {
         self.skillScanner = skillScanner
     }
 
-    public func scan(roots: [URL]) async throws -> PluginScanResult {
+    public func scan(roots: [PluginRoot]) async throws -> PluginScanResult {
         var plugins: [PluginRecord] = []
         var skills: [SkillRecord] = []
         var diagnostics: [String] = []
 
-        for root in roots {
+        for rootDescriptor in roots {
             try Task.checkCancellation()
+            let root = rootDescriptor.url
             let manifestURL = root.appending(path: ".codex-plugin/plugin.json")
             guard let data = try? Data(contentsOf: manifestURL) else {
                 diagnostics.append("Missing Plugin manifest at \(manifestURL.path)")
@@ -57,7 +109,12 @@ public struct PluginScanner<Scanner: SkillScanning>: PluginScanning {
             let parentRoots = Dictionary(grouping: acceptedFolders, by: { $0.deletingLastPathComponent().path })
                 .values
                 .compactMap(\.first)
-                .map { SkillRoot(url: $0.deletingLastPathComponent(), scope: .pluginProvided(pluginID: pluginID.uuidString)) }
+                .map { SkillRoot(
+                    url: $0.deletingLastPathComponent(),
+                    scope: .pluginProvided(pluginID: pluginID.uuidString),
+                    owner: .plugin(pluginID: pluginID.uuidString),
+                    locationScope: .bundled
+                ) }
             let discovered = try await skillScanner.scan(roots: parentRoots)
             let acceptedPaths = Set(acceptedFolders.map { $0.standardizedFileURL.resolvingSymlinksInPath().path })
             let ownedSkills = discovered
@@ -74,7 +131,9 @@ public struct PluginScanner<Scanner: SkillScanning>: PluginScanning {
                         parentPluginID: pluginID,
                         fingerprint: skill.fingerprint,
                         conflict: skill.conflict,
-                        managementStatus: .parentManaged
+                        managementStatus: .parentManaged,
+                        owner: .plugin(pluginID: pluginID.uuidString),
+                        locationScope: .bundled
                     )
                 }
             skills.append(contentsOf: ownedSkills)
@@ -87,7 +146,9 @@ public struct PluginScanner<Scanner: SkillScanning>: PluginScanning {
                 allocatedSize: allocatedSize(of: root),
                 skillIDs: Set(ownedSkills.map(\.id)),
                 dependencies: manifest.dependencies,
-                managementCapability: .officialHandoff
+                managementCapability: .officialHandoff,
+                owner: rootDescriptor.owner,
+                locationScope: rootDescriptor.locationScope
             ))
         }
 
@@ -96,6 +157,10 @@ public struct PluginScanner<Scanner: SkillScanning>: PluginScanning {
             skills: skills.sorted { $0.name < $1.name },
             diagnostics: diagnostics
         )
+    }
+
+    public func scan(roots: [URL]) async throws -> PluginScanResult {
+        try await scan(roots: roots.map { PluginRoot(url: $0) })
     }
 
     private func validatedComponent(_ relativePath: String, beneath root: URL) -> URL? {

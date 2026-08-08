@@ -1,34 +1,88 @@
 import SpacePilotCore
 import SwiftUI
 
-/// Read-only global Skills page. Shows every `SkillRecord` in the snapshot,
-/// including shared and unowned records — not just registry skill roots. Uses an
-/// explicit regular/compact layout branch and reuses the native double-click
-/// Finder reveal so single-click selection stays native.
+/// Read-only global Skills page grouped by explicit owner/location scope. The
+/// grouping comes from Core records only; this view never infers ownership from
+/// path, display name, or source strings.
 struct GlobalSkillsView: View {
     let skills: [SkillRecord]
+    let plugins: [PluginRecord]
     let searchText: String
+    @Binding var selectedGroupID: String?
     @Binding var selection: UUID?
 
+    private var projection: GroupedSkillsProjection {
+        GroupedSkillsProjection(skills: skills, plugins: plugins)
+    }
+
+    private var selectedGroup: AIAssetGroup? {
+        guard let selectedGroupID else { return nil }
+        return projection.groups.first { $0.id == selectedGroupID }
+    }
+
     private var filteredSkills: [SkillRecord] {
-        AISectionFilter.filterSkills(skills, query: searchText)
+        guard let selectedGroupID else { return [] }
+        return projection.skills(in: selectedGroupID, matching: searchText)
     }
 
     var body: some View {
-        GeometryReader { geometry in
-            let layout = PluginTableLayoutMode(availableWidth: geometry.size.width)
+        Group {
             if skills.isEmpty {
-                // No skills indexed at all — genuinely empty source.
                 ContentUnavailableView(
                     L10n.text(.aiSkillsEmpty),
                     systemImage: "sparkles"
                 )
-            } else if filteredSkills.isEmpty {
-                // Source has skills, but the current query matched none.
+            } else if projection.groups.isEmpty {
                 ContentUnavailableView(
-                    L10n.text(.aiStateNoResults),
-                    systemImage: "magnifyingglass"
+                    L10n.text(.aiGroupEmpty),
+                    systemImage: "folder.badge.questionmark"
                 )
+            } else {
+                HSplitView {
+                    groupList
+                        .frame(minWidth: 150, idealWidth: 190, maxWidth: 240)
+                    tableContent
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+        }
+        .onAppear(perform: resolveSelection)
+        .onChange(of: projection.groups.map(\.id)) { _, _ in resolveSelection() }
+        .onChange(of: selectedGroupID) { _, _ in resolveRowSelection() }
+        .onChange(of: searchText) { _, _ in resolveRowSelection() }
+    }
+
+    private var groupList: some View {
+        List(projection.groups, selection: $selectedGroupID) { group in
+            VStack(alignment: .leading, spacing: 3) {
+                HStack {
+                    Text(group.title)
+                        .lineLimit(1)
+                    Spacer(minLength: 8)
+                    Text(group.itemCount.formatted())
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+                Text(groupDetail(group))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .tag(group.id)
+        }
+    }
+
+    @ViewBuilder
+    private var tableContent: some View {
+        GeometryReader { geometry in
+            let layout = PluginTableLayoutMode(availableWidth: geometry.size.width)
+            if selectedGroupID == nil {
+                ContentUnavailableView(L10n.text(.aiGroupSelect), systemImage: "sidebar.left")
+            } else if filteredSkills.isEmpty, !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                ContentUnavailableView(L10n.text(.aiStateNoResults), systemImage: "magnifyingglass")
+            } else if filteredSkills.isEmpty {
+                ContentUnavailableView(L10n.text(.aiGroupNoItems), systemImage: "tray")
             } else if layout == .compact {
                 compactTable
             } else {
@@ -97,5 +151,34 @@ struct GlobalSkillsView: View {
 
     private func urlForRow(_ row: Int) -> URL? {
         filteredSkills.indices.contains(row) ? filteredSkills[row].url : nil
+    }
+
+    private func groupDetail(_ group: AIAssetGroup) -> String {
+        "\(localizedDetail(group.detail)) · \(ByteCount.string(group.allocatedSize))"
+    }
+
+    private func localizedDetail(_ detail: String) -> String {
+        switch detail {
+        case "Global": L10n.text(.aiGroupGlobal)
+        case "Project": L10n.text(.aiGroupProject)
+        case "Bundled": L10n.text(.aiGroupBundled)
+        case "System": L10n.text(.aiGroupSystem)
+        default: L10n.text(.aiGroupUnknown)
+        }
+    }
+
+    private func resolveSelection() {
+        let oldSelection = selectedGroupID
+        selectedGroupID = GroupedSkillsProjection.resolvedSelection(
+            current: selectedGroupID,
+            preferredOwnerFrom: oldSelection,
+            groups: projection.groups
+        )
+        resolveRowSelection()
+    }
+
+    private func resolveRowSelection() {
+        if let selection, filteredSkills.contains(where: { $0.id == selection }) { return }
+        selection = filteredSkills.first?.id
     }
 }

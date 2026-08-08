@@ -28,6 +28,14 @@ enum L10n {
         static let aiCLIStatus = Self(key: "ai.cli.status", english: "Status")
         static let aiCLIAvailable = Self(key: "ai.cli.available", english: "Available")
         static let aiCLIEmpty = Self(key: "ai.cli.empty", english: "No CLI tools found")
+        static let aiGroupBundled = Self(key: "ai.group.bundled", english: "Bundled")
+        static let aiGroupEmpty = Self(key: "ai.group.empty", english: "No ownership groups")
+        static let aiGroupGlobal = Self(key: "ai.group.global", english: "Global")
+        static let aiGroupNoItems = Self(key: "ai.group.no-items", english: "No items in this group")
+        static let aiGroupProject = Self(key: "ai.group.project", english: "Project")
+        static let aiGroupSelect = Self(key: "ai.group.select", english: "Select a group")
+        static let aiGroupSystem = Self(key: "ai.group.system", english: "System")
+        static let aiGroupUnknown = Self(key: "ai.group.unknown", english: "Unknown")
         static let aiSkillsEmpty = Self(key: "ai.skills.empty", english: "No skills indexed")
         static let aiAppsDiscovered = Self(key: "ai.apps.discovered", english: "Discovered")
         static let aiStateNotScanned = Self(key: "ai.state.not-scanned", english: "Run a scan to discover AI tools.")
@@ -128,7 +136,9 @@ enum L10n {
         "ai.section.apps", "ai.section.cli", "ai.overview.apps", "ai.overview.clis",
         "ai.overview.partial-coverage", "ai.overview.discovering", "ai.overview.discovery-issue",
         "ai.cli.executable", "ai.cli.owner", "ai.cli.status", "ai.cli.available",
-        "ai.cli.empty", "ai.skills.empty", "ai.apps.discovered",
+        "ai.cli.empty", "ai.group.bundled", "ai.group.empty", "ai.group.global",
+        "ai.group.no-items", "ai.group.project", "ai.group.select", "ai.group.system",
+        "ai.group.unknown", "ai.skills.empty", "ai.apps.discovered",
         "ai.state.not-scanned", "ai.state.no-results",
         "ai.coverage.permission-denied", "ai.coverage.timeout", "ai.coverage.output-truncated",
         "ai.coverage.invalid-output", "ai.coverage.unavailable", "ai.owner.shared",

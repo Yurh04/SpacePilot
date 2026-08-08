@@ -60,6 +60,14 @@
 "ai.cli.status" = "Status";
 "ai.cli.available" = "Available";
 "ai.cli.empty" = "No CLI tools found";
+"ai.group.bundled" = "Bundled";
+"ai.group.empty" = "No ownership groups";
+"ai.group.global" = "Global";
+"ai.group.no-items" = "No items in this group";
+"ai.group.project" = "Project";
+"ai.group.select" = "Select a group";
+"ai.group.system" = "System";
+"ai.group.unknown" = "Unknown";
 "ai.skills.empty" = "No skills indexed";
 "ai.apps.discovered" = "Discovered";
 "ai.state.not-scanned" = "Run a scan to discover AI tools.";

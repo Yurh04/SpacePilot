@@ -17,6 +17,23 @@ final class DeveloperAIProjectionGlobalListsTests: XCTestCase {
         )
     }
 
+    private func ownedSkill(name: String, path: String, owner: AIAssetOwner) -> SkillRecord {
+        SkillRecord(
+            name: name,
+            summary: "summary",
+            url: URL(fileURLWithPath: path),
+            allocatedSize: 10,
+            scope: .sharedAgents,
+            visibleAgents: ["Codex"],
+            parentPluginID: nil,
+            fingerprint: "fp-\(name)",
+            conflict: nil,
+            managementStatus: .standalone,
+            owner: owner,
+            locationScope: .userGlobal
+        )
+    }
+
     private func plugin(name: String, path: String) -> PluginRecord {
         PluginRecord(
             name: name,
@@ -24,6 +41,18 @@ final class DeveloperAIProjectionGlobalListsTests: XCTestCase {
             url: URL(fileURLWithPath: path),
             source: "source",
             allocatedSize: 10
+        )
+    }
+
+    private func ownedPlugin(name: String, path: String, owner: AIAssetOwner) -> PluginRecord {
+        PluginRecord(
+            name: name,
+            version: "1.0",
+            url: URL(fileURLWithPath: path),
+            source: "source",
+            allocatedSize: 10,
+            owner: owner,
+            locationScope: .userGlobal
         )
     }
 
@@ -185,6 +214,29 @@ final class DeveloperAIProjectionGlobalListsTests: XCTestCase {
 
         let projection = try DeveloperAIProjection(snapshot: snapshot, checkCancellation: {})
 
+        XCTAssertEqual(projection.allPlugins.count, 2)
+    }
+
+    func testSameCanonicalURLDifferentOwnerIsNotDeduplicated() throws {
+        let shared = ownedSkill(name: "shared", path: "/same/skill", owner: .shared)
+        let codex = ownedSkill(name: "codex", path: "/same/skill/", owner: .tool(definitionID: "codex"))
+        let sharedPlugin = ownedPlugin(name: "shared", path: "/same/plugin", owner: .shared)
+        let codexPlugin = ownedPlugin(name: "codex", path: "/same/plugin/", owner: .tool(definitionID: "codex"))
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: [],
+            applications: [],
+            aiApplications: [],
+            plugins: [sharedPlugin, codexPlugin],
+            skills: [shared, codex],
+            coverage: .complete,
+            pluginDiagnostics: []
+        )
+
+        let projection = try DeveloperAIProjection(snapshot: snapshot, checkCancellation: {})
+
+        XCTAssertEqual(projection.allSkills.count, 2)
         XCTAssertEqual(projection.allPlugins.count, 2)
     }
 }

@@ -306,6 +306,8 @@ public struct DeveloperAIProjection: Sendable {
                 url: { $0.url },
                 name: { $0.name },
                 id: { $0.id },
+                owner: { $0.owner },
+                locationScope: { $0.locationScope },
                 checkCancellation: checkCancellation
             ),
             by: {
@@ -323,6 +325,8 @@ public struct DeveloperAIProjection: Sendable {
                 url: { $0.url },
                 name: { $0.name },
                 id: { $0.id },
+                owner: { $0.owner },
+                locationScope: { $0.locationScope },
                 checkCancellation: checkCancellation
             ),
             by: {
@@ -340,8 +344,9 @@ public struct DeveloperAIProjection: Sendable {
     }
 
     /// Deduplicates records that resolve to the same canonical (standardized,
-    /// symlink-resolved) URL so overlapping roots do not produce duplicate rows
-    /// in the global Skills/Plugins pages.
+    /// symlink-resolved) URL with the same explicit owner and location scope so
+    /// overlapping roots do not produce duplicate rows in the global
+    /// Skills/Plugins pages.
     ///
     /// The survivor for a given canonical URL is deterministic regardless of
     /// snapshot input order: records are first placed in a stable total order
@@ -352,22 +357,33 @@ public struct DeveloperAIProjection: Sendable {
         url: (Record) -> URL,
         name: (Record) -> String,
         id: (Record) -> UUID,
+        owner: (Record) -> AIAssetOwner,
+        locationScope: (Record) -> AIAssetLocationScope,
         checkCancellation: @escaping @Sendable () throws -> Void
     ) throws -> [Record] {
         var checkpoint = ProjectionCancellationCheckpoint(checkCancellation: checkCancellation)
 
         // Precompute canonical paths once, then order by a stable total order so
         // the survivor of a duplicate canonical URL never depends on input order.
-        var annotated: [(record: Record, canonicalPath: String)] = []
+        var annotated: [(record: Record, key: CanonicalAssetDedupKey)] = []
         annotated.reserveCapacity(records.count)
         for record in records {
             try checkpoint.checkPeriodically()
-            let canonicalPath = url(record).standardizedFileURL.resolvingSymlinksInPath().path
-            annotated.append((record, canonicalPath))
+            annotated.append((record, CanonicalAssetDedupKey(
+                canonicalPath: url(record).standardizedFileURL.resolvingSymlinksInPath().path,
+                owner: owner(record),
+                locationScope: locationScope(record)
+            )))
         }
         annotated.sort { lhs, rhs in
-            if lhs.canonicalPath != rhs.canonicalPath {
-                return lhs.canonicalPath < rhs.canonicalPath
+            if lhs.key.canonicalPath != rhs.key.canonicalPath {
+                return lhs.key.canonicalPath < rhs.key.canonicalPath
+            }
+            if lhs.key.ownerSortKey != rhs.key.ownerSortKey {
+                return lhs.key.ownerSortKey < rhs.key.ownerSortKey
+            }
+            if lhs.key.locationSortKey != rhs.key.locationSortKey {
+                return lhs.key.locationSortKey < rhs.key.locationSortKey
             }
             let nameOrder = name(lhs.record).localizedCaseInsensitiveCompare(name(rhs.record))
             if nameOrder != .orderedSame {
@@ -376,14 +392,46 @@ public struct DeveloperAIProjection: Sendable {
             return id(lhs.record).uuidString < id(rhs.record).uuidString
         }
 
-        var seenPaths = Set<String>()
+        var seenKeys = Set<CanonicalAssetDedupKey>()
         var result: [Record] = []
         result.reserveCapacity(annotated.count)
         for entry in annotated {
             try checkpoint.checkPeriodically()
-            guard seenPaths.insert(entry.canonicalPath).inserted else { continue }
+            guard seenKeys.insert(entry.key).inserted else { continue }
             result.append(entry.record)
         }
         return result
+    }
+}
+
+private struct CanonicalAssetDedupKey: Hashable {
+    let canonicalPath: String
+    let owner: AIAssetOwner
+    let locationScope: AIAssetLocationScope
+
+    var ownerSortKey: String {
+        switch owner {
+        case .shared:
+            return "0:shared"
+        case .tool(let definitionID):
+            return "1:tool:\(definitionID)"
+        case .plugin(let pluginID):
+            return "2:plugin:\(pluginID)"
+        case .unknown:
+            return "3:unknown"
+        }
+    }
+
+    var locationSortKey: String {
+        switch locationScope {
+        case .userGlobal:
+            return "0:global"
+        case .project(let project):
+            return "1:project:\(project.id)"
+        case .bundled:
+            return "2:bundled"
+        case .system:
+            return "3:system"
+        }
     }
 }

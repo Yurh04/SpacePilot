@@ -66,6 +66,50 @@ final class PluginScannerTests: XCTestCase {
         XCTAssertEqual(result.plugins.first?.skillIDs.count, 2)
     }
 
+    func testPluginRecordInheritsDescriptorOwnership() async throws {
+        let plugin = try PluginFixture.make(
+            name: "product-design",
+            version: "0.1.52",
+            skillNames: ["index"]
+        )
+
+        let result = try await PluginScanner(skillScanner: SkillScanner()).scan(roots: [PluginRoot(
+            url: plugin.root,
+            owner: .tool(definitionID: "codex"),
+            locationScope: .userGlobal
+        )])
+
+        XCTAssertEqual(result.plugins.first?.owner, .tool(definitionID: "codex"))
+        XCTAssertEqual(result.plugins.first?.locationScope, .userGlobal)
+        XCTAssertEqual(result.skills.first?.owner, .plugin(pluginID: result.plugins.first?.id.uuidString ?? ""))
+        XCTAssertEqual(result.skills.first?.locationScope, .bundled)
+    }
+
+    func testPluginProductionRootsMergeKnownDefinitionsAndDiscoveredRoots() throws {
+        let home = URL(fileURLWithPath: "/Users/test")
+
+        let roots = PluginRoot.production(
+            homeDirectory: home,
+            discoveredRoots: [home.appending(path: ".codex/plugins/cache/source/plugin/1.0.0")]
+        )
+
+        XCTAssertTrue(roots.contains { $0.url.path == "/Users/test/.codex/plugins" && $0.owner == .tool(definitionID: "codex") })
+        XCTAssertTrue(roots.contains { $0.url.path == "/Users/test/.claude/plugins" && $0.owner == .tool(definitionID: "claude") })
+        XCTAssertTrue(roots.contains { $0.url.path.contains(".codex/plugins/cache") && $0.owner == .unknown })
+    }
+
+    func testPluginProductionRootConflictsBecomeUnknown() throws {
+        let home = URL(fileURLWithPath: "/Users/test")
+        let definitions = [
+            AIToolDefinition(id: "alpha", displayName: "Alpha", pluginRoots: [AIToolRootDescriptor(".plugins")]),
+            AIToolDefinition(id: "beta", displayName: "Beta", pluginRoots: [AIToolRootDescriptor(".plugins")])
+        ]
+
+        let roots = PluginRoot.production(homeDirectory: home, discoveredRoots: [], definitions: definitions)
+
+        XCTAssertEqual(roots.first?.owner, .unknown)
+    }
+
     func testTraversalSkillPathIsRejectedWithDiagnostic() async throws {
         let plugin = try PluginFixture.make(
             name: "unsafe-plugin",

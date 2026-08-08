@@ -1,34 +1,80 @@
 import SpacePilotCore
 import SwiftUI
 
-/// Read-only global Plugins page. Shows every `PluginRecord` in the snapshot,
-/// not just registry plugin roots. Uses an explicit regular/compact layout
-/// branch and reuses the native double-click Finder reveal so single-click
-/// selection stays native.
+/// Read-only global Plugins page grouped by explicit owner/location scope.
 struct GlobalPluginsView: View {
     let plugins: [PluginRecord]
     let searchText: String
+    @Binding var selectedGroupID: String?
     @Binding var selection: UUID?
 
+    private var projection: GroupedPluginsProjection {
+        GroupedPluginsProjection(plugins: plugins)
+    }
+
     private var filteredPlugins: [PluginRecord] {
-        AISectionFilter.filterPlugins(plugins, query: searchText)
+        guard let selectedGroupID else { return [] }
+        return projection.plugins(in: selectedGroupID, matching: searchText)
     }
 
     var body: some View {
-        GeometryReader { geometry in
-            let layout = PluginTableLayoutMode(availableWidth: geometry.size.width)
+        Group {
             if plugins.isEmpty {
-                // No plugins indexed at all — genuinely empty source.
                 ContentUnavailableView(
                     L10n.noPluginsInstalled(),
                     systemImage: "puzzlepiece.extension"
                 )
-            } else if filteredPlugins.isEmpty {
-                // Source has plugins, but the current query matched none.
+            } else if projection.groups.isEmpty {
                 ContentUnavailableView(
-                    L10n.text(.aiStateNoResults),
-                    systemImage: "magnifyingglass"
+                    L10n.text(.aiGroupEmpty),
+                    systemImage: "folder.badge.questionmark"
                 )
+            } else {
+                HSplitView {
+                    groupList
+                        .frame(minWidth: 150, idealWidth: 190, maxWidth: 240)
+                    tableContent
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            }
+        }
+        .onAppear(perform: resolveSelection)
+        .onChange(of: projection.groups.map(\.id)) { _, _ in resolveSelection() }
+        .onChange(of: selectedGroupID) { _, _ in resolveRowSelection() }
+        .onChange(of: searchText) { _, _ in resolveRowSelection() }
+    }
+
+    private var groupList: some View {
+        List(projection.groups, selection: $selectedGroupID) { group in
+            VStack(alignment: .leading, spacing: 3) {
+                HStack {
+                    Text(group.title)
+                        .lineLimit(1)
+                    Spacer(minLength: 8)
+                    Text(group.itemCount.formatted())
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+                Text(groupDetail(group))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .tag(group.id)
+        }
+    }
+
+    @ViewBuilder
+    private var tableContent: some View {
+        GeometryReader { geometry in
+            let layout = PluginTableLayoutMode(availableWidth: geometry.size.width)
+            if selectedGroupID == nil {
+                ContentUnavailableView(L10n.text(.aiGroupSelect), systemImage: "sidebar.left")
+            } else if filteredPlugins.isEmpty, !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                ContentUnavailableView(L10n.text(.aiStateNoResults), systemImage: "magnifyingglass")
+            } else if filteredPlugins.isEmpty {
+                ContentUnavailableView(L10n.text(.aiGroupNoItems), systemImage: "tray")
             } else if layout == .compact {
                 compactTable
             } else {
@@ -96,5 +142,34 @@ struct GlobalPluginsView: View {
 
     private func urlForRow(_ row: Int) -> URL? {
         filteredPlugins.indices.contains(row) ? filteredPlugins[row].url : nil
+    }
+
+    private func groupDetail(_ group: AIAssetGroup) -> String {
+        "\(localizedDetail(group.detail)) · \(ByteCount.string(group.allocatedSize))"
+    }
+
+    private func localizedDetail(_ detail: String) -> String {
+        switch detail {
+        case "Global": L10n.text(.aiGroupGlobal)
+        case "Project": L10n.text(.aiGroupProject)
+        case "Bundled": L10n.text(.aiGroupBundled)
+        case "System": L10n.text(.aiGroupSystem)
+        default: L10n.text(.aiGroupUnknown)
+        }
+    }
+
+    private func resolveSelection() {
+        let oldSelection = selectedGroupID
+        selectedGroupID = GroupedPluginsProjection.resolvedSelection(
+            current: selectedGroupID,
+            preferredOwnerFrom: oldSelection,
+            groups: projection.groups
+        )
+        resolveRowSelection()
+    }
+
+    private func resolveRowSelection() {
+        if let selection, filteredPlugins.contains(where: { $0.id == selection }) { return }
+        selection = filteredPlugins.first?.id
     }
 }
