@@ -18,6 +18,12 @@ public enum KnownAIToolDefinitions {
         displayNameOverride: "Shared Agent Skills"
     )
 
+    static let sharedProjectSkills = AIProjectAssetDescriptor(
+        ".agents/skills",
+        ownership: .shared,
+        kind: .skills
+    )
+
     public static let all: [AIToolDefinition] = [
         AIToolDefinition(
             id: "codex",
@@ -39,6 +45,11 @@ public enum KnownAIToolDefinitions {
                     packageName: "@openai/codex",
                     metadataRelativePaths: [".local/share/pnpm/global/5/node_modules/@openai/codex/package.json"]
                 )
+            ],
+            projectAssetDescriptors: [
+                AIProjectAssetDescriptor(".codex/skills", kind: .skills),
+                AIProjectAssetDescriptor(".codex/plugins", kind: .pluginContainer),
+                sharedProjectSkills
             ]
         ),
         AIToolDefinition(
@@ -49,7 +60,12 @@ public enum KnownAIToolDefinitions {
             skillRoots: [AIToolRootDescriptor(".claude/skills"), sharedAgentsSkillsRoot],
             pluginRoots: [AIToolRootDescriptor(".claude/plugins")],
             configRelativePaths: [".claude"],
-            cliProbeID: "claude"
+            cliProbeID: "claude",
+            projectAssetDescriptors: [
+                AIProjectAssetDescriptor(".claude/skills", kind: .skills),
+                AIProjectAssetDescriptor(".claude/plugins", kind: .pluginContainer),
+                sharedProjectSkills
+            ]
         ),
         AIToolDefinition(
             id: "chatgpt",

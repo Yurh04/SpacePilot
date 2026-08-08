@@ -3489,6 +3489,294 @@
         }
       }
     },
+    "ai.project.add-folder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add Project Folder…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "添加项目文件夹…"
+          }
+        }
+      }
+    },
+    "ai.project.no-approved-folders": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No approved project folders"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未批准项目文件夹"
+          }
+        }
+      }
+    },
+    "ai.project.remove-folder": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove Project"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除项目"
+          }
+        }
+      }
+    },
+    "ai.project.scanning": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scanning project assets…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在扫描项目资产…"
+          }
+        }
+      }
+    },
+    "ai.project.issue.descriptor-escape": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A project asset path escaped the approved folder."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "某个项目资产路径逃逸了已批准文件夹。"
+          }
+        }
+      }
+    },
+    "ai.project.issue.duplicate": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That project folder is already approved."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该项目文件夹已批准。"
+          }
+        }
+      }
+    },
+    "ai.project.issue.home-rejected": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a project folder, not your home folder."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择具体项目文件夹，而不是个人主文件夹。"
+          }
+        }
+      }
+    },
+    "ai.project.issue.invalid-descriptor": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A fixed project asset path was rejected."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "某个固定项目资产路径已被拒绝。"
+          }
+        }
+      }
+    },
+    "ai.project.issue.invalid-payload": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Project approval settings could not be read."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取项目批准设置。"
+          }
+        }
+      }
+    },
+    "ai.project.issue.missing": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An approved project folder no longer exists."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "某个已批准项目文件夹不再存在。"
+          }
+        }
+      }
+    },
+    "ai.project.issue.no-supported-assets": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No supported project asset locations are defined."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有已定义的受支持项目资产位置。"
+          }
+        }
+      }
+    },
+    "ai.project.issue.not-directory": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The selected project path is not a folder."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所选项目路径不是文件夹。"
+          }
+        }
+      }
+    },
+    "ai.project.issue.overlap": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Parent and child project folders cannot both be approved."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不能同时批准父级和子级项目文件夹。"
+          }
+        }
+      }
+    },
+    "ai.project.issue.plugin-child-escape": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A plugin folder escaped the approved project."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "某个插件文件夹逃逸了已批准项目。"
+          }
+        }
+      }
+    },
+    "ai.project.issue.root-rejected": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The filesystem root cannot be approved as a project."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不能将文件系统根目录批准为项目。"
+          }
+        }
+      }
+    },
+    "ai.project.issue.symlink-duplicate": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That folder points to an already approved project."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该文件夹指向已批准的项目。"
+          }
+        }
+      }
+    },
+    "ai.project.issue.tampered": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A project approval entry was ignored because its identity did not match its path."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "某个项目批准条目的身份与路径不匹配，已忽略。"
+          }
+        }
+      }
+    },
+    "ai.project.issue.unreadable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A project folder cannot be read."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取某个项目文件夹。"
+          }
+        }
+      }
+    },
     "ai.skills.empty": {
       "localizations": {
         "en": {

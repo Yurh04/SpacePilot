@@ -4,7 +4,14 @@ import SwiftUI
 /// Read-only global Plugins page grouped by explicit owner/location scope.
 struct GlobalPluginsView: View {
     let plugins: [PluginRecord]
+    let approvedProjectRoots: [ApprovedProjectRoot]
+    let approvedProjectRootIssues: [ApprovedProjectRootIssue]
+    let projectScanIssues: [ProjectAIAssetScanIssue]
+    let isScanningProjects: Bool
+    let projectScanError: String?
     let searchText: String
+    let onAddProjectRoot: (URL) -> Void
+    let onRemoveProjectRoot: (String) -> Void
     @Binding var selectedGroupID: String?
     @Binding var selection: UUID?
 
@@ -18,17 +25,29 @@ struct GlobalPluginsView: View {
     }
 
     var body: some View {
-        Group {
+        VStack(alignment: .leading, spacing: 0) {
+            ProjectApprovalBar(
+                approvedProjectRoots: approvedProjectRoots,
+                approvedProjectRootIssues: approvedProjectRootIssues,
+                projectScanIssues: projectScanIssues,
+                isScanningProjects: isScanningProjects,
+                projectScanError: projectScanError,
+                onAddProjectRoot: onAddProjectRoot,
+                onRemoveProjectRoot: onRemoveProjectRoot
+            )
+            Divider()
             if plugins.isEmpty {
                 ContentUnavailableView(
                     L10n.noPluginsInstalled(),
                     systemImage: "puzzlepiece.extension"
                 )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if projection.groups.isEmpty {
                 ContentUnavailableView(
                     L10n.text(.aiGroupEmpty),
                     systemImage: "folder.badge.questionmark"
                 )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 HSplitView {
                     groupList
@@ -152,6 +171,8 @@ struct GlobalPluginsView: View {
         switch detail {
         case "Global": L10n.text(.aiGroupGlobal)
         case "Project": L10n.text(.aiGroupProject)
+        case let detail where detail.hasPrefix("Project · "):
+            L10n.text(.aiGroupProject) + String(detail.dropFirst("Project".count))
         case "Bundled": L10n.text(.aiGroupBundled)
         case "System": L10n.text(.aiGroupSystem)
         default: L10n.text(.aiGroupUnknown)

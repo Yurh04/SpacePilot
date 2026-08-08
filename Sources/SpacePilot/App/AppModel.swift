@@ -41,6 +41,13 @@ final class AppModel {
     /// A read-only error surface for AI discovery. Deliberately separate from
     /// `errorMessage` so a discovery failure never clobbers the main scan error.
     var aiDiscoveryError: String?
+    var approvedProjectRoots: [ApprovedProjectRoot] = []
+    var approvedProjectRootIssues: [ApprovedProjectRootIssue] = []
+    var projectAIAssetSkills: [SkillRecord] = []
+    var projectAIAssetPlugins: [PluginRecord] = []
+    var projectAIAssetScanIssues: [ProjectAIAssetScanIssue] = []
+    var isScanningProjectAIAssets = false
+    var projectAIAssetError: String?
 
     var isPreparingAIQuery: Bool {
         guard selection == .developerAI,
@@ -71,6 +78,8 @@ final class AppModel {
     private var fileSystemChangeReconciler: FileSystemChangeReconciler?
     private var pendingAutomaticRefreshScope: ScanScope?
     private let runtime: SpacePilotRuntime?
+    private let approvedProjectRootStore: any ApprovedProjectRootStoring
+    private let approvedProjectRootValidator = ApprovedProjectRootValidator()
 
     // MARK: - AI discovery
 
@@ -98,6 +107,11 @@ final class AppModel {
     /// Set when the user explicitly refreshes the Developer & AI view; consumed
     /// by the next `apply(snapshot:)` to force a fresh discovery pass.
     private var pendingForceAIDiscovery = false
+    private let scanProjectAIAssets: @Sendable ([ApprovedProjectRoot]) async throws -> ProjectAIAssetScanResult
+    private var projectAIAssetWorker: Task<ProjectAIAssetScanResult, Error>?
+    private var projectAIAssetPublicationTask: Task<Void, Never>?
+    private var projectAIAssetGeneration = 0
+    private var lastProjectAIAssetFingerprint: ProjectAIAssetFingerprint?
 
     init() {
         do {
@@ -108,6 +122,8 @@ final class AppModel {
         }
         self.discoverAITools = Self.liveAIToolDiscovery
         self.aiDiscoveryHomeURL = runtime?.homeDirectory
+        self.approvedProjectRootStore = UserDefaultsApprovedProjectRootStore()
+        self.scanProjectAIAssets = Self.liveProjectAIAssetScan
         Task { await loadSavedState() }
     }
 
@@ -117,11 +133,15 @@ final class AppModel {
     init(
         runtime: SpacePilotRuntime?,
         homeDirectory: URL,
-        discoverAITools: @escaping @Sendable (ScanSnapshot, URL) async throws -> [AIToolRecord]
+        discoverAITools: @escaping @Sendable (ScanSnapshot, URL) async throws -> [AIToolRecord],
+        approvedProjectRootStore: any ApprovedProjectRootStoring = InMemoryApprovedProjectRootStore(),
+        scanProjectAIAssets: (@Sendable ([ApprovedProjectRoot]) async throws -> ProjectAIAssetScanResult)? = nil
     ) {
         self.runtime = runtime
         self.aiDiscoveryHomeURL = homeDirectory
         self.discoverAITools = discoverAITools
+        self.approvedProjectRootStore = approvedProjectRootStore
+        self.scanProjectAIAssets = scanProjectAIAssets ?? Self.liveProjectAIAssetScan
     }
 
     /// The production discovery function: builds a snapshot-backed locator and a
@@ -130,6 +150,10 @@ final class AppModel {
         let locator = SnapshotAIApplicationLocator(snapshot: snapshot)
         let registry = AIToolRegistry(applicationLocator: locator)
         return try await registry.discover(homeDirectory: homeDirectory)
+    }
+
+    private static let liveProjectAIAssetScan: @Sendable ([ApprovedProjectRoot]) async throws -> ProjectAIAssetScanResult = { roots in
+        try await ProjectAIAssetScanner(skillScanner: SkillScanner()).scan(approvedRoots: roots)
     }
 
     func startScan(
@@ -381,6 +405,7 @@ final class AppModel {
 
     private func loadSavedState() async {
         guard let runtime else { return }
+        loadApprovedProjectRoots()
         do {
             if let snapshot = try await runtime.store.latestSnapshot() {
                 apply(snapshot: snapshot)
@@ -396,6 +421,58 @@ final class AppModel {
             Self.logger.error(
                 "Could not start storage monitoring: \(error.localizedDescription, privacy: .public)"
             )
+        }
+    }
+
+    private func loadApprovedProjectRoots() {
+        do {
+            let result = try approvedProjectRootStore.load()
+            approvedProjectRoots = result.roots
+            approvedProjectRootIssues = result.issues
+            startProjectAIAssetScan(force: true)
+        } catch {
+            approvedProjectRootIssues = [.invalidPayload]
+        }
+    }
+
+    func addApprovedProjectRoot(_ url: URL) {
+        do {
+            let roots = try approvedProjectRootValidator.adding(
+                url,
+                to: approvedProjectRoots,
+                homeDirectory: aiDiscoveryHomeURL
+            )
+            try approvedProjectRootStore.replace(roots)
+            approvedProjectRoots = roots
+            approvedProjectRootIssues = []
+            startProjectAIAssetScan(force: true)
+        } catch let error as ApprovedProjectRootMutationError {
+            approvedProjectRootIssues = [Self.issue(for: error)]
+        } catch {
+            approvedProjectRootIssues = [.invalidPayload]
+        }
+    }
+
+    func removeApprovedProjectRoot(id: String) {
+        do {
+            let roots = approvedProjectRootValidator.removing(id: id, from: approvedProjectRoots)
+            try approvedProjectRootStore.replace(roots)
+            approvedProjectRoots = roots
+            approvedProjectRootIssues = []
+            startProjectAIAssetScan(force: true)
+        } catch {
+            approvedProjectRootIssues = [.invalidPayload]
+        }
+    }
+
+    private static func issue(for error: ApprovedProjectRootMutationError) -> ApprovedProjectRootIssue {
+        switch error {
+        case .filesystemRootRejected: .filesystemRootRejected
+        case .homeDirectoryRejected: .homeDirectoryRejected
+        case .notDirectory: .notDirectory
+        case .unreadableDirectory: .unreadableDirectory
+        case .duplicateRoot: .duplicateRoot
+        case .overlappingRoot: .overlappingRoot
         }
     }
 
@@ -928,6 +1005,63 @@ final class AppModel {
         isDiscoveringAITools = false
     }
 
+    private func startProjectAIAssetScan(force: Bool) {
+        let roots = approvedProjectRoots
+        let fingerprint = ProjectAIAssetFingerprint(roots: roots)
+        if !force,
+           isScanningProjectAIAssets == false,
+           lastProjectAIAssetFingerprint == fingerprint {
+            return
+        }
+        projectAIAssetPublicationTask?.cancel()
+        projectAIAssetWorker?.cancel()
+        projectAIAssetGeneration &+= 1
+        let generation = projectAIAssetGeneration
+        if roots.isEmpty {
+            projectAIAssetSkills = []
+            projectAIAssetPlugins = []
+            projectAIAssetScanIssues = []
+            projectAIAssetError = nil
+            isScanningProjectAIAssets = false
+            lastProjectAIAssetFingerprint = fingerprint
+            return
+        }
+        isScanningProjectAIAssets = true
+        projectAIAssetError = nil
+        let scanner = scanProjectAIAssets
+        let worker = Task.detached(priority: .utility) { [roots, scanner] in
+            try await scanner(roots)
+        }
+        projectAIAssetWorker = worker
+        projectAIAssetPublicationTask = Task { [weak self] in
+            do {
+                let result = try await worker.value
+                guard let self,
+                      !Task.isCancelled,
+                      self.projectAIAssetGeneration == generation,
+                      ProjectAIAssetFingerprint(roots: self.approvedProjectRoots) == fingerprint else { return }
+                self.projectAIAssetSkills = result.skills
+                self.projectAIAssetPlugins = result.plugins
+                self.projectAIAssetScanIssues = result.issues
+                self.projectAIAssetError = nil
+                self.isScanningProjectAIAssets = false
+                self.lastProjectAIAssetFingerprint = fingerprint
+                self.projectAIAssetWorker = nil
+                self.projectAIAssetPublicationTask = nil
+            } catch is CancellationError {
+                return
+            } catch {
+                guard let self,
+                      self.projectAIAssetGeneration == generation,
+                      ProjectAIAssetFingerprint(roots: self.approvedProjectRoots) == fingerprint else { return }
+                self.projectAIAssetError = error.localizedDescription
+                self.isScanningProjectAIAssets = false
+                self.projectAIAssetWorker = nil
+                self.projectAIAssetPublicationTask = nil
+            }
+        }
+    }
+
     #if DEBUG
     /// Test-only seam: drives a snapshot through the same `apply(snapshot:)`
     /// entry point production uses, optionally forcing a fresh discovery pass,
@@ -948,6 +1082,11 @@ final class AppModel {
         pendingForceAIDiscovery = force
         apply(snapshot: snapshot)
         return aiDiscoveryPublicationTask
+    }
+
+    func addApprovedProjectRootForTesting(_ url: URL) async {
+        addApprovedProjectRoot(url)
+        await projectAIAssetPublicationTask?.value
     }
     #endif
 
@@ -1010,5 +1149,37 @@ private struct AIDiscoveryFingerprint: Equatable, Sendable {
             ))
         }
         self.entries = entries.sorted()
+    }
+}
+
+private struct ProjectAIAssetFingerprint: Equatable, Sendable {
+    private let entries: [String]
+
+    init(roots: [ApprovedProjectRoot]) {
+        entries = roots.map { $0.id + "|" + $0.canonicalRootURL.path }.sorted()
+    }
+}
+
+struct InMemoryApprovedProjectRootStore: ApprovedProjectRootStoring {
+    private final class Box: @unchecked Sendable {
+        var roots: [ApprovedProjectRoot]
+
+        init(roots: [ApprovedProjectRoot]) {
+            self.roots = roots
+        }
+    }
+
+    private let box: Box
+
+    init(roots: [ApprovedProjectRoot] = []) {
+        self.box = Box(roots: roots)
+    }
+
+    func load() throws -> ApprovedProjectRootValidationResult {
+        ApprovedProjectRootValidator().validateStored(box.roots)
+    }
+
+    func replace(_ roots: [ApprovedProjectRoot]) throws {
+        box.roots = roots
     }
 }

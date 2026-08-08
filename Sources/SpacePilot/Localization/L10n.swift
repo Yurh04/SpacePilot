@@ -36,6 +36,10 @@ enum L10n {
         static let aiGroupSelect = Self(key: "ai.group.select", english: "Select a group")
         static let aiGroupSystem = Self(key: "ai.group.system", english: "System")
         static let aiGroupUnknown = Self(key: "ai.group.unknown", english: "Unknown")
+        static let aiProjectAddFolder = Self(key: "ai.project.add-folder", english: "Add Project Folder…")
+        static let aiProjectNoApprovedFolders = Self(key: "ai.project.no-approved-folders", english: "No approved project folders")
+        static let aiProjectRemoveFolder = Self(key: "ai.project.remove-folder", english: "Remove Project")
+        static let aiProjectScanning = Self(key: "ai.project.scanning", english: "Scanning project assets…")
         static let aiSkillsEmpty = Self(key: "ai.skills.empty", english: "No skills indexed")
         static let aiAppsDiscovered = Self(key: "ai.apps.discovered", english: "Discovered")
         static let aiStateNotScanned = Self(key: "ai.state.not-scanned", english: "Run a scan to discover AI tools.")
@@ -138,7 +142,13 @@ enum L10n {
         "ai.cli.executable", "ai.cli.owner", "ai.cli.status", "ai.cli.available",
         "ai.cli.empty", "ai.group.bundled", "ai.group.empty", "ai.group.global",
         "ai.group.no-items", "ai.group.project", "ai.group.select", "ai.group.system",
-        "ai.group.unknown", "ai.skills.empty", "ai.apps.discovered",
+        "ai.group.unknown", "ai.project.add-folder", "ai.project.no-approved-folders",
+        "ai.project.remove-folder", "ai.project.scanning", "ai.skills.empty", "ai.apps.discovered",
+        "ai.project.issue.descriptor-escape", "ai.project.issue.duplicate", "ai.project.issue.invalid-descriptor",
+        "ai.project.issue.home-rejected", "ai.project.issue.invalid-payload", "ai.project.issue.missing", "ai.project.issue.no-supported-assets",
+        "ai.project.issue.not-directory", "ai.project.issue.overlap", "ai.project.issue.plugin-child-escape",
+        "ai.project.issue.root-rejected", "ai.project.issue.symlink-duplicate", "ai.project.issue.tampered",
+        "ai.project.issue.unreadable",
         "ai.state.not-scanned", "ai.state.no-results",
         "ai.coverage.permission-denied", "ai.coverage.timeout", "ai.coverage.output-truncated",
         "ai.coverage.invalid-output", "ai.coverage.unavailable", "ai.owner.shared",
@@ -478,6 +488,33 @@ enum L10n {
         case .outputTruncated: value("ai.coverage.output-truncated", default: "Output truncated", locale: locale)
         case .invalidOutput: value("ai.coverage.invalid-output", default: "Invalid output", locale: locale)
         case .unavailable: value("ai.coverage.unavailable", default: "Unavailable", locale: locale)
+        }
+    }
+
+    static func name(for issue: ApprovedProjectRootIssue, locale: Locale? = nil) -> String {
+        switch issue {
+        case .invalidPayload: value("ai.project.issue.invalid-payload", default: "Project approval settings could not be read.", locale: locale)
+        case .tamperedIdentity: value("ai.project.issue.tampered", default: "A project approval entry was ignored because its identity did not match its path.", locale: locale)
+        case .missingPath: value("ai.project.issue.missing", default: "An approved project folder no longer exists.", locale: locale)
+        case .notDirectory: value("ai.project.issue.not-directory", default: "The selected project path is not a folder.", locale: locale)
+        case .unreadableDirectory: value("ai.project.issue.unreadable", default: "A project folder cannot be read.", locale: locale)
+        case .filesystemRootRejected: value("ai.project.issue.root-rejected", default: "The filesystem root cannot be approved as a project.", locale: locale)
+        case .homeDirectoryRejected: value("ai.project.issue.home-rejected", default: "Choose a project folder, not your home folder.", locale: locale)
+        case .duplicateRoot: value("ai.project.issue.duplicate", default: "That project folder is already approved.", locale: locale)
+        case .symlinkAliasDuplicate: value("ai.project.issue.symlink-duplicate", default: "That folder points to an already approved project.", locale: locale)
+        case .overlappingRoot: value("ai.project.issue.overlap", default: "Parent and child project folders cannot both be approved.", locale: locale)
+        }
+    }
+
+    static func name(for issue: ProjectAIAssetScanIssue, locale: Locale? = nil) -> String {
+        switch issue {
+        case .invalidDescriptor: value("ai.project.issue.invalid-descriptor", default: "A fixed project asset path was rejected.", locale: locale)
+        case .descriptorEscapesProjectRoot: value("ai.project.issue.descriptor-escape", default: "A project asset path escaped the approved folder.", locale: locale)
+        case .pluginChildEscapesProjectRoot: value("ai.project.issue.plugin-child-escape", default: "A plugin folder escaped the approved project.", locale: locale)
+        case .projectRootMissing: value("ai.project.issue.missing", default: "An approved project folder no longer exists.", locale: locale)
+        case .projectRootNotDirectory: value("ai.project.issue.not-directory", default: "The selected project path is not a folder.", locale: locale)
+        case .projectRootUnreadable: value("ai.project.issue.unreadable", default: "A project folder cannot be read.", locale: locale)
+        case .noSupportedAssets: value("ai.project.issue.no-supported-assets", default: "No supported project asset locations are defined.", locale: locale)
         }
     }
 

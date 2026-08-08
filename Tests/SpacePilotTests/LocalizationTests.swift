@@ -165,6 +165,22 @@ final class LocalizationTests: XCTestCase {
         XCTAssertEqual(L10n.text(.aiGroupNoItems, locale: Locale(identifier: "zh-Hans")), "此分组中没有项目")
     }
 
+    func testAIProjectApprovalLabelsAreTranslated() {
+        let english = Locale(identifier: "en")
+        let chinese = Locale(identifier: "zh-Hans")
+
+        XCTAssertEqual(L10n.text(.aiProjectAddFolder, locale: english), "Add Project Folder…")
+        XCTAssertEqual(L10n.text(.aiProjectAddFolder, locale: chinese), "添加项目文件夹…")
+        XCTAssertEqual(
+            L10n.name(for: ApprovedProjectRootIssue.homeDirectoryRejected, locale: english),
+            "Choose a project folder, not your home folder."
+        )
+        XCTAssertEqual(
+            L10n.name(for: ProjectAIAssetScanIssue.noSupportedAssets, locale: chinese),
+            "没有已定义的受支持项目资产位置。"
+        )
+    }
+
     func testSelectiveCleanupAndStorageWorkbenchUseBothLanguages() {
         let english = Locale(identifier: "en")
         let chinese = Locale(identifier: "zh-Hans")
@@ -277,7 +293,7 @@ final class LocalizationTests: XCTestCase {
         let english = try stringsTable(at: resources.appending(path: "en.lproj/Localizable.strings"))
         let chinese = try stringsTable(at: resources.appending(path: "zh-Hans.lproj/Localizable.strings"))
 
-        XCTAssertEqual(L10n.allKeys.count, 228)
+        XCTAssertEqual(L10n.allKeys.count, 246)
         XCTAssertEqual(Set(catalogStrings.keys), L10n.allKeys)
         XCTAssertEqual(Set(english.keys), L10n.allKeys)
         XCTAssertEqual(Set(chinese.keys), L10n.allKeys)

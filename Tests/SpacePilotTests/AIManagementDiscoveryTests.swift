@@ -152,6 +152,62 @@ final class AIManagementDiscoveryTests: XCTestCase {
         XCTAssertNil(model.aiDiscoveryError)
     }
 
+    func testProjectAssetScanFailureDoesNotClearGlobalProjectionOrScanError() async {
+        struct Boom: Error {}
+        let directory = try! Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = AppModel(
+            runtime: nil,
+            homeDirectory: Self.home,
+            discoverAITools: { _, _ in [Self.record(name: "Codex")] },
+            scanProjectAIAssets: { _ in throw Boom() }
+        )
+        await model.applySnapshotForTesting(Self.snapshot())
+        model.errorMessage = "scan-error"
+
+        await model.addApprovedProjectRootForTesting(directory)
+
+        XCTAssertEqual(model.aiManagementProjection.records.map(\.displayName), ["Codex"])
+        XCTAssertEqual(model.errorMessage, "scan-error")
+        XCTAssertNotNil(model.projectAIAssetError)
+    }
+
+    func testProjectAssetScanPublishesOnlyNewestApprovedRootGeneration() async {
+        let first = try! Self.temporaryDirectory()
+        let second = try! Self.temporaryDirectory()
+        defer {
+            try? FileManager.default.removeItem(at: first)
+            try? FileManager.default.removeItem(at: second)
+        }
+        let gate = AsyncGate()
+        let model = AppModel(
+            runtime: nil,
+            homeDirectory: Self.home,
+            discoverAITools: { _, _ in [] },
+            scanProjectAIAssets: { roots in
+                if roots.count == 1, roots.first?.canonicalRootURL == first {
+                    await gate.wait()
+                    return ProjectAIAssetScanResult(
+                        skills: [Self.skill(name: "old", project: roots[0].identity)],
+                        plugins: [],
+                        issues: []
+                    )
+                }
+                return ProjectAIAssetScanResult(
+                    skills: [Self.skill(name: "new", project: roots[0].identity)],
+                    plugins: [],
+                    issues: []
+                )
+            }
+        )
+
+        model.addApprovedProjectRoot(first)
+        await model.addApprovedProjectRootForTesting(second)
+        await gate.open()
+
+        XCTAssertEqual(model.projectAIAssetSkills.map(\.name), ["new"])
+    }
+
     // MARK: - Fixtures
 
     private static let home = URL(fileURLWithPath: "/Users/test")
@@ -163,6 +219,31 @@ final class AIManagementDiscoveryTests: XCTestCase {
             displayName: name,
             owner: .tool(definitionID: name)
         )
+    }
+
+    private nonisolated static func skill(name: String, project: AIProjectIdentity) -> SkillRecord {
+        SkillRecord(
+            id: UUID(),
+            name: name,
+            summary: "",
+            url: URL(fileURLWithPath: "/tmp/\(name)/SKILL.md"),
+            allocatedSize: 1,
+            scope: .agentSpecific(agent: "Codex"),
+            visibleAgents: ["Codex"],
+            parentPluginID: nil,
+            fingerprint: name,
+            conflict: nil,
+            managementStatus: .standalone,
+            owner: .tool(definitionID: "codex"),
+            locationScope: .project(project)
+        )
+    }
+
+    private nonisolated static func temporaryDirectory() throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "SpacePilotProjectScan-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
     }
 
     private nonisolated static func snapshot(aiName: String = "Codex") -> ScanSnapshot {

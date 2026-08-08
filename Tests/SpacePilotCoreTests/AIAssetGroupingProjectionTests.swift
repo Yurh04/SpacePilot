@@ -8,6 +8,7 @@ final class AIAssetGroupingProjectionTests: XCTestCase {
         let project = AIProjectIdentity(displayName: "Repo", canonicalRootURL: URL(fileURLWithPath: "/tmp/repo"))
         let skills = [
             skill("shared", path: "/skills/shared", owner: .shared, location: .userGlobal),
+            skill("shared-project", path: "/skills/shared-project", owner: .shared, location: .project(project)),
             skill("global", path: "/skills/global", owner: .tool(definitionID: "codex"), location: .userGlobal),
             skill("project", path: "/skills/project", owner: .tool(definitionID: "codex"), location: .project(project)),
             skill("system", path: "/skills/system", owner: .tool(definitionID: "codex"), location: .system),
@@ -18,11 +19,15 @@ final class AIAssetGroupingProjectionTests: XCTestCase {
 
         XCTAssertEqual(projection.groups.map(\.id), [
             "shared:global",
+            "shared:project:\(project.id)",
             "tool:codex:global",
             "tool:codex:project:\(project.id)",
             "tool:codex:system",
             "unknown"
         ])
+        XCTAssertEqual(projection.groups.first { $0.id == "shared:project:\(project.id)" }?.detail, "Project · Repo")
+        XCTAssertEqual(projection.groups.first { $0.id == "tool:codex:project:\(project.id)" }?.title, "Codex")
+        XCTAssertEqual(projection.groups.first { $0.id == "tool:codex:project:\(project.id)" }?.detail, "Project · Repo")
         XCTAssertEqual(projection.skills(in: "tool:codex:project:\(project.id)").map(\.name), ["project"])
     }
 

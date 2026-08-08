@@ -75,6 +75,20 @@ final class DeveloperAIArchitectureTests: XCTestCase {
         }
     }
 
+    func testProjectApprovalUIUsesSystemFolderPickerAndNoRowGestures() throws {
+        let approval = try source(at: "Sources/SpacePilot/Views/DeveloperAI/ProjectApprovalBar.swift")
+        XCTAssertTrue(approval.contains("NSOpenPanel()"))
+        XCTAssertTrue(approval.contains("panel.canChooseDirectories = true"))
+        XCTAssertTrue(approval.contains("panel.canChooseFiles = false"))
+        XCTAssertTrue(approval.contains("onAddProjectRoot(url)"))
+        XCTAssertTrue(approval.contains("onRemoveProjectRoot(root.id)"))
+        XCTAssertFalse(approval.contains(".onTapGesture"))
+
+        let shell = try source(at: "Sources/SpacePilot/Views/DeveloperAI/DeveloperAIView.swift")
+        XCTAssertTrue(shell.contains("projection.allSkills + model.projectAIAssetSkills"))
+        XCTAssertTrue(shell.contains("projection.allPlugins + model.projectAIAssetPlugins"))
+    }
+
     func testCLIToolsViewShowsHonestCoverageStatusAndRevealsExecutable() throws {
         let source = try source(at: "Sources/SpacePilot/Views/DeveloperAI/CLIToolsView.swift")
 

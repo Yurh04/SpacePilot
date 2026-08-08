@@ -54,6 +54,30 @@ public struct AIToolPackageDescriptor: Hashable, Sendable {
     }
 }
 
+public enum AIProjectAssetKind: String, Codable, Hashable, Sendable {
+    case skills
+    case plugin
+    case pluginContainer
+}
+
+/// A fixed project-relative asset location. Project scanning only evaluates
+/// these code constants beneath a user-approved project root.
+public struct AIProjectAssetDescriptor: Hashable, Sendable {
+    public let relativePath: String
+    public let ownership: AIToolRootOwnership
+    public let kind: AIProjectAssetKind
+
+    public init(
+        _ relativePath: String,
+        ownership: AIToolRootOwnership = .tool,
+        kind: AIProjectAssetKind
+    ) {
+        self.relativePath = relativePath
+        self.ownership = ownership
+        self.kind = kind
+    }
+}
+
 /// A pure, read-only description of a known AI tool. It carries no behavior:
 /// it does not import SwiftUI, touch the file system, or spawn processes. All
 /// discovery logic lives in `AIToolRegistry`; this type only says *what to look
@@ -95,6 +119,10 @@ public struct AIToolDefinition: Identifiable, Hashable, Sendable {
     /// Fixed package receipt locations used only for read-only install facts.
     public let packageDescriptors: [AIToolPackageDescriptor]
 
+    /// Fixed project-relative Skills/Plugins roots, evaluated only inside a
+    /// user-approved project root.
+    public let projectAssetDescriptors: [AIProjectAssetDescriptor]
+
     public init(
         id: String,
         displayName: String,
@@ -105,7 +133,8 @@ public struct AIToolDefinition: Identifiable, Hashable, Sendable {
         configRelativePaths: [String] = [],
         hostEvidenceRelativePaths: [String] = [],
         cliProbeID: String? = nil,
-        packageDescriptors: [AIToolPackageDescriptor] = []
+        packageDescriptors: [AIToolPackageDescriptor] = [],
+        projectAssetDescriptors: [AIProjectAssetDescriptor] = []
     ) {
         self.id = id
         self.displayName = displayName
@@ -117,5 +146,6 @@ public struct AIToolDefinition: Identifiable, Hashable, Sendable {
         self.hostEvidenceRelativePaths = hostEvidenceRelativePaths
         self.cliProbeID = cliProbeID
         self.packageDescriptors = packageDescriptors
+        self.projectAssetDescriptors = projectAssetDescriptors
     }
 }

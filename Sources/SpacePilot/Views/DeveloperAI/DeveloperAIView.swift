@@ -90,16 +90,30 @@ struct DeveloperAIView: View {
             )
         case .skills:
             GlobalSkillsView(
-                skills: projection.allSkills,
-                plugins: projection.allPlugins,
+                skills: projection.allSkills + model.projectAIAssetSkills,
+                plugins: projection.allPlugins + model.projectAIAssetPlugins,
+                approvedProjectRoots: model.approvedProjectRoots,
+                approvedProjectRootIssues: model.approvedProjectRootIssues,
+                projectScanIssues: model.projectAIAssetScanIssues,
+                isScanningProjects: model.isScanningProjectAIAssets,
+                projectScanError: model.projectAIAssetError,
                 searchText: model.searchText,
+                onAddProjectRoot: model.addApprovedProjectRoot,
+                onRemoveProjectRoot: model.removeApprovedProjectRoot,
                 selectedGroupID: $selectedSkillGroupID,
                 selection: $selectedSkillID
             )
         case .plugins:
             GlobalPluginsView(
-                plugins: projection.allPlugins,
+                plugins: projection.allPlugins + model.projectAIAssetPlugins,
+                approvedProjectRoots: model.approvedProjectRoots,
+                approvedProjectRootIssues: model.approvedProjectRootIssues,
+                projectScanIssues: model.projectAIAssetScanIssues,
+                isScanningProjects: model.isScanningProjectAIAssets,
+                projectScanError: model.projectAIAssetError,
                 searchText: model.searchText,
+                onAddProjectRoot: model.addApprovedProjectRoot,
+                onRemoveProjectRoot: model.removeApprovedProjectRoot,
                 selectedGroupID: $selectedPluginGroupID,
                 selection: $selectedPluginID
             )

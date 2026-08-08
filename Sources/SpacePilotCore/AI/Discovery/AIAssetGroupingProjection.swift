@@ -2,6 +2,7 @@ import Foundation
 
 public enum AIAssetGroupKind: Hashable, Sendable {
     case sharedGlobal
+    case sharedProject(project: AIProjectIdentity)
     case toolGlobal(definitionID: String)
     case toolProject(definitionID: String, project: AIProjectIdentity)
     case toolBundled(definitionID: String)
@@ -43,10 +44,12 @@ public struct GroupedSkillsProjection: Sendable {
         plugins: [PluginRecord],
         definitions: [AIToolDefinition] = KnownAIToolDefinitions.all
     ) {
-        let pluginOwnerByID = Dictionary(uniqueKeysWithValues: plugins.map { ($0.id, $0.owner) })
+        let pluginScopeByID = Dictionary(uniqueKeysWithValues: plugins.map {
+            ($0.id, PluginGroupingScope(owner: $0.owner, locationScope: $0.locationScope))
+        })
         let records = Self.deduplicated(skills)
         let grouped = Dictionary(grouping: records) { skill in
-            Self.groupKey(for: skill, pluginOwnerByID: pluginOwnerByID)
+            Self.groupKey(for: skill, pluginScopeByID: pluginScopeByID)
         }
         let orderedKeys = Self.orderedKeys(Array(grouped.keys), definitions: definitions)
         let definitionNames = Dictionary(uniqueKeysWithValues: definitions.map { ($0.id, $0.displayName) })
@@ -78,14 +81,20 @@ public struct GroupedSkillsProjection: Sendable {
 
     private static func groupKey(
         for skill: SkillRecord,
-        pluginOwnerByID: [UUID: AIAssetOwner]
+        pluginScopeByID: [UUID: PluginGroupingScope]
     ) -> AIAssetGroupKey {
         if case .plugin = skill.owner {
             guard let pluginID = skill.parentPluginID,
-                  case .tool(let definitionID) = pluginOwnerByID[pluginID] else {
+                  let pluginScope = pluginScopeByID[pluginID],
+                  case .tool(let definitionID) = pluginScope.owner else {
                 return .unknown
             }
-            return .tool(definitionID: definitionID, scope: .bundled)
+            switch pluginScope.locationScope {
+            case .project(let project):
+                return .tool(definitionID: definitionID, scope: .project(project))
+            default:
+                return .tool(definitionID: definitionID, scope: .bundled)
+            }
         }
         return AIAssetGroupKey(owner: skill.owner, locationScope: skill.locationScope)
     }
@@ -177,8 +186,14 @@ private struct DedupKey: Hashable {
     }
 }
 
+private struct PluginGroupingScope: Hashable {
+    let owner: AIAssetOwner
+    let locationScope: AIAssetLocationScope
+}
+
 private enum AIAssetGroupKey: Hashable {
     case sharedGlobal
+    case sharedProject(AIProjectIdentity)
     case tool(definitionID: String, scope: ToolScope)
     case unknown
 
@@ -193,6 +208,8 @@ private enum AIAssetGroupKey: Hashable {
         switch (owner, locationScope) {
         case (.shared, .userGlobal):
             self = .sharedGlobal
+        case (.shared, .project(let project)):
+            self = .sharedProject(project)
         case (.tool(let definitionID), .userGlobal):
             self = .tool(definitionID: definitionID, scope: .global)
         case (.tool(let definitionID), .project(let project)):
@@ -210,6 +227,8 @@ private enum AIAssetGroupKey: Hashable {
         switch self {
         case .sharedGlobal:
             return "shared:global"
+        case .sharedProject(let project):
+            return "shared:project:\(project.id)"
         case .tool(let definitionID, let scope):
             return "tool:\(definitionID):\(scope.id)"
         case .unknown:
@@ -221,6 +240,13 @@ private enum AIAssetGroupKey: Hashable {
         let keySet = Set(keys)
         var ordered: [Self] = []
         if keySet.contains(.sharedGlobal) { ordered.append(.sharedGlobal) }
+        let sharedProjects = keySet.compactMap { key -> AIProjectIdentity? in
+            guard case .sharedProject(let project) = key else { return nil }
+            return project
+        }
+        for project in sharedProjects.sorted(by: projectOrder) {
+            ordered.append(.sharedProject(project))
+        }
         for definition in definitions {
             let global = Self.tool(definitionID: definition.id, scope: .global)
             if keySet.contains(global) { ordered.append(global) }
@@ -257,6 +283,8 @@ private enum AIAssetGroupKey: Hashable {
         switch self {
         case .sharedGlobal:
             return .sharedGlobal
+        case .sharedProject(let project):
+            return .sharedProject(project: project)
         case .tool(let definitionID, .global):
             return .toolGlobal(definitionID: definitionID)
         case .tool(let definitionID, .project(let project)):
@@ -274,13 +302,15 @@ private enum AIAssetGroupKey: Hashable {
         switch self {
         case .sharedGlobal:
             return "Shared"
+        case .sharedProject:
+            return "Shared"
         case .tool(let definitionID, let scope):
             let name = definitionNames[definitionID] ?? definitionID
             switch scope {
             case .global, .bundled, .system:
                 return name
-            case .project(let project):
-                return project.displayName
+            case .project:
+                return name
             }
         case .unknown:
             return "Unknown"
@@ -291,10 +321,12 @@ private enum AIAssetGroupKey: Hashable {
         switch self {
         case .sharedGlobal:
             return "Global"
+        case .sharedProject(let project):
+            return "Project · \(project.displayName)"
         case .tool(_, .global):
             return "Global"
-        case .tool(_, .project):
-            return "Project"
+        case .tool(_, .project(let project)):
+            return "Project · \(project.displayName)"
         case .tool(_, .bundled):
             return "Bundled"
         case .tool(_, .system):
@@ -354,7 +386,7 @@ private func totalOrder(
 }
 
 private func ownerPrefix(_ groupID: String) -> String? {
-    if groupID == "shared:global" { return "shared" }
+    if groupID.hasPrefix("shared:") { return "shared" }
     if groupID == "unknown" { return "unknown" }
     let parts = groupID.split(separator: ":", maxSplits: 2).map(String.init)
     guard parts.count >= 2 else { return nil }
