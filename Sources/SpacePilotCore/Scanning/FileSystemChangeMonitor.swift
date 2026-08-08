@@ -108,13 +108,36 @@ public enum ChangedPathReducer {
         }
 
         var retained: [String] = []
-        for path in candidates where !retained.contains(where: {
-            path == $0 || path.hasPrefix($0 + "/")
-        }) {
+        var retainedPaths = Set<String>()
+        retained.reserveCapacity(candidates.count)
+        retainedPaths.reserveCapacity(candidates.count)
+        for path in candidates where !hasRetainedAncestor(
+            of: path,
+            in: retainedPaths
+        ) {
             retained.append(path)
+            retainedPaths.insert(path)
         }
         return retained.map {
             URL(fileURLWithPath: $0, isDirectory: true)
+        }
+    }
+
+    private static func hasRetainedAncestor(
+        of path: String,
+        in retainedPaths: Set<String>
+    ) -> Bool {
+        var ancestor = URL(fileURLWithPath: path)
+        while true {
+            let ancestorPath = ancestor.path
+            if retainedPaths.contains(ancestorPath) {
+                return true
+            }
+            let parent = ancestor.deletingLastPathComponent()
+            guard parent.path != ancestorPath else {
+                return false
+            }
+            ancestor = parent
         }
     }
 }

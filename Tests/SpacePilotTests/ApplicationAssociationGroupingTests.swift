@@ -42,6 +42,44 @@ final class ApplicationAssociationGroupingTests: XCTestCase {
         XCTAssertTrue(ApplicationAssociationGroup.grouped([]).isEmpty)
     }
 
+    func testDoubleClickRowsAccountForGroupHeadersAndCollapsedGroups() {
+        let applicationID = UUID()
+        let developer = pair(
+            applicationID: applicationID,
+            path: "/tmp/developer",
+            category: .developer,
+            allocatedSize: 200
+        )
+        let cache = pair(
+            applicationID: applicationID,
+            path: "/tmp/cache",
+            category: .cache,
+            allocatedSize: 100
+        )
+        let groups = ApplicationAssociationGroup.grouped([cache, developer])
+
+        let collapsedRows = ApplicationAssociationGroup.tableRowURLs(
+            for: groups,
+            collapsedCategories: [.developer],
+            expandAll: false
+        )
+
+        XCTAssertEqual(collapsedRows.count, 3)
+        XCTAssertNil(collapsedRows[0])
+        XCTAssertNil(collapsedRows[1])
+        XCTAssertEqual(collapsedRows[2]?.lastPathComponent, "cache")
+
+        let searchRows = ApplicationAssociationGroup.tableRowURLs(
+            for: groups,
+            collapsedCategories: [.developer],
+            expandAll: true
+        )
+        XCTAssertEqual(
+            searchRows.map { $0?.lastPathComponent },
+            [nil, "developer", nil, "cache"]
+        )
+    }
+
     private func pair(
         applicationID: UUID,
         path: String,

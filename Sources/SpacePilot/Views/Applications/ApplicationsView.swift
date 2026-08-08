@@ -1,4 +1,3 @@
-import AppKit
 import SpacePilotCore
 import SwiftUI
 
@@ -31,6 +30,20 @@ struct ApplicationAssociationGroup: Identifiable {
                     $0 + $1.item.allocatedSize
                 }
             )
+        }
+    }
+
+    static func tableRowURLs(
+        for groups: [ApplicationAssociationGroup],
+        collapsedCategories: Set<ItemCategory>,
+        expandAll: Bool
+    ) -> [URL?] {
+        groups.flatMap { group -> [URL?] in
+            var rowURLs: [URL?] = [nil]
+            if expandAll || !collapsedCategories.contains(group.category) {
+                rowURLs.append(contentsOf: group.pairs.map { $0.item.url })
+            }
+            return rowURLs
         }
     }
 }
@@ -179,9 +192,15 @@ private struct ApplicationListPane: View {
             List(applications, selection: $selection) { projection in
                 let application = projection.application
                 ApplicationListRow(projection: projection)
+                    .contentShape(Rectangle())
+                    .simultaneousGesture(
+                        TapGesture().onEnded {
+                            selection = projection.id
+                        }
+                    )
                     .tag(projection.id)
                     .contextMenu {
-                        Button(L10n.text(.revealFinder)) { reveal(application.url) }
+                        Button(L10n.text(.revealFinder)) { FinderReveal.reveal(application.url) }
                         Divider()
                         Button(L10n.text(.applicationReviewReset)) { reset(projection) }
                         Button(L10n.text(.applicationReviewUninstall)) {
@@ -191,6 +210,11 @@ private struct ApplicationListPane: View {
                     .accessibilityLabel(
                         "\(application.name), \(ByteCount.string(projection.totalSize))"
                     )
+            }
+            .nativeTableDoubleClickReveal { row in
+                applications.indices.contains(row)
+                    ? applications[row].application.url
+                    : nil
             }
             .listStyle(.sidebar)
             .overlay {
@@ -251,6 +275,7 @@ private struct ApplicationDetail: View {
     let uninstall: () -> Void
     let reset: () -> Void
     @State private var collapsedCategories: Set<ItemCategory> = []
+    @State private var selectedAssociationID: UUID?
 
     private var application: ApplicationRecord { projection.application }
     private var visibleAssociations: [ApplicationAssociationProjection] {
@@ -289,6 +314,7 @@ private struct ApplicationDetail: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                .onDoubleClickRevealInFinder(application.url)
 
                 HStack(spacing: 8) {
                     Spacer()
@@ -341,16 +367,17 @@ private struct ApplicationDetail: View {
 
             Divider()
 
-            List {
+            List(selection: $selectedAssociationID) {
                 ForEach(associationGroups) { group in
                     DisclosureGroup(
                         isExpanded: expansionBinding(for: group.category)
                     ) {
                         ForEach(group.pairs) { pair in
                             ApplicationAssociationRow(pair: pair)
+                                .tag(pair.id)
                                 .contextMenu {
                                     Button(L10n.text(.revealFinder)) {
-                                        reveal(pair.item.url)
+                                        FinderReveal.reveal(pair.item.url)
                                     }
                                 }
                         }
@@ -358,6 +385,16 @@ private struct ApplicationDetail: View {
                         ApplicationAssociationGroupHeader(group: group)
                     }
                 }
+            }
+            .nativeTableDoubleClickReveal { row in
+                let rowURLs = ApplicationAssociationGroup.tableRowURLs(
+                    for: associationGroups,
+                    collapsedCategories: collapsedCategories,
+                    expandAll: !searchText.isEmpty
+                )
+                return rowURLs.indices.contains(row)
+                    ? rowURLs[row]
+                    : nil
             }
             .listStyle(.inset)
             .overlay {
@@ -390,6 +427,7 @@ private struct ApplicationDetail: View {
             }
         )
     }
+
 }
 
 private struct ApplicationAssociationGroupHeader: View {

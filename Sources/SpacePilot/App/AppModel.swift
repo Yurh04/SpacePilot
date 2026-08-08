@@ -34,6 +34,13 @@ final class AppModel {
     var latestCleanupTransaction: CleanupTransaction?
     var cleanupHistory: [CleanupTransaction] = []
     var analyzingApplicationID: UUID?
+    /// Read-only projection of discovered AI tools/assets for the future
+    /// management UI. Never mutated by discovery directly; only replaced whole.
+    var aiManagementProjection = AIManagementProjection.empty
+    var isDiscoveringAITools = false
+    /// A read-only error surface for AI discovery. Deliberately separate from
+    /// `errorMessage` so a discovery failure never clobbers the main scan error.
+    var aiDiscoveryError: String?
 
     var isPreparingAIQuery: Bool {
         guard selection == .developerAI,
@@ -65,6 +72,33 @@ final class AppModel {
     private var pendingAutomaticRefreshScope: ScanScope?
     private let runtime: SpacePilotRuntime?
 
+    // MARK: - AI discovery
+
+    /// Injected discovery function. It receives an immutable snapshot and the
+    /// home directory and returns read-only records. It is executed on a
+    /// detached, non-MainActor worker; injecting it (rather than calling
+    /// `AIToolRegistry` directly) makes publication races deterministically
+    /// testable without spawning real processes.
+    private let discoverAITools: @Sendable (ScanSnapshot, URL) async throws -> [AIToolRecord]
+    /// Home directory used to anchor discovery. In production this mirrors the
+    /// runtime's home directory; in tests it is injected directly so discovery
+    /// can run without a live runtime.
+    private let aiDiscoveryHomeURL: URL?
+    /// The off-MainActor worker computing records, and the MainActor task that
+    /// awaits it and publishes. Both are cancelled on a new snapshot or explicit
+    /// cancellation, mirroring `projectionWorker`/`projectionPublicationTask`.
+    private var aiDiscoveryWorker: Task<[AIToolRecord], Error>?
+    private var aiDiscoveryPublicationTask: Task<Void, Never>?
+    /// Monotonically increasing token; only the newest discovery may publish.
+    private var aiDiscoveryGeneration = 0
+    /// The fingerprint of the last snapshot whose discovery *successfully
+    /// published*. Only a completed, still-current pass sets this, so a failed or
+    /// cancelled first pass never suppresses a retry for the same inputs.
+    private var lastSuccessfulAIDiscoveryFingerprint: AIDiscoveryFingerprint?
+    /// Set when the user explicitly refreshes the Developer & AI view; consumed
+    /// by the next `apply(snapshot:)` to force a fresh discovery pass.
+    private var pendingForceAIDiscovery = false
+
     init() {
         do {
             runtime = try .live()
@@ -72,7 +106,30 @@ final class AppModel {
             runtime = nil
             errorMessage = error.localizedDescription
         }
+        self.discoverAITools = Self.liveAIToolDiscovery
+        self.aiDiscoveryHomeURL = runtime?.homeDirectory
         Task { await loadSavedState() }
+    }
+
+    /// Internal initializer used by tests to inject a deterministic discovery
+    /// function and skip the live runtime, so publication-race behavior can be
+    /// exercised without touching disk or spawning processes.
+    init(
+        runtime: SpacePilotRuntime?,
+        homeDirectory: URL,
+        discoverAITools: @escaping @Sendable (ScanSnapshot, URL) async throws -> [AIToolRecord]
+    ) {
+        self.runtime = runtime
+        self.aiDiscoveryHomeURL = homeDirectory
+        self.discoverAITools = discoverAITools
+    }
+
+    /// The production discovery function: builds a snapshot-backed locator and a
+    /// read-only `AIToolRegistry`, then discovers records off the MainActor.
+    private static let liveAIToolDiscovery: @Sendable (ScanSnapshot, URL) async throws -> [AIToolRecord] = { snapshot, homeDirectory in
+        let locator = SnapshotAIApplicationLocator(snapshot: snapshot)
+        let registry = AIToolRegistry(applicationLocator: locator)
+        return try await registry.discover(homeDirectory: homeDirectory)
     }
 
     func startScan(
@@ -129,6 +186,9 @@ final class AppModel {
 
     func cancelScan() {
         scanTask?.cancel()
+        // A cancelled scan should not leave an in-flight discovery running; the
+        // generation bump ensures a mid-flight worker can never publish.
+        cancelAIManagementDiscovery()
     }
 
     func refreshCurrentView() {
@@ -142,6 +202,11 @@ final class AppModel {
             .developerAI
         case .history:
             .applications
+        }
+        if scope == .developerAI {
+            // An explicit Developer & AI refresh should re-run discovery even if
+            // the AI-relevant snapshot inputs look unchanged.
+            pendingForceAIDiscovery = true
         }
         startScan(scope: scope)
     }
@@ -702,6 +767,8 @@ final class AppModel {
         projectionPublicationTask?.cancel()
         projectionWorker?.cancel()
 
+        startAIManagementDiscovery(for: snapshot, force: consumePendingForceAIDiscovery())
+
         let worker = Task.detached(priority: .userInitiated) { [snapshot] in
             try AppSnapshotProjection.build(snapshot: snapshot)
         }
@@ -769,6 +836,121 @@ final class AppModel {
         aiQueryWorker?.cancel()
     }
 
+    // MARK: - AI management discovery
+
+    /// Reads and clears the one-shot "force discovery" request.
+    private func consumePendingForceAIDiscovery() -> Bool {
+        defer { pendingForceAIDiscovery = false }
+        return pendingForceAIDiscovery
+    }
+
+    /// Launches read-only AI-tool discovery for a snapshot. The old pass (worker
+    /// and its publication task) is always cancelled first. When `force` is false
+    /// and the AI-relevant inputs are unchanged from the last launched pass,
+    /// discovery is skipped so routine (for example, storage) refreshes don't
+    /// re-run CLI probes.
+    ///
+    /// Work runs on a detached, non-MainActor worker so directory probes and the
+    /// definition loop never block the UI; the detached closure captures only
+    /// `Sendable` values (snapshot, home, the discover function), never `self`.
+    /// Publication stays on the MainActor and is guarded three ways: the task
+    /// must not be cancelled, the generation must still be current, and
+    /// `latestSnapshot.id` must still match the captured snapshot. That guarantees
+    /// a stale pass can never overwrite results from a newer snapshot.
+    private func startAIManagementDiscovery(for snapshot: ScanSnapshot, force: Bool) {
+        guard let homeDirectory = aiDiscoveryHomeURL else { return }
+        let fingerprint = AIDiscoveryFingerprint(snapshot: snapshot)
+        if !force,
+           isDiscoveringAITools == false,
+           lastSuccessfulAIDiscoveryFingerprint == fingerprint {
+            // Inputs unchanged since a successful pass and none in flight: keep
+            // existing results.
+            return
+        }
+
+        aiDiscoveryPublicationTask?.cancel()
+        aiDiscoveryWorker?.cancel()
+        aiDiscoveryGeneration &+= 1
+        let generation = aiDiscoveryGeneration
+        let snapshotID = snapshot.id
+        isDiscoveringAITools = true
+        aiDiscoveryError = nil
+
+        let discover = discoverAITools
+        let worker = Task.detached(priority: .utility) { [snapshot, homeDirectory, discover] in
+            try await discover(snapshot, homeDirectory)
+        }
+        aiDiscoveryWorker = worker
+        aiDiscoveryPublicationTask = Task { [weak self] in
+            do {
+                let records = try await worker.value
+                guard let self,
+                      !Task.isCancelled,
+                      self.aiDiscoveryGeneration == generation,
+                      self.latestSnapshot?.id == snapshotID else { return }
+                self.aiManagementProjection = AIManagementProjection(records: records)
+                // Record success only now, so a failed/cancelled pass never marks
+                // these inputs as covered and a retry stays possible.
+                self.lastSuccessfulAIDiscoveryFingerprint = fingerprint
+                self.isDiscoveringAITools = false
+                self.aiDiscoveryWorker = nil
+                self.aiDiscoveryPublicationTask = nil
+            } catch is CancellationError {
+                // Superseded or cancelled: leave state (including fingerprint) for
+                // the newer pass to own; the same inputs may retry later.
+                return
+            } catch {
+                guard let self,
+                      self.aiDiscoveryGeneration == generation,
+                      self.latestSnapshot?.id == snapshotID else { return }
+                // Surface as a discovery-only error; never clobber the main scan
+                // error, never clear a still-valid prior projection, and do not
+                // mark the fingerprint successful so the same inputs can retry.
+                self.aiDiscoveryError = error.localizedDescription
+                self.isDiscoveringAITools = false
+                self.aiDiscoveryWorker = nil
+                self.aiDiscoveryPublicationTask = nil
+                Self.logger.error(
+                    "AI tool discovery failed: \(error.localizedDescription, privacy: .public)"
+                )
+            }
+        }
+    }
+
+    /// Cancels any in-flight discovery and invalidates its generation, so a
+    /// worker that is mid-flight can never publish after cancellation.
+    private func cancelAIManagementDiscovery() {
+        aiDiscoveryPublicationTask?.cancel()
+        aiDiscoveryWorker?.cancel()
+        aiDiscoveryPublicationTask = nil
+        aiDiscoveryWorker = nil
+        aiDiscoveryGeneration &+= 1
+        isDiscoveringAITools = false
+    }
+
+    #if DEBUG
+    /// Test-only seam: drives a snapshot through the same `apply(snapshot:)`
+    /// entry point production uses, optionally forcing a fresh discovery pass,
+    /// then awaits the current discovery pass (worker + publication) so races can
+    /// be asserted deterministically. Never used in production.
+    func applySnapshotForTesting(_ snapshot: ScanSnapshot, force: Bool = false) async {
+        pendingForceAIDiscovery = force
+        apply(snapshot: snapshot)
+        await aiDiscoveryPublicationTask?.value
+    }
+
+    /// Test-only seam: applies a snapshot without awaiting discovery, so a slow
+    /// or gated pass can be left in flight while a newer snapshot is applied. It
+    /// returns the publication task for the pass it started (if any) so a test
+    /// can deterministically await that specific pass finishing.
+    @discardableResult
+    func startForTesting(_ snapshot: ScanSnapshot, force: Bool = false) -> Task<Void, Never>? {
+        pendingForceAIDiscovery = force
+        apply(snapshot: snapshot)
+        return aiDiscoveryPublicationTask
+    }
+    #endif
+
     func exportDiagnostics() {
         let panel = NSSavePanel()
         panel.nameFieldStringValue = "SpacePilot-Diagnostics.json"
@@ -782,5 +964,51 @@ final class AppModel {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+}
+
+/// A structured, stable fingerprint of the AI-relevant inputs of a snapshot: the
+/// bundle identifiers and application URLs that feed the snapshot-backed locator.
+/// Entries are standardized and sorted, so equality is order-independent and
+/// robust to paths containing separators or newlines (no string concatenation).
+///
+/// Home-directory-relative filesystem presence is deliberately not captured, so
+/// an explicit `force` is required to pick up on-disk changes that don't alter
+/// the snapshot itself.
+private struct AIDiscoveryFingerprint: Equatable, Sendable {
+    private struct Entry: Equatable, Sendable, Comparable {
+        let kind: String
+        let bundleIdentifier: String?
+        let path: String?
+
+        static func < (lhs: Entry, rhs: Entry) -> Bool {
+            if lhs.kind != rhs.kind { return lhs.kind < rhs.kind }
+            if lhs.bundleIdentifier != rhs.bundleIdentifier {
+                return (lhs.bundleIdentifier ?? "") < (rhs.bundleIdentifier ?? "")
+            }
+            return (lhs.path ?? "") < (rhs.path ?? "")
+        }
+    }
+
+    private let entries: [Entry]
+
+    init(snapshot: ScanSnapshot) {
+        var entries: [Entry] = []
+        for application in snapshot.aiApplications {
+            entries.append(Entry(
+                kind: "ai",
+                bundleIdentifier: application.bundleIdentifier,
+                path: application.applicationURL?.standardizedFileURL.path
+            ))
+        }
+        for application in snapshot.applications {
+            guard let bundle = application.bundleIdentifier else { continue }
+            entries.append(Entry(
+                kind: "app",
+                bundleIdentifier: bundle,
+                path: application.url.standardizedFileURL.path
+            ))
+        }
+        self.entries = entries.sorted()
     }
 }

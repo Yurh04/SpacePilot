@@ -30,6 +30,13 @@ SpacePilot 完全在本机分析。SQLite 索引只保存路径、大小、分�
 - macOS 15+
 - Xcode 16+ 和 Swift 6
 
+测试和发布检查需要把完整 Xcode 设为当前开发目录；如果当前还是 Command Line Tools，`swift test` 可能会直接报 `no such module 'XCTest'`。可先检查：
+
+```bash
+xcode-select -p
+sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+```
+
 运行应用：
 
 ```bash
@@ -43,6 +50,8 @@ SpacePilot 完全在本机分析。SQLite 索引只保存路径、大小、分�
 ```bash
 swift test
 ```
+
+如果脚本或测试提示当前开发目录是 `/Library/Developer/CommandLineTools`，请先切回完整 Xcode 后再重试。
 
 完整发布前检查：
 
