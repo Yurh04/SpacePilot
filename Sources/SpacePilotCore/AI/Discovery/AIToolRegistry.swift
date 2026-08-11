@@ -176,10 +176,14 @@ public struct AIToolRegistry: Sendable {
 
     // MARK: - Application
 
-    /// Builds the tool-level record. It is emitted when an application bundle is
-    /// installed, or when data/config roots exist for the tool. The canonical
-    /// location prefers the application URL, then the first data root, then the
-    /// first config root, guaranteeing a stable, non-random identifier.
+    /// Builds the application-level record. It is emitted *only* when a real
+    /// application bundle from `applicationBundleIdentifiers` is installed and
+    /// located by the injected locator. Data/config roots and host-evidence
+    /// roots attach as supplemental evidence but never fabricate an app on
+    /// their own, so a leftover config directory (`~/.cursor`,
+    /// `~/.config/opencode`) or a CLI-only tool's dot-directory can never
+    /// appear as an installed AI application. The canonical location is the
+    /// application URL, guaranteeing a stable, non-random identifier.
     private func applicationRecord(
         for definition: AIToolDefinition,
         owner: AIToolOwner,
@@ -188,19 +192,31 @@ public struct AIToolRegistry: Sendable {
         hostEvidenceRoots: [URL],
         coverageFailures: Set<AIToolCoverageFailure>
     ) -> AIToolRecord? {
-        var evidence = AIToolEvidence()
-        evidence.dataRoots = dataRoots
-        evidence.configDirectories = AIToolEvidence.mergeURLsForDiscovery(
-            configRoots,
-            hostEvidenceRoots
-        )
+        // An AI App record must correspond to a *real installed application
+        // bundle*. Config/data footprints (for example a leftover `~/.cursor`
+        // or `~/.config/opencode` after uninstalling the app, or a CLI-only
+        // tool's dot-directory) must never fabricate an application. Those
+        // footprints only attach as supplemental evidence to an app that is
+        // actually installed.
+        guard !definition.applicationBundleIdentifiers.isEmpty else {
+            // CLI-only definition (OpenCode, Gemini CLI, Aider, ...). It can
+            // still produce a `.cli` record elsewhere, but never an app.
+            return nil
+        }
 
+        var evidence = AIToolEvidence()
         for bundleID in definition.applicationBundleIdentifiers {
             if let url = applicationLocator.applicationURL(forBundleIdentifier: bundleID) {
                 evidence.bundleIdentifier = bundleID
                 evidence.applicationURL = url
                 break
             }
+        }
+
+        // No installed bundle: this application is not present, regardless of
+        // any config/data footprint. Do not emit an application record.
+        guard let appURL = evidence.applicationURL else {
+            return nil
         }
 
         if !definition.hostEvidenceRelativePaths.isEmpty,
@@ -212,27 +228,18 @@ public struct AIToolRegistry: Sendable {
             return nil
         }
 
-        let canonical: String
-        if let appURL = evidence.applicationURL {
-            canonical = Self.canonicalKey(appURL)
-        } else if let firstData = dataRoots.first {
-            canonical = Self.canonicalKey(firstData)
-        } else if let firstConfig = configRoots.first {
-            canonical = Self.canonicalKey(firstConfig)
-        } else if coverageFailures.isEmpty {
-            // No application bundle and no data/config footprint: nothing to show.
-            return nil
-        } else {
-            // Only coverage failures were observed; anchor on the tool ID so the
-            // failure is still surfaced rather than dropped.
-            canonical = "definition:\(definition.id)"
-        }
+        // The app is installed; attach the data/config footprint as evidence.
+        evidence.dataRoots = dataRoots
+        evidence.configDirectories = AIToolEvidence.mergeURLsForDiscovery(
+            configRoots,
+            hostEvidenceRoots
+        )
 
         return AIToolRecord(
             id: AIToolRecord.stableID(
                 kind: .application,
                 owner: owner,
-                canonicalLocation: canonical
+                canonicalLocation: Self.canonicalKey(appURL)
             ),
             kind: .application,
             displayName: definition.displayName,
@@ -274,6 +281,7 @@ public struct AIToolRegistry: Sendable {
         var evidence = AIToolEvidence()
         evidence.executableURL = executableURL
         evidence.detectedVersion = result.version
+        evidence.aliasExecutableURLs = result.aliasExecutableURLs
 
         var failures = Set<AIToolCoverageFailure>()
         if let failure = result.coverageFailure {

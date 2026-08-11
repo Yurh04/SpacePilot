@@ -15,6 +15,11 @@ struct AIManagementOverviewView: View {
     let globalPluginCount: Int
     let isDiscovering: Bool
     let discoveryError: String?
+    let updateSummary: UpdateCheckSummary
+    let isCheckingUpdates: Bool
+    let updateError: String?
+    let onCheckUpdates: () -> Void
+    let onCancelUpdateCheck: () -> Void
 
     private var partialCoverageCount: Int {
         managementProjection.recordsWithCoverageFailures.count
@@ -40,6 +45,48 @@ struct AIManagementOverviewView: View {
                 } header: {
                     Text(L10n.text(.aiOverviewDiscoveryIssue))
                 }
+            }
+            Section {
+                HStack {
+                    Button(L10n.text(.aiUpdateCheckNow)) { onCheckUpdates() }
+                        .disabled(isCheckingUpdates)
+                    if isCheckingUpdates {
+                        Button(L10n.text(.aiUpdateCancel)) { onCancelUpdateCheck() }
+                    }
+                }
+                if isCheckingUpdates {
+                    Label(L10n.text(.aiUpdateStatusChecking), systemImage: "arrow.triangle.2.circlepath")
+                        .foregroundStyle(.secondary)
+                }
+                if let updateError {
+                    Label(updateError, systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+                LabeledContent(
+                    L10n.text(.aiUpdateSummaryAvailable),
+                    value: updateSummary.updateAvailableCount.formatted()
+                )
+                LabeledContent(
+                    L10n.text(.aiUpdateSummaryUpToDate),
+                    value: updateSummary.upToDateCount.formatted()
+                )
+                LabeledContent(
+                    L10n.text(.aiUpdateSummaryUnknown),
+                    value: updateSummary.unknownCount.formatted()
+                )
+                LabeledContent(
+                    L10n.text(.aiUpdateSummaryFailed),
+                    value: updateSummary.failedCount.formatted()
+                )
+                LabeledContent(
+                    L10n.text(.aiUpdateSummaryUnsupported),
+                    value: updateSummary.unsupportedCount.formatted()
+                )
+            } header: {
+                Text(L10n.text(.aiUpdateSection))
+            } footer: {
+                Text(L10n.text(.aiUpdateReadOnlyFooter))
             }
             Section {
                 LabeledContent(

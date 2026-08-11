@@ -63,6 +63,22 @@ final class AIToolRegistryTests: XCTestCase {
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
     }
 
+    /// Creates the fixed npm package directory that the FNM candidate gate now
+    /// requires (`installation/lib/node_modules/<packageID>`), so the version
+    /// root counts as having installed the tool.
+    private func makeInstalledFNMPackage(
+        home: URL,
+        version: String,
+        packageIdentifier: String
+    ) throws {
+        var packageURL = home
+            .appending(path: ".local/share/fnm/node-versions/\(version)/installation/lib/node_modules", directoryHint: .isDirectory)
+        for component in packageIdentifier.split(separator: "/", omittingEmptySubsequences: true) {
+            packageURL = packageURL.appending(path: String(component), directoryHint: .isDirectory)
+        }
+        try FileManager.default.createDirectory(at: packageURL, withIntermediateDirectories: true)
+    }
+
     // MARK: - Hit / miss
 
     func testKnownDefinitionsCoverRequired4BToolsWithStableIDs() {
@@ -76,12 +92,46 @@ final class AIToolRegistryTests: XCTestCase {
         XCTAssertEqual(definitions.first { $0.id == "antigravity" }?.applicationBundleIdentifiers, ["com.google.antigravity"])
         XCTAssertEqual(definitions.first { $0.id == "vscode" }?.applicationBundleIdentifiers, ["com.microsoft.VSCode"])
         XCTAssertEqual(definitions.first { $0.id == "aiden" }?.cliProbeID, "aiden")
+        // ChatGPT desktop app uses the `com.openai.codex` bundle ID; the codex
+        // definition is a CLI/npm tool and must not claim any app bundle.
+        XCTAssertEqual(definitions.first { $0.id == "chatgpt" }?.applicationBundleIdentifiers, ["com.openai.codex"])
+        XCTAssertEqual(definitions.first { $0.id == "codex" }?.applicationBundleIdentifiers, [])
+        // Newly-added, bundle-verified AI applications.
+        XCTAssertEqual(definitions.first { $0.id == "aime" }?.applicationBundleIdentifiers, ["com.bytedance.aime.electron"])
+        XCTAssertEqual(definitions.first { $0.id == "mira" }?.applicationBundleIdentifiers, ["net.byteintl.mira"])
+        XCTAssertEqual(definitions.first { $0.id == "doubao" }?.applicationBundleIdentifiers, ["com.bot.pc.doubao"])
+        XCTAssertEqual(definitions.first { $0.id == "cici" }?.applicationBundleIdentifiers, ["com.bot.pc.cici"])
+        XCTAssertEqual(definitions.first { $0.id == "m365-copilot" }?.applicationBundleIdentifiers, ["com.microsoft.m365copilot.shim"])
+        // Warp was removed as an AI application per the user's ruling: it is a
+        // terminal, not an AI Agent, and must no longer appear in the catalog.
+        XCTAssertNil(definitions.first { $0.id == "warp" })
         for required in [
             "codex", "claude", "chatgpt", "cursor", "windsurf", "gemini-cli",
             "opencode", "aider", "copilot", "continue", "cline", "roo",
             "ollama", "lm-studio", "jan"
         ] {
             XCTAssertTrue(ids.contains(required), "Missing existing definition: \(required)")
+        }
+        // Newly-added, machine-confirmed CLI-only tools resolved through fixed,
+        // code-owned probe templates (FNM, uv tool root, Homebrew, or an exact
+        // home-relative install path). Each references a whitelisted probe ID.
+        for (definitionID, probeID) in [
+            ("merlin-cli", "merlin-cli"),
+            ("one-cli", "one"),
+            ("bytedcli", "bytedcli"),
+            ("opencli", "opencli"),
+            ("botmux", "botmux"),
+            ("traex", "traex"),
+            ("lark-cli", "lark-cli"),
+            ("aime", "aime"),
+            ("mira", "mira")
+        ] {
+            let definition = definitions.first { $0.id == definitionID }
+            XCTAssertEqual(definition?.cliProbeID, probeID, "Missing CLI probe for \(definitionID)")
+            XCTAssertTrue(
+                SafeCLIVersionProbe.isKnownProbe(probeID),
+                "Probe \(probeID) is not whitelisted"
+            )
         }
     }
 
@@ -202,6 +252,8 @@ final class AIToolRegistryTests: XCTestCase {
             path: ".local/share/fnm/node-versions/v24.18.0/installation/bin/claude",
             directoryHint: .notDirectory
         ))
+        try makeInstalledFNMPackage(home: tree.url, version: "v24.18.0", packageIdentifier: "@openai/codex")
+        try makeInstalledFNMPackage(home: tree.url, version: "v24.18.0", packageIdentifier: "@anthropic-ai/claude-code")
         try makeExecutable(at: tree.url.appending(
             path: "Library/pnpm/bin/aiden",
             directoryHint: .notDirectory
@@ -229,9 +281,68 @@ final class AIToolRegistryTests: XCTestCase {
         XCTAssertTrue(projection.clis.allSatisfy { $0.coverageFailures.contains(.invalidOutput) })
     }
 
+    func testExpandedCLILayoutsProduceOwnerRecordsForMerlinTraexAndUvTool() async throws {
+        let tree = try TemporaryTree(files: [:])
+        // merlin-cli: exact home-relative install path.
+        try makeExecutable(at: tree.url.appending(
+            path: ".merlin-cli/bin/merlin-cli",
+            directoryHint: .notDirectory
+        ))
+        // traex: ~/.local/share/traex/current -> releases/<version>/traex.
+        let traexRelease = tree.url.appending(
+            path: ".local/share/traex/releases/0.200.19/traex",
+            directoryHint: .notDirectory
+        )
+        try makeExecutable(at: traexRelease)
+        try FileManager.default.createSymbolicLink(
+            at: tree.url.appending(path: ".local/share/traex/current", directoryHint: .isDirectory),
+            withDestinationURL: tree.url.appending(path: ".local/share/traex/releases/0.200.19", directoryHint: .isDirectory)
+        )
+        // traex aliases resolve to the same executable and must surface as evidence.
+        let traexPrimary = tree.url.appending(path: ".local/share/traex/current/traex", directoryHint: .notDirectory)
+        let localBin = tree.url.appending(path: ".local/bin", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: localBin, withIntermediateDirectories: true)
+        for alias in ["trae-cli", "trae-agent"] {
+            try FileManager.default.createSymbolicLink(
+                at: localBin.appending(path: alias, directoryHint: .notDirectory),
+                withDestinationURL: traexPrimary
+            )
+        }
+        // mira: fixed uv tool root.
+        try makeExecutable(at: tree.url.appending(
+            path: ".local/share/uv/tools/togo-cli/bin/mira",
+            directoryHint: .notDirectory
+        ))
+        let definitions = KnownAIToolDefinitions.all.filter { ["merlin-cli", "traex", "mira"].contains($0.id) }
+        let registry = AIToolRegistry(
+            definitions: definitions,
+            applicationLocator: StubApplicationLocator(installed: [:]),
+            directoryProbe: StubDirectoryProbe(results: [:]),
+            cliProbe: SafeCLIVersionProbe(
+                runner: StubCLIRunner(),
+                locator: LocalExecutableLocator()
+            )
+        )
+
+        let projection = AIManagementProjection(records: try await registry.discover(homeDirectory: tree.url))
+
+        XCTAssertEqual(Set(projection.clis.map(\.owner)), [
+            .tool(definitionID: "merlin-cli"),
+            .tool(definitionID: "traex"),
+            .tool(definitionID: "mira")
+        ])
+        XCTAssertTrue(projection.clis.allSatisfy { $0.evidence.executableURL != nil })
+
+        let traex = try XCTUnwrap(projection.clis.first { $0.owner == .tool(definitionID: "traex") })
+        XCTAssertEqual(
+            traex.evidence.aliasExecutableURLs.map(\.lastPathComponent),
+            ["trae-agent", "trae-cli"]
+        )
+    }
+
     // MARK: - Coverage failure retention
 
-    func testPermissionDeniedDataRootRetainedAsCoverageFailure() async throws {
+    func testPermissionDeniedDataRootDoesNotFabricateApplicationForCLIOnlyTool() async throws {
         let home = URL(filePath: "/Users/test")
         let definition = AIToolDefinition(
             id: "aider",
@@ -249,11 +360,58 @@ final class AIToolRegistryTests: XCTestCase {
 
         let records = try await registry.discover(homeDirectory: home)
 
-        let record = try XCTUnwrap(records.first)
-        XCTAssertEqual(record.kind, .application)
-        XCTAssertTrue(record.coverageFailures.contains(.permissionDenied))
-        // The data root was not readable, so no present data root is recorded.
-        XCTAssertTrue(record.evidence.dataRoots.isEmpty)
+        // Aider has no application bundle identifier, so a data-root footprint
+        // (even an unreadable one) must never fabricate an application record.
+        XCTAssertTrue(records.filter { $0.kind == .application }.isEmpty)
+    }
+
+    func testConfigOnlyFootprintDoesNotFabricateApplicationWhenBundleAbsent() async throws {
+        let home = URL(filePath: "/Users/test")
+        let cursor = try XCTUnwrap(KnownAIToolDefinitions.all.first { $0.id == "cursor" })
+        let opencode = try XCTUnwrap(KnownAIToolDefinitions.all.first { $0.id == "opencode" })
+        let registry = AIToolRegistry(
+            definitions: [cursor, opencode],
+            // No Cursor app installed, and OpenCode has no bundle at all.
+            applicationLocator: StubApplicationLocator(installed: [:]),
+            directoryProbe: StubDirectoryProbe(results: [
+                canonical(home, ".cursor"): .present,
+                canonical(home, ".config/opencode"): .present,
+                canonical(home, ".opencode"): .present
+            ]),
+            cliProbe: makeCLIProbe()
+        )
+
+        let records = try await registry.discover(homeDirectory: home)
+
+        // A leftover `~/.cursor` or `~/.config/opencode` must not appear as an
+        // installed AI application.
+        XCTAssertTrue(records.filter { $0.kind == .application }.isEmpty)
+    }
+
+    func testInstalledBundleWithConfigFootprintProducesApplicationWithConfigEvidence() async throws {
+        let home = URL(filePath: "/Users/test")
+        let cursor = try XCTUnwrap(KnownAIToolDefinitions.all.first { $0.id == "cursor" })
+        let registry = AIToolRegistry(
+            definitions: [cursor],
+            applicationLocator: StubApplicationLocator(
+                installed: ["com.todesktop.230313mzl4w4u92": URL(filePath: "/Applications/Cursor.app")]
+            ),
+            directoryProbe: StubDirectoryProbe(results: [
+                canonical(home, ".cursor"): .present
+            ]),
+            cliProbe: makeCLIProbe()
+        )
+
+        let records = try await registry.discover(homeDirectory: home)
+
+        let app = try XCTUnwrap(records.first { $0.kind == .application })
+        XCTAssertEqual(app.owner, .tool(definitionID: "cursor"))
+        XCTAssertEqual(app.evidence.applicationURL, URL(filePath: "/Applications/Cursor.app"))
+        // The config footprint attaches to the installed app as evidence.
+        XCTAssertEqual(
+            app.evidence.configDirectories.map { AIToolRegistry.canonicalKey($0) },
+            [canonical(home, ".cursor")]
+        )
     }
 
     // MARK: - Shared skill ownership + dedup
@@ -300,24 +458,30 @@ final class AIToolRegistryTests: XCTestCase {
 
     func testOverlappingCanonicalDataRootsDeduplicate() async throws {
         let home = URL(filePath: "/Users/test")
-        // Two relative paths that canonicalize to the same location.
+        // Two relative paths that canonicalize to the same location. Data roots
+        // no longer fabricate applications on their own, so anchor the dedup
+        // assertion on a real installed-app fixture where the overlapping data
+        // roots attach as evidence.
         let definition = AIToolDefinition(
-            id: "opencode",
-            displayName: "OpenCode",
-            dataRootRelativePaths: [".opencode", "./.opencode"]
+            id: "claude",
+            displayName: "Claude",
+            applicationBundleIdentifiers: ["com.anthropic.claudefordesktop"],
+            dataRootRelativePaths: [".claude", "./.claude"]
         )
         let registry = AIToolRegistry(
             definitions: [definition],
-            applicationLocator: StubApplicationLocator(installed: [:]),
+            applicationLocator: StubApplicationLocator(
+                installed: ["com.anthropic.claudefordesktop": URL(filePath: "/Applications/Claude.app")]
+            ),
             directoryProbe: StubDirectoryProbe(results: [
-                canonical(home, ".opencode"): .present
+                canonical(home, ".claude"): .present
             ]),
             cliProbe: makeCLIProbe()
         )
 
         let records = try await registry.discover(homeDirectory: home)
 
-        let record = try XCTUnwrap(records.first)
+        let record = try XCTUnwrap(records.first { $0.kind == .application })
         XCTAssertEqual(record.evidence.dataRoots.count, 1)
     }
 

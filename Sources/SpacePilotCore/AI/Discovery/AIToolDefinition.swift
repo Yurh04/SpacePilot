@@ -119,9 +119,28 @@ public struct AIToolDefinition: Identifiable, Hashable, Sendable {
     /// Fixed package receipt locations used only for read-only install facts.
     public let packageDescriptors: [AIToolPackageDescriptor]
 
+    /// Fixed, code-owned update metadata provider. This is never sourced from
+    /// PATH, package receipts, project config, plugin manifests, or scripts.
+    public let updateCapability: UpdateCapability?
+
+    /// Fixed, code-owned update EXECUTION capability. Separate from
+    /// `updateCapability` (which only reads the latest version): this authorizes
+    /// running a specific package manager to install the latest version. It is
+    /// only ever set for tools whose manager + package identifier + install
+    /// source are proven, and is never sourced from a manifest, receipt, config,
+    /// or PATH. `nil` means the tool is checkable-only or handoff-only.
+    public let updateExecutionCapability: UpdateExecutionCapability?
+
     /// Fixed project-relative Skills/Plugins roots, evaluated only inside a
     /// user-approved project root.
     public let projectAssetDescriptors: [AIProjectAssetDescriptor]
+
+    /// Fixed, code-owned AI Agent classification. When non-nil, this definition
+    /// is an AI Agent (surfaced under AI Agents, split into local/remote) rather
+    /// than a supporting developer CLI. When nil, the definition is a supporting
+    /// tool that only ever appears in CLI Tools. This is a definition constant
+    /// and is never inferred from names or the presence of a local executable.
+    public let agentProfile: AIAgentProfile?
 
     public init(
         id: String,
@@ -134,7 +153,10 @@ public struct AIToolDefinition: Identifiable, Hashable, Sendable {
         hostEvidenceRelativePaths: [String] = [],
         cliProbeID: String? = nil,
         packageDescriptors: [AIToolPackageDescriptor] = [],
-        projectAssetDescriptors: [AIProjectAssetDescriptor] = []
+        updateCapability: UpdateCapability? = nil,
+        updateExecutionCapability: UpdateExecutionCapability? = nil,
+        projectAssetDescriptors: [AIProjectAssetDescriptor] = [],
+        agentProfile: AIAgentProfile? = nil
     ) {
         self.id = id
         self.displayName = displayName
@@ -146,6 +168,9 @@ public struct AIToolDefinition: Identifiable, Hashable, Sendable {
         self.hostEvidenceRelativePaths = hostEvidenceRelativePaths
         self.cliProbeID = cliProbeID
         self.packageDescriptors = packageDescriptors
+        self.updateCapability = updateCapability
+        self.updateExecutionCapability = updateExecutionCapability
         self.projectAssetDescriptors = projectAssetDescriptors
+        self.agentProfile = agentProfile
     }
 }

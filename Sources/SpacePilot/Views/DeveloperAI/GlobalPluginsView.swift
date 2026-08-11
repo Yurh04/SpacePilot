@@ -4,6 +4,7 @@ import SwiftUI
 /// Read-only global Plugins page grouped by explicit owner/location scope.
 struct GlobalPluginsView: View {
     let plugins: [PluginRecord]
+    let discoveredToolIDs: Set<String>
     let approvedProjectRoots: [ApprovedProjectRoot]
     let approvedProjectRootIssues: [ApprovedProjectRootIssue]
     let projectScanIssues: [ProjectAIAssetScanIssue]
@@ -12,11 +13,31 @@ struct GlobalPluginsView: View {
     let searchText: String
     let onAddProjectRoot: (URL) -> Void
     let onRemoveProjectRoot: (String) -> Void
+    let updateResults: [AIUpdateAssetKey: UpdateCheckResult]
+    let isCheckingUpdates: Bool
+    let updateAssets: [AIUpdateAsset]
+    let onCheckSelectedUpdates: (Set<AIUpdateAssetKey>) -> Void
+    let onUpdateSelected: (Set<AIUpdateAssetKey>) -> Void
+    let onCancelUpdateCheck: () -> Void
     @Binding var selectedGroupID: String?
-    @Binding var selection: UUID?
+    @Binding var selection: Set<UUID>
 
     private var projection: GroupedPluginsProjection {
-        GroupedPluginsProjection(plugins: plugins)
+        GroupedPluginsProjection(plugins: plugins, discoveredToolIDs: discoveredToolIDs)
+    }
+
+    private var selectedRows: [AIUpdateSelectionPlan.SelectedRow] {
+        filteredPlugins
+            .filter { selection.contains($0.id) }
+            .map { AIUpdateSelectionPlan.SelectedRow(key: AIUpdateKeyBuilder.key(for: $0), displayName: $0.name) }
+    }
+
+    private var selectionPlan: AIUpdateSelectionPlan {
+        AIUpdateSelectionPlan(
+            selection: selectedRows,
+            assets: updateAssets,
+            results: updateResults
+        )
     }
 
     private var filteredPlugins: [PluginRecord] {
@@ -52,8 +73,19 @@ struct GlobalPluginsView: View {
                 HSplitView {
                     groupList
                         .frame(minWidth: 150, idealWidth: 190, maxWidth: 240)
-                    tableContent
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    VStack(spacing: 0) {
+                        AIUpdateActionBar(
+                            plan: selectionPlan,
+                            isChecking: isCheckingUpdates,
+                            onCheckSelected: { onCheckSelectedUpdates(Set(selectionPlan.checkableKeys)) },
+                            onUpdateSelected: { onUpdateSelected(Set(selectionPlan.selected.map(\.key))) },
+                            onCancel: onCancelUpdateCheck
+                        )
+                        Divider()
+                        tableContent
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
         }
@@ -65,22 +97,23 @@ struct GlobalPluginsView: View {
 
     private var groupList: some View {
         List(projection.groups, selection: $selectedGroupID) { group in
-            VStack(alignment: .leading, spacing: 3) {
-                HStack {
-                    Text(group.title)
-                        .lineLimit(1)
-                    Spacer(minLength: 8)
-                    Text(group.itemCount.formatted())
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-                Text(groupDetail(group))
+            HStack {
+                Text(groupTitle(group))
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+                Text(group.itemCount.formatted())
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .monospacedDigit()
             }
             .tag(group.id)
+        }
+    }
+
+    private func groupTitle(_ group: AIAssetGroup) -> String {
+        switch group.kind {
+        case .shared: L10n.text(.aiGroupSharedPlugins)
+        case .tool, .unknown: group.title
         }
     }
 
@@ -107,12 +140,11 @@ struct GlobalPluginsView: View {
             TableColumn(L10n.text(.plugin)) { plugin in
                 pluginNameCell(plugin)
             }
-            TableColumn(L10n.space()) {
-                Text(ByteCount.string($0.allocatedSize))
-                    .monospacedDigit()
+            TableColumn(L10n.text(.aiUpdateStatus)) {
+                Text(updateStatusText(for: $0))
                     .lineLimit(1)
             }
-            .width(min: 76, ideal: 92, max: 104)
+            .width(min: 90, ideal: 110, max: 130)
         }
         .nativeTableDoubleClickReveal(urlAtRow: urlForRow)
     }
@@ -122,8 +154,20 @@ struct GlobalPluginsView: View {
             TableColumn(L10n.text(.plugin)) { plugin in
                 pluginNameCell(plugin)
             }
+            TableColumn(L10n.text(.aiGroupScope)) {
+                Text(scopeLabel(for: $0))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            .width(min: 96, ideal: 120, max: 160)
             TableColumn(L10n.version()) {
-                Text($0.version ?? "—")
+                Text(currentVersionText(for: $0))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            .width(min: 64, ideal: 76, max: 88)
+            TableColumn(L10n.text(.aiUpdateLatest)) {
+                Text(latestVersionText(for: $0))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -133,6 +177,12 @@ struct GlobalPluginsView: View {
                     .lineLimit(1)
             }
             .width(min: 52, ideal: 64, max: 76)
+            TableColumn(L10n.text(.aiUpdateStatus)) {
+                Text(updateStatusText(for: $0))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            .width(min: 90, ideal: 110, max: 130)
             TableColumn(L10n.space()) {
                 Text(ByteCount.string($0.allocatedSize))
                     .monospacedDigit()
@@ -163,20 +213,28 @@ struct GlobalPluginsView: View {
         filteredPlugins.indices.contains(row) ? filteredPlugins[row].url : nil
     }
 
-    private func groupDetail(_ group: AIAssetGroup) -> String {
-        "\(localizedDetail(group.detail)) · \(ByteCount.string(group.allocatedSize))"
+    private func updateResult(for plugin: PluginRecord) -> UpdateCheckResult? {
+        AIUpdateStatusPresentation.result(
+            for: AIUpdateKeyBuilder.key(for: plugin),
+            in: updateResults,
+            isChecking: isCheckingUpdates
+        )
     }
 
-    private func localizedDetail(_ detail: String) -> String {
-        switch detail {
-        case "Global": L10n.text(.aiGroupGlobal)
-        case "Project": L10n.text(.aiGroupProject)
-        case let detail where detail.hasPrefix("Project · "):
-            L10n.text(.aiGroupProject) + String(detail.dropFirst("Project".count))
-        case "Bundled": L10n.text(.aiGroupBundled)
-        case "System": L10n.text(.aiGroupSystem)
-        default: L10n.text(.aiGroupUnknown)
-        }
+    private func updateStatusText(for plugin: PluginRecord) -> String {
+        AIUpdateStatusPresentation.statusText(updateResult(for: plugin))
+    }
+
+    private func currentVersionText(for plugin: PluginRecord) -> String {
+        AIUpdateStatusPresentation.currentVersion(updateResult(for: plugin), fallback: plugin.version)
+    }
+
+    private func latestVersionText(for plugin: PluginRecord) -> String {
+        AIUpdateStatusPresentation.latestVersion(updateResult(for: plugin))
+    }
+
+    private func scopeLabel(for plugin: PluginRecord) -> String {
+        L10n.scopeDetailLabel(projection.scopeDetail(for: plugin))
     }
 
     private func resolveSelection() {
@@ -190,7 +248,9 @@ struct GlobalPluginsView: View {
     }
 
     private func resolveRowSelection() {
-        if let selection, filteredPlugins.contains(where: { $0.id == selection }) { return }
-        selection = filteredPlugins.first?.id
+        // Keep only still-visible rows selected; a group/search change must not
+        // leave a phantom selection pointing at a filtered-out row.
+        let visible = Set(filteredPlugins.map(\.id))
+        selection = selection.intersection(visible)
     }
 }

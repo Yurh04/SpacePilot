@@ -86,6 +86,25 @@ final class SafeCLIVersionProbeTests: XCTestCase {
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
     }
 
+    /// Creates the `node_modules/<packageID>` directory that the FNM/NVM
+    /// candidate gate now requires so a version root counts as having actually
+    /// installed the fixed npm package. `versionRootRelativePath` points at the
+    /// version directory (for example `.local/share/fnm/node-versions/v24.18.0`).
+    private func makeInstalledNodePackage(
+        home: URL,
+        versionRootRelativePath: String,
+        nodeModulesTail: String = "installation/lib/node_modules",
+        packageIdentifier: String
+    ) throws {
+        var packageURL = home
+            .appending(path: versionRootRelativePath, directoryHint: .isDirectory)
+            .appending(path: nodeModulesTail, directoryHint: .isDirectory)
+        for component in packageIdentifier.split(separator: "/", omittingEmptySubsequences: true) {
+            packageURL = packageURL.appending(path: String(component), directoryHint: .isDirectory)
+        }
+        try FileManager.default.createDirectory(at: packageURL, withIntermediateDirectories: true)
+    }
+
     // MARK: - Whitelist / unknown ID
 
     func testKnownProbeRunsFixedExecutableAndArgumentsWithFixedEnvironment() async throws {
@@ -133,6 +152,11 @@ final class SafeCLIVersionProbeTests: XCTestCase {
             directoryHint: .notDirectory
         )
         try makeExecutable(at: executable)
+        try makeInstalledNodePackage(
+            home: tree.url,
+            versionRootRelativePath: ".local/share/fnm/node-versions/v24.18.0",
+            packageIdentifier: "@openai/codex"
+        )
         let runner = RecordingRunner(output: output(stdout: "codex 0.42.0\n"))
         let probe = SafeCLIVersionProbe(runner: runner, locator: LocalExecutableLocator())
 
@@ -159,6 +183,104 @@ final class SafeCLIVersionProbeTests: XCTestCase {
         XCTAssertEqual(runner.invocations.first?.environment, SafeCLIVersionProbe.fixedEnvironment)
     }
 
+    func testProbeFindsMerlinExactHomeRelativeBin() async throws {
+        let tree = try TemporaryTree(files: [:])
+        let executable = tree.url.appending(path: ".merlin-cli/bin/merlin-cli", directoryHint: .notDirectory)
+        try makeExecutable(at: executable)
+        let runner = RecordingRunner(output: output(stdout: "merlin-cli 3.2.1\n"))
+        let probe = SafeCLIVersionProbe(runner: runner, locator: LocalExecutableLocator())
+
+        let result = try await probe.probeVersion(probeID: "merlin-cli", homeDirectory: tree.url)
+
+        XCTAssertEqual(result.executableURL, executable)
+        XCTAssertEqual(result.version, "merlin-cli 3.2.1")
+        XCTAssertEqual(runner.invocations.first?.environment, SafeCLIVersionProbe.fixedEnvironment)
+    }
+
+    func testProbeFindsTraexCurrentSymlinkExecutable() async throws {
+        let tree = try TemporaryTree(files: [:])
+        // ~/.local/share/traex/current -> releases/<version>/, then /traex.
+        let release = tree.url.appending(
+            path: ".local/share/traex/releases/0.200.19/traex",
+            directoryHint: .notDirectory
+        )
+        try makeExecutable(at: release)
+        let currentLink = tree.url.appending(path: ".local/share/traex/current", directoryHint: .isDirectory)
+        try FileManager.default.createSymbolicLink(
+            at: currentLink,
+            withDestinationURL: tree.url.appending(path: ".local/share/traex/releases/0.200.19", directoryHint: .isDirectory)
+        )
+        let runner = RecordingRunner(output: output(stdout: "traex 0.200.19\n"))
+        let probe = SafeCLIVersionProbe(runner: runner, locator: LocalExecutableLocator())
+
+        let result = try await probe.probeVersion(probeID: "traex", homeDirectory: tree.url)
+
+        // The home-relative candidate is used as-is (the `current` symlink is
+        // resolved by the filesystem when executed); the executable is found and
+        // its version parsed.
+        let expected = tree.url.appending(path: ".local/share/traex/current/traex", directoryHint: .notDirectory)
+        XCTAssertEqual(result.executableURL, expected)
+        XCTAssertEqual(result.version, "traex 0.200.19")
+    }
+
+    func testProbeFindsUvToolBinForMira() async throws {
+        let tree = try TemporaryTree(files: [:])
+        // Fixed uv tool template: ~/.local/share/uv/tools/togo-cli/bin/mira.
+        let executable = tree.url.appending(
+            path: ".local/share/uv/tools/togo-cli/bin/mira",
+            directoryHint: .notDirectory
+        )
+        try makeExecutable(at: executable)
+        let runner = RecordingRunner(output: output(stdout: "mira 1.4.0\n"))
+        let probe = SafeCLIVersionProbe(runner: runner, locator: LocalExecutableLocator())
+
+        let result = try await probe.probeVersion(probeID: "mira", homeDirectory: tree.url)
+
+        XCTAssertEqual(result.executableURL, executable.standardizedFileURL.resolvingSymlinksInPath())
+        XCTAssertEqual(result.version, "mira 1.4.0")
+        XCTAssertEqual(runner.invocations.first?.environment, SafeCLIVersionProbe.fixedEnvironment)
+    }
+
+    func testUvToolSymlinkEscapeIsRejected() async throws {
+        let tree = try TemporaryTree(files: [:])
+        // The tool root is a symlink pointing outside the uv tools tree; the
+        // resolved executable escapes its declared root and must be rejected.
+        let outside = tree.url.appending(path: "outside/togo-cli", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(
+            at: outside.appending(path: "bin", directoryHint: .isDirectory),
+            withIntermediateDirectories: true
+        )
+        try makeExecutable(at: outside.appending(path: "bin/aime", directoryHint: .notDirectory))
+        let uvTools = tree.url.appending(path: ".local/share/uv/tools", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: uvTools, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(
+            at: uvTools.appending(path: "togo-cli", directoryHint: .isDirectory),
+            withDestinationURL: outside
+        )
+        let runner = RecordingRunner(output: output(stdout: "aime 1.0.0\n"))
+        let probe = SafeCLIVersionProbe(runner: runner, locator: LocalExecutableLocator())
+
+        let result = try await probe.probeVersion(probeID: "aime", homeDirectory: tree.url)
+
+        // No home-relative or uv candidate is valid, so the CLI is unavailable
+        // and no process is run.
+        XCTAssertNil(result.executableURL)
+        XCTAssertTrue(runner.invocations.isEmpty)
+    }
+
+    func testProbeFindsLarkCliHomebrewBin() async throws {
+        let runner = RecordingRunner(output: output(stdout: "lark-cli 2.5.0\n"))
+        let probe = SafeCLIVersionProbe(runner: runner, locator: AlwaysExecutableLocator())
+
+        let result = try await probe.probeVersion(probeID: "lark-cli", homeDirectory: home)
+
+        _ = result
+        let invocation = try XCTUnwrap(runner.invocations.first)
+        // Homebrew path is preferred first for lark-cli.
+        XCTAssertEqual(invocation.executableURL.path, "/opt/homebrew/bin/lark-cli")
+        XCTAssertEqual(invocation.environment, SafeCLIVersionProbe.fixedEnvironment)
+    }
+
     func testVersionFailureStillReturnsExecutableAndCoverageFailure() async throws {
         let tree = try TemporaryTree(files: [:])
         let executable = tree.url.appending(
@@ -166,6 +288,11 @@ final class SafeCLIVersionProbeTests: XCTestCase {
             directoryHint: .notDirectory
         )
         try makeExecutable(at: executable)
+        try makeInstalledNodePackage(
+            home: tree.url,
+            versionRootRelativePath: ".local/share/fnm/node-versions/v24.18.0",
+            packageIdentifier: "@anthropic-ai/claude-code"
+        )
         let runner = RecordingRunner(output: output(stdout: "not a version\n"))
         let probe = SafeCLIVersionProbe(runner: runner, locator: LocalExecutableLocator())
 
@@ -185,6 +312,11 @@ final class SafeCLIVersionProbeTests: XCTestCase {
         try FileManager.default.createDirectory(at: executable.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data().write(to: executable)
         try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: executable.path)
+        try makeInstalledNodePackage(
+            home: tree.url,
+            versionRootRelativePath: ".local/share/fnm/node-versions/v24.18.0",
+            packageIdentifier: "@anthropic-ai/claude-code"
+        )
         let runner = RecordingRunner(output: output(stdout: "claude 1.0.0\n"))
         let probe = SafeCLIVersionProbe(runner: runner, locator: LocalExecutableLocator())
 
@@ -201,12 +333,40 @@ final class SafeCLIVersionProbeTests: XCTestCase {
         let newest = tree.url.appending(path: ".local/share/fnm/node-versions/v24.18.0/installation/bin/codex", directoryHint: .notDirectory)
         try makeExecutable(at: old)
         try makeExecutable(at: newest)
+        try makeInstalledNodePackage(
+            home: tree.url,
+            versionRootRelativePath: ".local/share/fnm/node-versions/v18.0.0",
+            packageIdentifier: "@openai/codex"
+        )
+        try makeInstalledNodePackage(
+            home: tree.url,
+            versionRootRelativePath: ".local/share/fnm/node-versions/v24.18.0",
+            packageIdentifier: "@openai/codex"
+        )
         let runner = RecordingRunner(output: output(stdout: "codex 1.0.0\n"))
         let probe = SafeCLIVersionProbe(runner: runner, locator: LocalExecutableLocator())
 
         let result = try await probe.probeVersion(probeID: "codex", homeDirectory: tree.url)
 
         XCTAssertEqual(result.executableURL, newest.standardizedFileURL.resolvingSymlinksInPath())
+    }
+
+    func testNodePackageToolRejectsUnverifiedGenericBasenameCandidates() async throws {
+        // `one` is distributed as the npm package @dp/one-cli. The generic
+        // basename candidates (/usr/local/bin/one, /opt/homebrew/bin/one,
+        // ~/.local/bin/one, ~/Library/pnpm/bin/one) carry no package identity and
+        // must NOT be offered for a node-package tool. AlwaysExecutableLocator
+        // claims every path is executable, so if any generic candidate were
+        // still offered it would run; instead only the package-ID gated
+        // FNM/NVM templates apply, none exist here, so nothing runs.
+        let runner = RecordingRunner(output: output(stdout: "one 9.9.9\n"))
+        let probe = SafeCLIVersionProbe(runner: runner, locator: AlwaysExecutableLocator())
+
+        let result = try await probe.probeVersion(probeID: "one", homeDirectory: home)
+
+        XCTAssertNil(result.executableURL)
+        XCTAssertEqual(result.coverageFailure, .unavailable)
+        XCTAssertTrue(runner.invocations.isEmpty)
     }
 
     func testFNMSymlinkEscapeIsRejectedButInternalSymlinkIsAllowed() async throws {
@@ -224,6 +384,11 @@ final class SafeCLIVersionProbeTests: XCTestCase {
         try FileManager.default.createSymbolicLink(at: internalBin, withDestinationURL: realBin)
         let executable = realBin.appending(path: "codex", directoryHint: .notDirectory)
         try makeExecutable(at: executable)
+        try makeInstalledNodePackage(
+            home: tree.url,
+            versionRootRelativePath: ".local/share/fnm/node-versions/v24.18.0",
+            packageIdentifier: "@openai/codex"
+        )
         let runner = RecordingRunner(output: output(stdout: "codex 1.0.0\n"))
         let probe = SafeCLIVersionProbe(runner: runner, locator: LocalExecutableLocator())
 
@@ -231,6 +396,92 @@ final class SafeCLIVersionProbeTests: XCTestCase {
 
         XCTAssertEqual(result.executableURL, executable.standardizedFileURL.resolvingSymlinksInPath())
         XCTAssertNotEqual(result.executableURL?.path, outside.appending(path: "installation/bin/codex").path)
+    }
+
+    func testFNMBasenameWithoutInstalledPackageIDIsNotExecuted() async throws {
+        // A Node version directory contains an executable that merely shares the
+        // basename `one`, but the fixed npm package `@dp/one-cli` was never
+        // installed under node_modules. The candidate must be rejected: no
+        // record, no process run — the probe never attributes an unrelated
+        // binary to the AI tool. (`one` has no absolute/app-bundled fallback, so
+        // the FNM candidate is the only source and rejection means unavailable.)
+        let tree = try TemporaryTree(files: [:])
+        let executable = tree.url.appending(
+            path: ".local/share/fnm/node-versions/v24.18.0/installation/bin/one",
+            directoryHint: .notDirectory
+        )
+        try makeExecutable(at: executable)
+        // Intentionally do NOT create installation/lib/node_modules/@dp/one-cli.
+        let runner = RecordingRunner(output: output(stdout: "one 9.9.9\n"))
+        let probe = SafeCLIVersionProbe(runner: runner, locator: LocalExecutableLocator())
+
+        let result = try await probe.probeVersion(probeID: "one", homeDirectory: tree.url)
+
+        XCTAssertNil(result.executableURL)
+        XCTAssertEqual(result.coverageFailure, .unavailable)
+        XCTAssertTrue(runner.invocations.isEmpty)
+    }
+
+    func testTraexResolvesKnownAliasesAsCanonicalDedupedEvidence() async throws {
+        // The real machine layout: ~/.local/bin/{trae-cli,trae-agent} are
+        // symlinks that ultimately resolve to the same traex executable. The
+        // probe must surface both aliases as evidence (as declared, so the UI
+        // shows the names the user knows) deduped by path and sorted.
+        let tree = try TemporaryTree(files: [:])
+        let primary = tree.url.appending(
+            path: ".local/share/traex/current/traex",
+            directoryHint: .notDirectory
+        )
+        try makeExecutable(at: primary)
+        let localBin = tree.url.appending(path: ".local/bin", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: localBin, withIntermediateDirectories: true)
+        for alias in ["trae-cli", "trae-agent"] {
+            try FileManager.default.createSymbolicLink(
+                at: localBin.appending(path: alias, directoryHint: .notDirectory),
+                withDestinationURL: primary
+            )
+        }
+        let runner = RecordingRunner(output: output(stdout: "traex 0.200.19\n"))
+        let probe = SafeCLIVersionProbe(runner: runner, locator: LocalExecutableLocator())
+
+        let result = try await probe.probeVersion(probeID: "traex", homeDirectory: tree.url)
+
+        let aliasNames = result.aliasExecutableURLs.map(\.lastPathComponent)
+        XCTAssertEqual(aliasNames, ["trae-agent", "trae-cli"])
+        // The aliases are declared as their ~/.local/bin paths, not the resolved
+        // traex target, so the UI can present the familiar names.
+        for url in result.aliasExecutableURLs {
+            XCTAssertTrue(url.path.hasSuffix(".local/bin/\(url.lastPathComponent)"))
+        }
+    }
+
+    func testTraexAliasEvidenceExcludesAliasesResolvingElsewhere() async throws {
+        // A ~/.local/bin/trae-cli that points at an unrelated executable must
+        // not be surfaced as evidence for the traex primary.
+        let tree = try TemporaryTree(files: [:])
+        let primary = tree.url.appending(
+            path: ".local/share/traex/current/traex",
+            directoryHint: .notDirectory
+        )
+        try makeExecutable(at: primary)
+        let unrelated = tree.url.appending(path: "other/trae-cli", directoryHint: .notDirectory)
+        try makeExecutable(at: unrelated)
+        let localBin = tree.url.appending(path: ".local/bin", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: localBin, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(
+            at: localBin.appending(path: "trae-cli", directoryHint: .notDirectory),
+            withDestinationURL: unrelated
+        )
+        try FileManager.default.createSymbolicLink(
+            at: localBin.appending(path: "trae-agent", directoryHint: .notDirectory),
+            withDestinationURL: primary
+        )
+        let runner = RecordingRunner(output: output(stdout: "traex 0.200.19\n"))
+        let probe = SafeCLIVersionProbe(runner: runner, locator: LocalExecutableLocator())
+
+        let result = try await probe.probeVersion(probeID: "traex", homeDirectory: tree.url)
+
+        XCTAssertEqual(result.aliasExecutableURLs.map(\.lastPathComponent), ["trae-agent"])
     }
 
     func testUnknownProbeIDIsRejectedWithoutRunningProcess() async {
@@ -307,12 +558,12 @@ final class SafeCLIVersionProbeTests: XCTestCase {
     }
 
     func testVersionParsedFromStderrFallback() async throws {
-        let runner = RecordingRunner(output: output(stdout: "", stderr: "claude v0.9.1\n"))
+        let runner = RecordingRunner(output: output(stdout: "", stderr: "codex v0.9.1\n"))
         let probe = SafeCLIVersionProbe(runner: runner, locator: AlwaysExecutableLocator())
 
-        let result = try await probe.probeVersion(probeID: "claude", homeDirectory: home)
+        let result = try await probe.probeVersion(probeID: "codex", homeDirectory: home)
 
-        XCTAssertEqual(result.version, "claude v0.9.1")
+        XCTAssertEqual(result.version, "codex v0.9.1")
         XCTAssertNil(result.coverageFailure)
     }
 

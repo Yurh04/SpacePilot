@@ -208,6 +208,72 @@ final class AIManagementDiscoveryTests: XCTestCase {
         XCTAssertEqual(model.projectAIAssetSkills.map(\.name), ["new"])
     }
 
+    func testAIUpdateCheckPublishesResultsWithoutClobberingScanError() async {
+        let key = AIUpdateAssetKey(kind: .cli, owner: .tool(definitionID: "codex"), canonicalLocation: "/bin/codex")
+        let model = AppModel(
+            runtime: nil,
+            homeDirectory: Self.home,
+            discoverAITools: { _, _ in [] },
+            checkAIUpdates: { _ in [Self.updateResult(key: key, status: .updateAvailable, latest: "1.1.0")] }
+        )
+        model.errorMessage = "scan-error"
+
+        await model.checkAIUpdatesForTesting()
+
+        XCTAssertEqual(model.aiUpdateResults[key]?.status, .updateAvailable)
+        XCTAssertEqual(model.errorMessage, "scan-error")
+        XCTAssertNil(model.aiUpdateError)
+        XCTAssertFalse(model.isCheckingAIUpdates)
+    }
+
+    func testAIUpdateCheckFailureKeepsExistingResultsAndScanError() async {
+        struct Boom: Error {}
+        let key = AIUpdateAssetKey(kind: .cli, owner: .tool(definitionID: "codex"), canonicalLocation: "/bin/codex")
+        let model = AppModel(
+            runtime: nil,
+            homeDirectory: Self.home,
+            discoverAITools: { _, _ in [] },
+            checkAIUpdates: { _ in throw Boom() }
+        )
+        model.aiUpdateResults = [key: Self.updateResult(key: key, status: .updateAvailable, latest: "1.1.0")]
+        model.errorMessage = "scan-error"
+
+        await model.checkAIUpdatesForTesting()
+
+        XCTAssertEqual(model.aiUpdateResults[key]?.status, .updateAvailable)
+        XCTAssertEqual(model.errorMessage, "scan-error")
+        XCTAssertNotNil(model.aiUpdateError)
+    }
+
+    func testAIUpdateCheckPublishesOnlyNewestGeneration() async {
+        let oldKey = AIUpdateAssetKey(kind: .cli, owner: .tool(definitionID: "old"), canonicalLocation: "/bin/old")
+        let newKey = AIUpdateAssetKey(kind: .cli, owner: .tool(definitionID: "new"), canonicalLocation: "/bin/new")
+        let gate = AsyncGate()
+        let counter = CallCounter()
+        let model = AppModel(
+            runtime: nil,
+            homeDirectory: Self.home,
+            discoverAITools: { _, _ in [] },
+            checkAIUpdates: { _ in
+                let attempt = await counter.incrementReturning()
+                if attempt == 1 {
+                    await gate.wait()
+                    return [Self.updateResult(key: oldKey)]
+                }
+                return [Self.updateResult(key: newKey)]
+            }
+        )
+
+        let stale = model.startAIUpdateCheckForTesting()
+        model.cancelAIUpdateCheck()
+        await model.checkAIUpdatesForTesting()
+        await gate.open()
+        await stale?.value
+
+        XCTAssertNil(model.aiUpdateResults[oldKey])
+        XCTAssertEqual(model.aiUpdateResults[newKey]?.status, .upToDate)
+    }
+
     // MARK: - Fixtures
 
     private static let home = URL(fileURLWithPath: "/Users/test")
@@ -236,6 +302,22 @@ final class AIManagementDiscoveryTests: XCTestCase {
             managementStatus: .standalone,
             owner: .tool(definitionID: "codex"),
             locationScope: .project(project)
+        )
+    }
+
+    private nonisolated static func updateResult(
+        key: AIUpdateAssetKey,
+        status: UpdateStatus = .upToDate,
+        latest: String = "1.0.0"
+    ) -> UpdateCheckResult {
+        UpdateCheckResult(
+            assetKey: key,
+            displayName: key.canonicalLocation,
+            localVersion: .resolved(VersionEvidence(version: "1.0.0", source: .cliProbe, confidence: .high)),
+            latestVersion: latest,
+            status: status,
+            checkedAt: .now,
+            failure: nil
         )
     }
 

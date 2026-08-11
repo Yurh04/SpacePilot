@@ -11,10 +11,34 @@ struct CLIToolsView: View {
     let searchText: String
     let isDiscovering: Bool
     let discoveryError: String?
-    @Binding var selection: String?
+    let updateResults: [AIUpdateAssetKey: UpdateCheckResult]
+    let isCheckingUpdates: Bool
+    let updateAssets: [AIUpdateAsset]
+    let onCheckSelectedUpdates: (Set<AIUpdateAssetKey>) -> Void
+    let onUpdateSelected: (Set<AIUpdateAssetKey>) -> Void
+    let onCancelUpdateCheck: () -> Void
+    @Binding var selection: Set<String>
 
     private var filteredCLIs: [AIToolRecord] {
         AISectionFilter.filterTools(clis, query: searchText)
+    }
+
+    private var selectedRows: [AIUpdateSelectionPlan.SelectedRow] {
+        filteredCLIs
+            .filter { selection.contains($0.id) }
+            .compactMap { tool in
+                AIUpdateKeyBuilder.key(for: tool).map {
+                    AIUpdateSelectionPlan.SelectedRow(key: $0, displayName: tool.displayName)
+                }
+            }
+    }
+
+    private var selectionPlan: AIUpdateSelectionPlan {
+        AIUpdateSelectionPlan(
+            selection: selectedRows,
+            assets: updateAssets,
+            results: updateResults
+        )
     }
 
     var body: some View {
@@ -50,6 +74,14 @@ struct CLIToolsView: View {
                 // refresh failed; a lightweight banner conveys status without
                 // hiding the table.
                 VStack(spacing: 0) {
+                    AIUpdateActionBar(
+                        plan: selectionPlan,
+                        isChecking: isCheckingUpdates,
+                        onCheckSelected: { onCheckSelectedUpdates(Set(selectionPlan.checkableKeys)) },
+                        onUpdateSelected: { onUpdateSelected(Set(selectionPlan.selected.map(\.key))) },
+                        onCancel: onCancelUpdateCheck
+                    )
+                    Divider()
                     refreshBanner
                     if layout == .compact {
                         compactTable
@@ -82,7 +114,7 @@ struct CLIToolsView: View {
         Table(filteredCLIs, selection: $selection) {
             TableColumn(L10n.text(.name)) { cliNameCell($0) }
             TableColumn(L10n.text(.aiCLIStatus)) {
-                Text(statusText(for: $0))
+                Text(updateStatusText(for: $0))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -95,7 +127,13 @@ struct CLIToolsView: View {
         Table(filteredCLIs, selection: $selection) {
             TableColumn(L10n.text(.name)) { cliNameCell($0) }
             TableColumn(L10n.version()) {
-                Text($0.evidence.detectedVersion ?? "—")
+                Text(currentVersionText(for: $0))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            .width(min: 64, ideal: 84, max: 100)
+            TableColumn(L10n.text(.aiUpdateLatest)) {
+                Text(latestVersionText(for: $0))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -107,7 +145,7 @@ struct CLIToolsView: View {
             }
             .width(min: 80, ideal: 100, max: 120)
             TableColumn(L10n.text(.aiCLIStatus)) {
-                Text(statusText(for: $0))
+                Text(updateStatusText(for: $0))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -126,12 +164,33 @@ struct CLIToolsView: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .truncationMode(.middle)
+            if !tool.evidence.aliasExecutableURLs.isEmpty {
+                // Known aliases resolved to the same executable are surfaced as
+                // evidence so the user recognizes the names they invoke (for
+                // example trae-cli / trae-agent for traex).
+                Text("\(L10n.text(.aiCLIAliases)): \(aliasNames(for: tool))")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
         }
         .contextMenu {
             if let url = tool.evidence.executableURL {
                 Button(L10n.text(.revealFinder)) { FinderReveal.reveal(url) }
             }
+            ForEach(tool.evidence.aliasExecutableURLs, id: \.self) { alias in
+                Button("\(L10n.text(.revealFinder)): \(alias.lastPathComponent)") {
+                    FinderReveal.reveal(alias)
+                }
+            }
         }
+    }
+
+    private func aliasNames(for tool: AIToolRecord) -> String {
+        tool.evidence.aliasExecutableURLs
+            .map(\.lastPathComponent)
+            .joined(separator: ", ")
     }
 
     private func executablePath(for tool: AIToolRecord) -> String {
@@ -145,6 +204,26 @@ struct CLIToolsView: View {
             return L10n.name(for: failure)
         }
         return L10n.text(.aiCLIAvailable)
+    }
+
+    private func updateResult(for tool: AIToolRecord) -> UpdateCheckResult? {
+        guard let key = AIUpdateKeyBuilder.key(for: tool) else { return nil }
+        return AIUpdateStatusPresentation.result(for: key, in: updateResults, isChecking: isCheckingUpdates)
+    }
+
+    private func updateStatusText(for tool: AIToolRecord) -> String {
+        if let result = updateResult(for: tool) {
+            return AIUpdateStatusPresentation.statusText(result)
+        }
+        return statusText(for: tool)
+    }
+
+    private func currentVersionText(for tool: AIToolRecord) -> String {
+        AIUpdateStatusPresentation.currentVersion(updateResult(for: tool), fallback: tool.evidence.detectedVersion)
+    }
+
+    private func latestVersionText(for tool: AIToolRecord) -> String {
+        AIUpdateStatusPresentation.latestVersion(updateResult(for: tool))
     }
 
     private func urlForRow(_ row: Int) -> URL? {

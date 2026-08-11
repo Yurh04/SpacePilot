@@ -18,6 +18,7 @@ struct AIApplicationDetailView: View {
     let queryProjection: AIApplicationQueryProjection?
     let isPreparingQuery: Bool
     let pluginDiagnostics: [String]
+    let updateResult: UpdateCheckResult?
     @Binding var selectedTab: AIApplicationTab
     @State private var selectedDataItemID: UUID?
     @State private var selectedPluginID: UUID?
@@ -64,6 +65,10 @@ struct AIApplicationDetailView: View {
         case .overview:
             List {
                 Section(L10n.text(.aiLocalFootprint)) {
+                    LabeledContent(L10n.version(), value: AIUpdateStatusPresentation.currentVersion(updateResult, fallback: nil))
+                    LabeledContent(L10n.text(.aiUpdateLatest), value: AIUpdateStatusPresentation.latestVersion(updateResult))
+                    LabeledContent(L10n.text(.aiUpdateStatus), value: AIUpdateStatusPresentation.statusText(updateResult))
+                    LabeledContent(L10n.text(.source), value: AIUpdateStatusPresentation.evidenceText(updateResult))
                     LabeledContent(L10n.text(.aiTotalIndexedSpace), value: ByteCount.string(projection.totalSize))
                     LabeledContent(L10n.text(.aiDataItems), value: projection.dataItems.count.formatted())
                     LabeledContent(L10n.plugins(), value: projection.plugins.count.formatted())

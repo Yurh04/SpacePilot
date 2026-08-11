@@ -179,6 +179,9 @@ final class LocalizationTests: XCTestCase {
             L10n.name(for: ProjectAIAssetScanIssue.noSupportedAssets, locale: chinese),
             "没有已定义的受支持项目资产位置。"
         )
+        XCTAssertEqual(L10n.text(.aiUpdateCheckNow, locale: english), "Check for Updates")
+        XCTAssertEqual(L10n.text(.aiUpdateStatusUnsupported, locale: chinese), "不支持")
+        XCTAssertEqual(L10n.name(for: VersionEvidenceSource.packageReceipt, locale: english), "Package receipt")
     }
 
     func testSelectiveCleanupAndStorageWorkbenchUseBothLanguages() {
@@ -293,7 +296,7 @@ final class LocalizationTests: XCTestCase {
         let english = try stringsTable(at: resources.appending(path: "en.lproj/Localizable.strings"))
         let chinese = try stringsTable(at: resources.appending(path: "zh-Hans.lproj/Localizable.strings"))
 
-        XCTAssertEqual(L10n.allKeys.count, 246)
+        XCTAssertEqual(L10n.allKeys.count, 311)
         XCTAssertEqual(Set(catalogStrings.keys), L10n.allKeys)
         XCTAssertEqual(Set(english.keys), L10n.allKeys)
         XCTAssertEqual(Set(chinese.keys), L10n.allKeys)

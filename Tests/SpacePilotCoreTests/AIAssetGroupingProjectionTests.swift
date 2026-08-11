@@ -4,7 +4,7 @@ import XCTest
 final class AIAssetGroupingProjectionTests: XCTestCase {
     private let codexPluginID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
 
-    func testSkillsGroupByExplicitOwnershipAndLocationScope() throws {
+    func testSkillsGroupByOwnerFirstWithScopeAvailablePerRow() throws {
         let project = AIProjectIdentity(displayName: "Repo", canonicalRootURL: URL(fileURLWithPath: "/tmp/repo"))
         let skills = [
             skill("shared", path: "/skills/shared", owner: .shared, location: .userGlobal),
@@ -17,18 +17,31 @@ final class AIAssetGroupingProjectionTests: XCTestCase {
 
         let projection = GroupedSkillsProjection(skills: Array(skills), plugins: [])
 
-        XCTAssertEqual(projection.groups.map(\.id), [
-            "shared:global",
-            "shared:project:\(project.id)",
-            "tool:codex:global",
-            "tool:codex:project:\(project.id)",
-            "tool:codex:system",
-            "unknown"
-        ])
-        XCTAssertEqual(projection.groups.first { $0.id == "shared:project:\(project.id)" }?.detail, "Project · Repo")
-        XCTAssertEqual(projection.groups.first { $0.id == "tool:codex:project:\(project.id)" }?.title, "Codex")
-        XCTAssertEqual(projection.groups.first { $0.id == "tool:codex:project:\(project.id)" }?.detail, "Project · Repo")
-        XCTAssertEqual(projection.skills(in: "tool:codex:project:\(project.id)").map(\.name), ["project"])
+        // First level is owner-only: Shared, one entry per tool, then Unknown.
+        XCTAssertEqual(projection.groups.map(\.id), ["shared", "tool:codex", "unknown"])
+        XCTAssertEqual(projection.groups.first { $0.id == "tool:codex" }?.title, "Codex")
+        XCTAssertEqual(projection.groups.first { $0.id == "tool:codex" }?.itemCount, 3)
+
+        // All of a tool's skills appear under its single entry across scopes.
+        XCTAssertEqual(projection.skills(in: "tool:codex").map(\.name), ["global", "project", "system"])
+        XCTAssertEqual(projection.skills(in: "shared").map(\.name), ["shared", "shared-project"])
+
+        // Scope is exposed per row for the right-pane column/filter.
+        let projectSkill = try XCTUnwrap(projection.skills(in: "tool:codex").first { $0.name == "project" })
+        XCTAssertEqual(projection.scopeDetail(for: projectSkill), .project(project))
+        let systemSkill = try XCTUnwrap(projection.skills(in: "tool:codex").first { $0.name == "system" })
+        XCTAssertEqual(projection.scopeDetail(for: systemSkill), .system)
+        let sharedProject = try XCTUnwrap(projection.skills(in: "shared").first { $0.name == "shared-project" })
+        XCTAssertEqual(projection.scopeDetail(for: sharedProject), .project(project))
+    }
+
+    func testEmptyOwnersProduceNoSidebarEntries() {
+        let projection = GroupedSkillsProjection(skills: [
+            skill("only", path: "/skills/only", owner: .tool(definitionID: "codex"), location: .userGlobal)
+        ], plugins: [])
+
+        // Only owners with assets appear; no empty Shared/Unknown rows.
+        XCTAssertEqual(projection.groups.map(\.id), ["tool:codex"])
     }
 
     func testPluginProvidedSkillGroupsUnderParentPluginToolOwner() {
@@ -59,9 +72,36 @@ final class AIAssetGroupingProjectionTests: XCTestCase {
 
         let projection = GroupedSkillsProjection(skills: [orphan, bundled], plugins: [plugin])
 
-        XCTAssertEqual(projection.groups.map(\.id), ["tool:codex:bundled", "unknown"])
-        XCTAssertEqual(projection.skills(in: "tool:codex:bundled").map(\.name), ["bundled"])
+        XCTAssertEqual(projection.groups.map(\.id), ["tool:codex", "unknown"])
+        XCTAssertEqual(projection.skills(in: "tool:codex").map(\.name), ["bundled"])
         XCTAssertEqual(projection.skills(in: "unknown").map(\.name), ["orphan"])
+        XCTAssertEqual(projection.scopeDetail(for: bundled), .bundled)
+    }
+
+    func testProjectPluginProvidedSkillKeepsProjectScope() {
+        let project = AIProjectIdentity(displayName: "Repo", canonicalRootURL: URL(fileURLWithPath: "/tmp/repo"))
+        let plugin = PluginRecord(
+            id: codexPluginID,
+            name: "project-plugin",
+            version: nil,
+            url: URL(fileURLWithPath: "/repo/.codex/plugins/project-plugin"),
+            source: "codex",
+            allocatedSize: 3,
+            owner: .tool(definitionID: "codex"),
+            locationScope: .project(project)
+        )
+        let child = skill(
+            "child",
+            path: "/repo/.codex/plugins/project-plugin/skills/child",
+            owner: .plugin(pluginID: codexPluginID.uuidString),
+            location: .bundled,
+            parentPluginID: codexPluginID
+        )
+
+        let projection = GroupedSkillsProjection(skills: [child], plugins: [plugin])
+
+        XCTAssertEqual(projection.groups.map(\.id), ["tool:codex"])
+        XCTAssertEqual(projection.scopeDetail(for: child), .project(project))
     }
 
     func testDedupUsesCanonicalURLPlusOwnerAndLocationScope() {
@@ -71,10 +111,10 @@ final class AIAssetGroupingProjectionTests: XCTestCase {
 
         let projection = GroupedSkillsProjection(skills: [sharedDuplicate, codexSameURL, shared], plugins: [])
 
-        XCTAssertEqual(projection.skills(in: "shared:global").map(\.name), ["alpha"])
-        XCTAssertEqual(projection.skills(in: "tool:codex:global").map(\.name), ["codex"])
-        XCTAssertEqual(projection.groups.first { $0.id == "shared:global" }?.allocatedSize, 10)
-        XCTAssertEqual(projection.groups.first { $0.id == "tool:codex:global" }?.allocatedSize, 20)
+        XCTAssertEqual(projection.skills(in: "shared").map(\.name), ["alpha"])
+        XCTAssertEqual(projection.skills(in: "tool:codex").map(\.name), ["codex"])
+        XCTAssertEqual(projection.groups.first { $0.id == "shared" }?.allocatedSize, 10)
+        XCTAssertEqual(projection.groups.first { $0.id == "tool:codex" }?.allocatedSize, 20)
     }
 
     func testPluginsGroupAndDeduplicateDeterministically() {
@@ -86,9 +126,10 @@ final class AIAssetGroupingProjectionTests: XCTestCase {
         let reverse = GroupedPluginsProjection(plugins: [first, shared, duplicate].reversed())
 
         XCTAssertEqual(forward.groups.map(\.id), reverse.groups.map(\.id))
-        XCTAssertEqual(forward.plugins(in: "tool:codex:global").map(\.name), ["Alpha"])
-        XCTAssertEqual(forward.groups.first { $0.id == "tool:codex:global" }?.itemCount, 1)
-        XCTAssertEqual(forward.groups.first { $0.id == "tool:codex:global" }?.allocatedSize, 8)
+        XCTAssertEqual(forward.groups.map(\.id), ["shared", "tool:codex"])
+        XCTAssertEqual(forward.plugins(in: "tool:codex").map(\.name), ["Alpha"])
+        XCTAssertEqual(forward.groups.first { $0.id == "tool:codex" }?.itemCount, 1)
+        XCTAssertEqual(forward.groups.first { $0.id == "tool:codex" }?.allocatedSize, 8)
     }
 
     func testSearchFiltersItemsWithoutChangingGroups() {
@@ -97,20 +138,20 @@ final class AIAssetGroupingProjectionTests: XCTestCase {
             skill("two", path: "/skills/two", owner: .shared, location: .userGlobal)
         ], plugins: [])
 
-        XCTAssertEqual(projection.groups.map(\.id), ["shared:global"])
-        XCTAssertEqual(projection.skills(in: "shared:global", matching: "two").map(\.name), ["two"])
-        XCTAssertEqual(projection.groups.map(\.id), ["shared:global"])
+        XCTAssertEqual(projection.groups.map(\.id), ["shared"])
+        XCTAssertEqual(projection.skills(in: "shared", matching: "two").map(\.name), ["two"])
+        XCTAssertEqual(projection.groups.map(\.id), ["shared"])
     }
 
     func testResolverPreservesValidThenNearestOwnerThenFirst() {
         let groups = [
-            AIAssetGroup(id: "shared:global", kind: .sharedGlobal, title: "Shared", detail: "Global", itemCount: 1, allocatedSize: 1),
-            AIAssetGroup(id: "tool:codex:bundled", kind: .toolBundled(definitionID: "codex"), title: "Codex", detail: "Bundled", itemCount: 1, allocatedSize: 1)
+            AIAssetGroup(id: "shared", kind: .shared, title: "Shared", itemCount: 1, allocatedSize: 1),
+            AIAssetGroup(id: "tool:codex", kind: .tool(definitionID: "codex"), title: "Codex", itemCount: 1, allocatedSize: 1)
         ]
 
-        XCTAssertEqual(GroupedSkillsProjection.resolvedSelection(current: "shared:global", preferredOwnerFrom: nil, groups: groups), "shared:global")
-        XCTAssertEqual(GroupedSkillsProjection.resolvedSelection(current: "missing", preferredOwnerFrom: "tool:codex:global", groups: groups), "tool:codex:bundled")
-        XCTAssertEqual(GroupedSkillsProjection.resolvedSelection(current: "missing", preferredOwnerFrom: nil, groups: groups), "shared:global")
+        XCTAssertEqual(GroupedSkillsProjection.resolvedSelection(current: "shared", preferredOwnerFrom: nil, groups: groups), "shared")
+        XCTAssertEqual(GroupedSkillsProjection.resolvedSelection(current: "missing", preferredOwnerFrom: "tool:codex", groups: groups), "tool:codex")
+        XCTAssertEqual(GroupedSkillsProjection.resolvedSelection(current: "missing", preferredOwnerFrom: nil, groups: groups), "shared")
         XCTAssertNil(GroupedSkillsProjection.resolvedSelection(current: nil, preferredOwnerFrom: nil, groups: []))
     }
 

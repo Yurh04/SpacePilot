@@ -1,12 +1,13 @@
 import Foundation
 
+/// First-level ownership grouping. The sidebar shows one entry per AI tool that
+/// actually has assets, a single "Shared" entry (assets shared by every AI), and
+/// an "Unknown" entry only when unattributed assets exist. Location scope
+/// (userGlobal / project / bundled / system) is NOT a sidebar level anymore; it
+/// is surfaced per-row in the right pane via `scopeDetail(for:)`.
 public enum AIAssetGroupKind: Hashable, Sendable {
-    case sharedGlobal
-    case sharedProject(project: AIProjectIdentity)
-    case toolGlobal(definitionID: String)
-    case toolProject(definitionID: String, project: AIProjectIdentity)
-    case toolBundled(definitionID: String)
-    case toolSystem(definitionID: String)
+    case shared
+    case tool(definitionID: String)
     case unknown
 }
 
@@ -14,7 +15,6 @@ public struct AIAssetGroup: Identifiable, Hashable, Sendable {
     public let id: String
     public let kind: AIAssetGroupKind
     public let title: String
-    public let detail: String
     public let itemCount: Int
     public let allocatedSize: Int64
 
@@ -22,48 +22,76 @@ public struct AIAssetGroup: Identifiable, Hashable, Sendable {
         id: String,
         kind: AIAssetGroupKind,
         title: String,
-        detail: String,
         itemCount: Int,
         allocatedSize: Int64
     ) {
         self.id = id
         self.kind = kind
         self.title = title
-        self.detail = detail
         self.itemCount = itemCount
         self.allocatedSize = allocatedSize
     }
 }
 
+/// Canonical, non-localized location-scope descriptor for a right-pane row. The
+/// UI layer localizes these tokens; Core never emits localized strings.
+public enum AIAssetScopeDetail: Hashable, Sendable {
+    case global
+    case project(AIProjectIdentity)
+    case bundled
+    case system
+    case unattributed
+}
+
 public struct GroupedSkillsProjection: Sendable {
     public let groups: [AIAssetGroup]
     private let recordsByGroupID: [String: [SkillRecord]]
+    private let scopeDetailByRecordID: [UUID: AIAssetScopeDetail]
 
     public init(
         skills: [SkillRecord],
         plugins: [PluginRecord],
-        definitions: [AIToolDefinition] = KnownAIToolDefinitions.all
+        definitions: [AIToolDefinition] = KnownAIToolDefinitions.all,
+        discoveredToolIDs: Set<String> = []
     ) {
         let pluginScopeByID = Dictionary(uniqueKeysWithValues: plugins.map {
             ($0.id, PluginGroupingScope(owner: $0.owner, locationScope: $0.locationScope))
         })
         let records = Self.deduplicated(skills)
-        let grouped = Dictionary(grouping: records) { skill in
-            Self.groupKey(for: skill, pluginScopeByID: pluginScopeByID)
+        let resolved = records.map { skill -> (SkillRecord, OwnerKey, AIAssetScopeDetail) in
+            let (ownerKey, scope) = Self.attribution(for: skill, pluginScopeByID: pluginScopeByID)
+            return (skill, ownerKey, scope)
         }
-        let orderedKeys = Self.orderedKeys(Array(grouped.keys), definitions: definitions)
+        let grouped = Dictionary(grouping: resolved) { $0.1 }
+        let orderedKeys = OwnerKey.ordered(
+            Array(grouped.keys),
+            definitions: definitions,
+            discoveredToolIDs: discoveredToolIDs
+        )
         let definitionNames = Dictionary(uniqueKeysWithValues: definitions.map { ($0.id, $0.displayName) })
         self.groups = orderedKeys.map { key in
-            let records = grouped[key, default: []]
-            return key.group(records: records, definitionNames: definitionNames)
+            let items = grouped[key, default: []]
+            return key.group(
+                title: key.title(definitionNames: definitionNames),
+                itemCount: items.count,
+                allocatedSize: items.reduce(0) { $0 + $1.0.allocatedSize }
+            )
         }
         self.recordsByGroupID = Dictionary(uniqueKeysWithValues: orderedKeys.map { key in
-            (key.id, (grouped[key] ?? []).sorted(by: Self.recordOrder))
+            (key.id, (grouped[key] ?? []).map(\.0).sorted(by: Self.recordOrder))
         })
+        self.scopeDetailByRecordID = Dictionary(
+            resolved.map { ($0.0.id, $0.2) },
+            uniquingKeysWith: { first, _ in first }
+        )
     }
 
     public func skills(in groupID: String, matching query: String = "") -> [SkillRecord] {
         filter(recordsByGroupID[groupID] ?? [], query: query)
+    }
+
+    public func scopeDetail(for skill: SkillRecord) -> AIAssetScopeDetail {
+        scopeDetailByRecordID[skill.id] ?? .unattributed
     }
 
     public static func resolvedSelection(
@@ -72,31 +100,42 @@ public struct GroupedSkillsProjection: Sendable {
         groups: [AIAssetGroup]
     ) -> String? {
         if let current, groups.contains(where: { $0.id == current }) { return current }
-        if let previousOwner = previous.flatMap(ownerPrefix),
-           let nearest = groups.first(where: { ownerPrefix($0.id) == previousOwner }) {
+        if let previous, let nearest = groups.first(where: { $0.id == previous }) {
             return nearest.id
         }
         return groups.first?.id
     }
 
-    private static func groupKey(
+    private static func attribution(
         for skill: SkillRecord,
         pluginScopeByID: [UUID: PluginGroupingScope]
-    ) -> AIAssetGroupKey {
+    ) -> (OwnerKey, AIAssetScopeDetail) {
         if case .plugin = skill.owner {
             guard let pluginID = skill.parentPluginID,
                   let pluginScope = pluginScopeByID[pluginID],
                   case .tool(let definitionID) = pluginScope.owner else {
-                return .unknown
+                return (.unknown, scopeDetail(for: skill.locationScope))
             }
+            // A plugin-provided skill aggregates to its parent plugin's tool
+            // owner. Its scope follows the parent plugin: a project plugin keeps
+            // the skill in that project, otherwise it is bundled.
             switch pluginScope.locationScope {
             case .project(let project):
-                return .tool(definitionID: definitionID, scope: .project(project))
+                return (.tool(definitionID: definitionID), .project(project))
             default:
-                return .tool(definitionID: definitionID, scope: .bundled)
+                return (.tool(definitionID: definitionID), .bundled)
             }
         }
-        return AIAssetGroupKey(owner: skill.owner, locationScope: skill.locationScope)
+        return (OwnerKey(owner: skill.owner), scopeDetail(for: skill.locationScope))
+    }
+
+    private static func scopeDetail(for location: AIAssetLocationScope) -> AIAssetScopeDetail {
+        switch location {
+        case .userGlobal: .global
+        case .project(let project): .project(project)
+        case .bundled: .bundled
+        case .system: .system
+        }
     }
 
     private static func deduplicated(_ records: [SkillRecord]) -> [SkillRecord] {
@@ -104,10 +143,6 @@ public struct GroupedSkillsProjection: Sendable {
             .values
             .compactMap { $0.sorted(by: recordOrder).first }
             .sorted(by: recordOrder)
-    }
-
-    private static func orderedKeys(_ keys: [AIAssetGroupKey], definitions: [AIToolDefinition]) -> [AIAssetGroupKey] {
-        AIAssetGroupKey.ordered(keys, definitions: definitions)
     }
 
     private static func recordOrder(_ lhs: SkillRecord, _ rhs: SkillRecord) -> Bool {
@@ -125,26 +160,47 @@ public struct GroupedSkillsProjection: Sendable {
 public struct GroupedPluginsProjection: Sendable {
     public let groups: [AIAssetGroup]
     private let recordsByGroupID: [String: [PluginRecord]]
+    private let scopeDetailByRecordID: [UUID: AIAssetScopeDetail]
 
     public init(
         plugins: [PluginRecord],
-        definitions: [AIToolDefinition] = KnownAIToolDefinitions.all
+        definitions: [AIToolDefinition] = KnownAIToolDefinitions.all,
+        discoveredToolIDs: Set<String> = []
     ) {
         let records = Self.deduplicated(plugins)
-        let grouped = Dictionary(grouping: records) { AIAssetGroupKey(owner: $0.owner, locationScope: $0.locationScope) }
-        let orderedKeys = AIAssetGroupKey.ordered(Array(grouped.keys), definitions: definitions)
+        let resolved = records.map { plugin -> (PluginRecord, OwnerKey, AIAssetScopeDetail) in
+            (plugin, OwnerKey(owner: plugin.owner), GroupedSkillsProjection.scopeDetailPublic(plugin.locationScope))
+        }
+        let grouped = Dictionary(grouping: resolved) { $0.1 }
+        let orderedKeys = OwnerKey.ordered(
+            Array(grouped.keys),
+            definitions: definitions,
+            discoveredToolIDs: discoveredToolIDs
+        )
         let definitionNames = Dictionary(uniqueKeysWithValues: definitions.map { ($0.id, $0.displayName) })
         self.groups = orderedKeys.map { key in
-            let records = grouped[key, default: []]
-            return key.group(records: records, definitionNames: definitionNames)
+            let items = grouped[key, default: []]
+            return key.group(
+                title: key.title(definitionNames: definitionNames),
+                itemCount: items.count,
+                allocatedSize: items.reduce(0) { $0 + $1.0.allocatedSize }
+            )
         }
         self.recordsByGroupID = Dictionary(uniqueKeysWithValues: orderedKeys.map { key in
-            (key.id, (grouped[key] ?? []).sorted(by: Self.recordOrder))
+            (key.id, (grouped[key] ?? []).map(\.0).sorted(by: Self.recordOrder))
         })
+        self.scopeDetailByRecordID = Dictionary(
+            resolved.map { ($0.0.id, $0.2) },
+            uniquingKeysWith: { first, _ in first }
+        )
     }
 
     public func plugins(in groupID: String, matching query: String = "") -> [PluginRecord] {
         filter(recordsByGroupID[groupID] ?? [], query: query)
+    }
+
+    public func scopeDetail(for plugin: PluginRecord) -> AIAssetScopeDetail {
+        scopeDetailByRecordID[plugin.id] ?? .unattributed
     }
 
     public static func resolvedSelection(
@@ -174,6 +230,13 @@ public struct GroupedPluginsProjection: Sendable {
     }
 }
 
+extension GroupedSkillsProjection {
+    // Shared with the plugins projection so both use one scope-detail mapping.
+    static func scopeDetailPublic(_ location: AIAssetLocationScope) -> AIAssetScopeDetail {
+        scopeDetail(for: location)
+    }
+}
+
 private struct DedupKey: Hashable {
     let canonicalPath: String
     let owner: AIAssetOwner
@@ -191,183 +254,90 @@ private struct PluginGroupingScope: Hashable {
     let locationScope: AIAssetLocationScope
 }
 
-private enum AIAssetGroupKey: Hashable {
-    case sharedGlobal
-    case sharedProject(AIProjectIdentity)
-    case tool(definitionID: String, scope: ToolScope)
+/// Owner-level grouping key. Location scope is intentionally excluded so the
+/// first level collapses to Shared / one entry per tool / Unknown.
+private enum OwnerKey: Hashable {
+    case shared
+    case tool(definitionID: String)
     case unknown
 
-    enum ToolScope: Hashable {
-        case global
-        case project(AIProjectIdentity)
-        case bundled
-        case system
-    }
-
-    init(owner: AIAssetOwner, locationScope: AIAssetLocationScope) {
-        switch (owner, locationScope) {
-        case (.shared, .userGlobal):
-            self = .sharedGlobal
-        case (.shared, .project(let project)):
-            self = .sharedProject(project)
-        case (.tool(let definitionID), .userGlobal):
-            self = .tool(definitionID: definitionID, scope: .global)
-        case (.tool(let definitionID), .project(let project)):
-            self = .tool(definitionID: definitionID, scope: .project(project))
-        case (.tool(let definitionID), .bundled):
-            self = .tool(definitionID: definitionID, scope: .bundled)
-        case (.tool(let definitionID), .system):
-            self = .tool(definitionID: definitionID, scope: .system)
-        default:
+    init(owner: AIAssetOwner) {
+        switch owner {
+        case .shared:
+            self = .shared
+        case .tool(let definitionID):
+            self = .tool(definitionID: definitionID)
+        case .plugin, .unknown:
             self = .unknown
         }
     }
 
     var id: String {
         switch self {
-        case .sharedGlobal:
-            return "shared:global"
-        case .sharedProject(let project):
-            return "shared:project:\(project.id)"
-        case .tool(let definitionID, let scope):
-            return "tool:\(definitionID):\(scope.id)"
-        case .unknown:
-            return "unknown"
+        case .shared: "shared"
+        case .tool(let definitionID): "tool:\(definitionID)"
+        case .unknown: "unknown"
         }
     }
 
-    static func ordered(_ keys: [Self], definitions: [AIToolDefinition]) -> [Self] {
-        let keySet = Set(keys)
+    var kind: AIAssetGroupKind {
+        switch self {
+        case .shared: .shared
+        case .tool(let definitionID): .tool(definitionID: definitionID)
+        case .unknown: .unknown
+        }
+    }
+
+    /// Produces the ordered sidebar keys. `discoveredToolIDs` seeds an entry for
+    /// each AI that was discovered (installed app / CLI / tool-owned asset) even
+    /// when it currently has zero skills/plugins, so the sidebar reflects the
+    /// machine rather than only owners present in records. Shared is always the
+    /// first row; Unknown appears only when a genuinely unattributed asset
+    /// exists. Ordering follows catalog order with a stable id fallback and is
+    /// independent of input order.
+    static func ordered(
+        _ keys: [Self],
+        definitions: [AIToolDefinition],
+        discoveredToolIDs: Set<String> = []
+    ) -> [Self] {
+        var keySet = Set(keys)
+        for toolID in discoveredToolIDs {
+            keySet.insert(.tool(definitionID: toolID))
+        }
         var ordered: [Self] = []
-        if keySet.contains(.sharedGlobal) { ordered.append(.sharedGlobal) }
-        let sharedProjects = keySet.compactMap { key -> AIProjectIdentity? in
-            guard case .sharedProject(let project) = key else { return nil }
-            return project
-        }
-        for project in sharedProjects.sorted(by: projectOrder) {
-            ordered.append(.sharedProject(project))
-        }
+        if keySet.contains(.shared) { ordered.append(.shared) }
         for definition in definitions {
-            let global = Self.tool(definitionID: definition.id, scope: .global)
-            if keySet.contains(global) { ordered.append(global) }
-            let projects = keySet.compactMap { key -> AIProjectIdentity? in
-                guard case .tool(definition.id, .project(let project)) = key else { return nil }
-                return project
-            }
-            for project in projects.sorted(by: projectOrder) {
-                ordered.append(.tool(definitionID: definition.id, scope: .project(project)))
-            }
-            for scope in [ToolScope.bundled, .system] {
-                let key = Self.tool(definitionID: definition.id, scope: scope)
-                if keySet.contains(key) { ordered.append(key) }
-            }
+            let key = Self.tool(definitionID: definition.id)
+            if keySet.contains(key) { ordered.append(key) }
         }
         let known = Set(ordered)
-        ordered.append(contentsOf: keySet.subtracting(known).filter { $0 != .unknown }.sorted(by: fallbackOrder))
+        let remainingTools = keySet
+            .subtracting(known)
+            .filter { $0 != .unknown }
+            .sorted { $0.id < $1.id }
+        ordered.append(contentsOf: remainingTools)
         if keySet.contains(.unknown) { ordered.append(.unknown) }
         return ordered
     }
 
-    func group<Record>(records: [Record], definitionNames: [String: String]) -> AIAssetGroup where Record: AIAssetGroupRecord {
+    func group(title: String, itemCount: Int, allocatedSize: Int64) -> AIAssetGroup {
         AIAssetGroup(
             id: id,
             kind: kind,
-            title: title(definitionNames: definitionNames),
-            detail: detail,
-            itemCount: records.count,
-            allocatedSize: records.reduce(0) { $0 + $1.allocatedSize }
+            title: title,
+            itemCount: itemCount,
+            allocatedSize: allocatedSize
         )
     }
 
-    private var kind: AIAssetGroupKind {
+    func title(definitionNames: [String: String]) -> String {
         switch self {
-        case .sharedGlobal:
-            return .sharedGlobal
-        case .sharedProject(let project):
-            return .sharedProject(project: project)
-        case .tool(let definitionID, .global):
-            return .toolGlobal(definitionID: definitionID)
-        case .tool(let definitionID, .project(let project)):
-            return .toolProject(definitionID: definitionID, project: project)
-        case .tool(let definitionID, .bundled):
-            return .toolBundled(definitionID: definitionID)
-        case .tool(let definitionID, .system):
-            return .toolSystem(definitionID: definitionID)
-        case .unknown:
-            return .unknown
-        }
-    }
-
-    private func title(definitionNames: [String: String]) -> String {
-        switch self {
-        case .sharedGlobal:
-            return "Shared"
-        case .sharedProject:
-            return "Shared"
-        case .tool(let definitionID, let scope):
-            let name = definitionNames[definitionID] ?? definitionID
-            switch scope {
-            case .global, .bundled, .system:
-                return name
-            case .project:
-                return name
-            }
-        case .unknown:
-            return "Unknown"
-        }
-    }
-
-    private var detail: String {
-        switch self {
-        case .sharedGlobal:
-            return "Global"
-        case .sharedProject(let project):
-            return "Project · \(project.displayName)"
-        case .tool(_, .global):
-            return "Global"
-        case .tool(_, .project(let project)):
-            return "Project · \(project.displayName)"
-        case .tool(_, .bundled):
-            return "Bundled"
-        case .tool(_, .system):
-            return "System"
-        case .unknown:
-            return "Unattributed"
-        }
-    }
-
-    private static func projectOrder(_ lhs: AIProjectIdentity, _ rhs: AIProjectIdentity) -> Bool {
-        let nameOrder = lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName)
-        if nameOrder != .orderedSame { return nameOrder == .orderedAscending }
-        return lhs.id < rhs.id
-    }
-
-    private static func fallbackOrder(_ lhs: Self, _ rhs: Self) -> Bool {
-        lhs.id < rhs.id
-    }
-}
-
-private extension AIAssetGroupKey.ToolScope {
-    var id: String {
-        switch self {
-        case .global:
-            return "global"
-        case .project(let project):
-            return "project:\(project.id)"
-        case .bundled:
-            return "bundled"
-        case .system:
-            return "system"
+        case .shared: "Shared"
+        case .tool(let definitionID): definitionNames[definitionID] ?? definitionID
+        case .unknown: "Unknown"
         }
     }
 }
-
-private protocol AIAssetGroupRecord {
-    var allocatedSize: Int64 { get }
-}
-
-extension SkillRecord: AIAssetGroupRecord {}
-extension PluginRecord: AIAssetGroupRecord {}
 
 private func totalOrder(
     lhsName: String,
@@ -383,14 +353,6 @@ private func totalOrder(
     let rhsPath = rhsURL.standardizedFileURL.resolvingSymlinksInPath().path
     if lhsPath != rhsPath { return lhsPath < rhsPath }
     return lhsID < rhsID
-}
-
-private func ownerPrefix(_ groupID: String) -> String? {
-    if groupID.hasPrefix("shared:") { return "shared" }
-    if groupID == "unknown" { return "unknown" }
-    let parts = groupID.split(separator: ":", maxSplits: 2).map(String.init)
-    guard parts.count >= 2 else { return nil }
-    return parts[0] + ":" + parts[1]
 }
 
 private func filter(_ skills: [SkillRecord], query: String) -> [SkillRecord] {

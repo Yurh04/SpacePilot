@@ -54,12 +54,12 @@ public struct PluginRoot: Sendable {
             roots[key] = root
             return
         }
-        if existing.owner == root.owner, existing.locationScope == root.locationScope { return }
-        if existing.owner == .shared || root.owner == .shared {
+        let resolvedOwner = SkillRoot.resolveOwner(existing.owner, root.owner)
+        if resolvedOwner == .shared {
             roots[key] = Self(url: existing.url, owner: .shared, locationScope: .userGlobal)
-            return
+        } else {
+            roots[key] = Self(url: existing.url, owner: resolvedOwner, locationScope: existing.locationScope)
         }
-        roots[key] = Self(url: existing.url, owner: .unknown, locationScope: existing.locationScope)
     }
 }
 

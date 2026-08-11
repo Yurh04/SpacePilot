@@ -119,7 +119,7 @@ final class FinderRevealArchitectureTests: XCTestCase {
             at: "Sources/SpacePilot/Views/DeveloperAI/AIApplicationDetailView.swift"
         )
         let workspace = try source(
-            at: "Sources/SpacePilot/Views/DeveloperAI/AIAppsSectionView.swift"
+            at: "Sources/SpacePilot/Views/DeveloperAI/AIAgentsSectionView.swift"
         )
 
         XCTAssertGreaterThanOrEqual(
@@ -147,7 +147,7 @@ final class FinderRevealArchitectureTests: XCTestCase {
             at: "Sources/SpacePilot/Views/Applications/ApplicationsView.swift"
         )
         let developerAI = try source(
-            at: "Sources/SpacePilot/Views/DeveloperAI/AIAppsSectionView.swift"
+            at: "Sources/SpacePilot/Views/DeveloperAI/AIAgentsSectionView.swift"
         )
         let developerAIShell = try source(
             at: "Sources/SpacePilot/Views/DeveloperAI/DeveloperAIView.swift"
@@ -167,11 +167,12 @@ final class FinderRevealArchitectureTests: XCTestCase {
         XCTAssertTrue(applications.contains(".simultaneousGesture("))
         XCTAssertTrue(applications.contains("selection = projection.id"))
         XCTAssertTrue(applications.contains("List(visibleAssociations, selection: $selectedAssociationID)"))
-        // AI Apps sidebar uses a single flat List with a unified selection and no
-        // per-row tap gesture; the native adapter maps clickedRow to entries[row]
-        // and the unified selection is synced back to the model.
-        XCTAssertTrue(developerAI.contains("List(entries, selection: $selectedEntryID)"))
-        XCTAssertTrue(developerAI.contains("model.selectedAIApplicationID = deepID"))
+        // AI Agents sidebar uses two flat Lists split by locality (local top,
+        // remote bottom), each with its own unified selection binding and no
+        // per-row tap gesture; each list's native adapter maps clickedRow to that
+        // list's entries[row].
+        XCTAssertTrue(developerAI.contains("List(localAgents, selection: $selectedEntryID)"))
+        XCTAssertTrue(developerAI.contains("List(remoteAgents, selection: $selectedEntryID)"))
         XCTAssertFalse(developerAI.contains(".simultaneousGesture("))
         XCTAssertFalse(developerAI.contains(".onTapGesture(count: 2)"))
         XCTAssertTrue(storage.contains("selection: $selectedItemIDs"))
@@ -224,11 +225,15 @@ final class FinderRevealArchitectureTests: XCTestCase {
     }
 
     func testFallbackHelpersAreUsedAtAIDisplayAndHistorySurfaces() throws {
-        let aiList = try source(at: "Sources/SpacePilot/Views/DeveloperAI/AIAppsSectionView.swift")
+        let aiList = try source(at: "Sources/SpacePilot/Views/DeveloperAI/AIAgentsSectionView.swift")
         let aiDetail = try source(at: "Sources/SpacePilot/Views/DeveloperAI/AIApplicationDetailView.swift")
         let history = try source(at: "Sources/SpacePilot/Views/History/CleanupHistoryView.swift")
 
-        XCTAssertTrue(aiList.contains("FinderReveal.applicationURL("))
+        // The Agents sidebar computes its reveal URL from the Agent's own evidence
+        // (application bundle first, then the controlled CLI executable) and hands
+        // it to the shared reveal helper for context-menu / double-click reveal.
+        XCTAssertTrue(aiList.contains("agent.applicationURL ?? agent.executableURL"))
+        XCTAssertTrue(aiList.contains("FinderReveal.reveal("))
         XCTAssertTrue(aiDetail.contains("FinderReveal.applicationURL(for: application)"))
         XCTAssertTrue(history.contains("FinderReveal.cleanupHistoryURL("))
         XCTAssertTrue(history.contains("resultingURL: outcome.resultingURL"))

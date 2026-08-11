@@ -69,10 +69,13 @@ final class ProjectAIAssetScannerTests: XCTestCase {
 
         let grouped = GroupedSkillsProjection(skills: result.skills, plugins: result.plugins)
 
-        XCTAssertTrue(grouped.groups.contains {
-            $0.kind == .toolProject(definitionID: "codex", project: root.identity)
-        })
-        XCTAssertFalse(grouped.groups.contains { $0.kind == .toolBundled(definitionID: "codex") })
+        // The plugin-provided skill aggregates under the Codex tool owner and
+        // keeps its project scope (not the global "bundled" scope).
+        XCTAssertTrue(grouped.groups.contains { $0.kind == .tool(definitionID: "codex") })
+        let codexSkills = grouped.skills(in: "tool:codex")
+        XCTAssertEqual(codexSkills.map(\.name), ["child-skill"])
+        let childSkill = try XCTUnwrap(codexSkills.first)
+        XCTAssertEqual(grouped.scopeDetail(for: childSkill), .project(root.identity))
     }
 
     private func writeSkill(named name: String, beneath root: URL) throws {

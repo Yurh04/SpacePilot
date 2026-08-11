@@ -16,7 +16,7 @@ enum AIManagementSection: String, CaseIterable, Identifiable, Hashable {
     var systemImage: String {
         switch self {
         case .overview: "square.grid.2x2"
-        case .apps: "sparkles.rectangle.stack"
+        case .apps: "brain.head.profile"
         case .skills: "sparkles"
         case .plugins: "puzzlepiece.extension"
         case .cli: "terminal"

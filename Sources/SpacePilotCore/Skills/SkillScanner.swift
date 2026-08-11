@@ -46,7 +46,7 @@ public struct SkillRoot: Sendable {
         merge(Self(
             url: homeDirectory.appending(path: ".codex/skills/.system", directoryHint: .isDirectory),
             scope: .systemManaged,
-            owner: .unknown,
+            owner: .tool(definitionID: "codex"),
             locationScope: .system
         ), into: &byCanonicalRoot)
         return byCanonicalRoot.values.sorted { $0.url.path < $1.url.path }
@@ -58,12 +58,29 @@ public struct SkillRoot: Sendable {
             roots[key] = root
             return
         }
-        if existing.owner == root.owner, existing.locationScope == root.locationScope { return }
-        if existing.owner == .shared || root.owner == .shared {
+        let resolvedOwner = Self.resolveOwner(existing.owner, root.owner)
+        // Shared ownership normalizes the scope to a userGlobal shared agents root;
+        // otherwise keep the existing scope/locationScope (they refer to the same path).
+        if resolvedOwner == .shared {
             roots[key] = Self(url: existing.url, scope: .sharedAgents, owner: .shared, locationScope: .userGlobal)
-            return
+        } else {
+            roots[key] = Self(url: existing.url, scope: existing.scope, owner: resolvedOwner, locationScope: existing.locationScope)
         }
-        roots[key] = Self(url: existing.url, scope: existing.scope, owner: .unknown, locationScope: existing.locationScope)
+    }
+
+    /// Order-independent owner precedence for two descriptors that resolve to the same
+    /// canonical root. Fixed attribution beats weak discovery:
+    /// - equal owners: keep as-is
+    /// - either `.shared`: shared wins (public overlap)
+    /// - one concrete `.tool` and the other `.unknown`: keep the concrete tool
+    /// - two *different* concrete tools: genuinely ambiguous -> `.unknown`
+    static func resolveOwner(_ lhs: AIAssetOwner, _ rhs: AIAssetOwner) -> AIAssetOwner {
+        if lhs == rhs { return lhs }
+        if lhs == .shared || rhs == .shared { return .shared }
+        if lhs == .unknown { return rhs }
+        if rhs == .unknown { return lhs }
+        // Two distinct concrete owners (e.g. two different tools) -> ambiguous.
+        return .unknown
     }
 }
 

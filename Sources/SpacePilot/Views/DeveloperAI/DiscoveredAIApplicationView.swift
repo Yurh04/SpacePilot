@@ -6,6 +6,7 @@ import SwiftUI
 /// coverage failures honestly; it performs no writes and triggers no probes.
 struct DiscoveredAIApplicationView: View {
     let application: AIApplicationJoin.RegistryOnlyApplication
+    let updateResult: UpdateCheckResult?
 
     var body: some View {
         List {
@@ -16,6 +17,18 @@ struct DiscoveredAIApplicationView: View {
                 if let version = application.detectedVersion {
                     LabeledContent(L10n.version(), value: version)
                 }
+                LabeledContent(
+                    L10n.text(.aiUpdateLatest),
+                    value: AIUpdateStatusPresentation.latestVersion(updateResult)
+                )
+                LabeledContent(
+                    L10n.text(.aiUpdateStatus),
+                    value: AIUpdateStatusPresentation.statusText(updateResult)
+                )
+                LabeledContent(
+                    L10n.text(.source),
+                    value: AIUpdateStatusPresentation.evidenceText(updateResult)
+                )
                 if let url = application.applicationURL {
                     LabeledContent(L10n.location()) {
                         Text(url.path)

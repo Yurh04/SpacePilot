@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 @MainActor
-private final class FileIconCache {
+final class FileIconCache {
     static let shared = FileIconCache()
     private let images: NSCache<NSString, NSImage>
 

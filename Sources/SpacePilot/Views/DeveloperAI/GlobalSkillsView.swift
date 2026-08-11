@@ -7,6 +7,7 @@ import SwiftUI
 struct GlobalSkillsView: View {
     let skills: [SkillRecord]
     let plugins: [PluginRecord]
+    let discoveredToolIDs: Set<String>
     let approvedProjectRoots: [ApprovedProjectRoot]
     let approvedProjectRootIssues: [ApprovedProjectRootIssue]
     let projectScanIssues: [ProjectAIAssetScanIssue]
@@ -15,11 +16,31 @@ struct GlobalSkillsView: View {
     let searchText: String
     let onAddProjectRoot: (URL) -> Void
     let onRemoveProjectRoot: (String) -> Void
+    let updateResults: [AIUpdateAssetKey: UpdateCheckResult]
+    let isCheckingUpdates: Bool
+    let updateAssets: [AIUpdateAsset]
+    let onCheckSelectedUpdates: (Set<AIUpdateAssetKey>) -> Void
+    let onUpdateSelected: (Set<AIUpdateAssetKey>) -> Void
+    let onCancelUpdateCheck: () -> Void
     @Binding var selectedGroupID: String?
-    @Binding var selection: UUID?
+    @Binding var selection: Set<UUID>
 
     private var projection: GroupedSkillsProjection {
-        GroupedSkillsProjection(skills: skills, plugins: plugins)
+        GroupedSkillsProjection(skills: skills, plugins: plugins, discoveredToolIDs: discoveredToolIDs)
+    }
+
+    private var selectedRows: [AIUpdateSelectionPlan.SelectedRow] {
+        filteredSkills
+            .filter { selection.contains($0.id) }
+            .map { AIUpdateSelectionPlan.SelectedRow(key: AIUpdateKeyBuilder.key(for: $0), displayName: $0.name) }
+    }
+
+    private var selectionPlan: AIUpdateSelectionPlan {
+        AIUpdateSelectionPlan(
+            selection: selectedRows,
+            assets: updateAssets,
+            results: updateResults
+        )
     }
 
     private var selectedGroup: AIAssetGroup? {
@@ -60,8 +81,19 @@ struct GlobalSkillsView: View {
                 HSplitView {
                     groupList
                         .frame(minWidth: 150, idealWidth: 190, maxWidth: 240)
-                    tableContent
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    VStack(spacing: 0) {
+                        AIUpdateActionBar(
+                            plan: selectionPlan,
+                            isChecking: isCheckingUpdates,
+                            onCheckSelected: { onCheckSelectedUpdates(Set(selectionPlan.checkableKeys)) },
+                            onUpdateSelected: { onUpdateSelected(Set(selectionPlan.selected.map(\.key))) },
+                            onCancel: onCancelUpdateCheck
+                        )
+                        Divider()
+                        tableContent
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
         }
@@ -73,22 +105,23 @@ struct GlobalSkillsView: View {
 
     private var groupList: some View {
         List(projection.groups, selection: $selectedGroupID) { group in
-            VStack(alignment: .leading, spacing: 3) {
-                HStack {
-                    Text(group.title)
-                        .lineLimit(1)
-                    Spacer(minLength: 8)
-                    Text(group.itemCount.formatted())
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-                Text(groupDetail(group))
+            HStack {
+                Text(groupTitle(group))
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+                Text(group.itemCount.formatted())
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .monospacedDigit()
             }
             .tag(group.id)
+        }
+    }
+
+    private func groupTitle(_ group: AIAssetGroup) -> String {
+        switch group.kind {
+        case .shared: L10n.text(.aiGroupSharedSkills)
+        case .tool, .unknown: group.title
         }
     }
 
@@ -115,12 +148,11 @@ struct GlobalSkillsView: View {
             TableColumn(L10n.text(.skill)) { skill in
                 skillNameCell(skill)
             }
-            TableColumn(L10n.space()) {
-                Text(ByteCount.string($0.allocatedSize))
-                    .monospacedDigit()
+            TableColumn(L10n.text(.aiUpdateStatus)) {
+                Text(updateStatusText(for: $0))
                     .lineLimit(1)
             }
-            .width(min: 76, ideal: 92, max: 104)
+            .width(min: 90, ideal: 110, max: 130)
         }
         .nativeTableDoubleClickReveal(urlAtRow: urlForRow)
     }
@@ -130,18 +162,24 @@ struct GlobalSkillsView: View {
             TableColumn(L10n.text(.skill)) { skill in
                 skillNameCell(skill)
             }
-            TableColumn(L10n.text(.source)) {
-                Text(verbatim: L10n.name(for: $0.scope))
+            TableColumn(L10n.text(.aiGroupScope)) {
+                Text(scopeLabel(for: $0))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
-            .width(min: 96, ideal: 120, max: 140)
+            .width(min: 96, ideal: 120, max: 160)
             TableColumn(L10n.management()) {
                 Text(verbatim: L10n.name(for: $0.managementStatus))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
             .width(min: 96, ideal: 110, max: 130)
+            TableColumn(L10n.text(.aiUpdateStatus)) {
+                Text(updateStatusText(for: $0))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            .width(min: 90, ideal: 110, max: 130)
             TableColumn(L10n.space()) {
                 Text(ByteCount.string($0.allocatedSize))
                     .monospacedDigit()
@@ -172,20 +210,20 @@ struct GlobalSkillsView: View {
         filteredSkills.indices.contains(row) ? filteredSkills[row].url : nil
     }
 
-    private func groupDetail(_ group: AIAssetGroup) -> String {
-        "\(localizedDetail(group.detail)) · \(ByteCount.string(group.allocatedSize))"
+    private func updateResult(for skill: SkillRecord) -> UpdateCheckResult? {
+        AIUpdateStatusPresentation.result(
+            for: AIUpdateKeyBuilder.key(for: skill),
+            in: updateResults,
+            isChecking: isCheckingUpdates
+        )
     }
 
-    private func localizedDetail(_ detail: String) -> String {
-        switch detail {
-        case "Global": L10n.text(.aiGroupGlobal)
-        case "Project": L10n.text(.aiGroupProject)
-        case let detail where detail.hasPrefix("Project · "):
-            L10n.text(.aiGroupProject) + String(detail.dropFirst("Project".count))
-        case "Bundled": L10n.text(.aiGroupBundled)
-        case "System": L10n.text(.aiGroupSystem)
-        default: L10n.text(.aiGroupUnknown)
-        }
+    private func updateStatusText(for skill: SkillRecord) -> String {
+        AIUpdateStatusPresentation.statusText(updateResult(for: skill))
+    }
+
+    private func scopeLabel(for skill: SkillRecord) -> String {
+        L10n.scopeDetailLabel(projection.scopeDetail(for: skill))
     }
 
     private func resolveSelection() {
@@ -199,7 +237,9 @@ struct GlobalSkillsView: View {
     }
 
     private func resolveRowSelection() {
-        if let selection, filteredSkills.contains(where: { $0.id == selection }) { return }
-        selection = filteredSkills.first?.id
+        // Keep only still-visible rows selected; a group/search change must not
+        // leave a phantom selection pointing at a filtered-out row.
+        let visible = Set(filteredSkills.map(\.id))
+        selection = selection.intersection(visible)
     }
 }

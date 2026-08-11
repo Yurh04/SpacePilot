@@ -3174,13 +3174,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "AI Apps"
+            "value": "AI Agents"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "AI 应用"
+            "value": "AI Agent"
           }
         }
       }
@@ -3206,15 +3206,87 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "AI apps"
+            "value": "AI Agents"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "AI 应用"
+            "value": "AI Agent"
           }
         }
+      }
+    },
+    "ai.agents.local": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Local Agents" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "本地 Agent" } }
+      }
+    },
+    "ai.agents.remote": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Remote Agents" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "云端 Agent" } }
+      }
+    },
+    "ai.agents.local-empty": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No local agents found" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "未发现本地 Agent" } }
+      }
+    },
+    "ai.agents.remote-empty": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No remote agents found" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "未发现云端 Agent" } }
+      }
+    },
+    "ai.agents.select": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Select an AI Agent" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "选择一个 AI Agent" } }
+      }
+    },
+    "ai.agent.storage": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Data & Storage" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "数据与储存空间" } }
+      }
+    },
+    "ai.agent.not-applicable": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Not applicable" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "不适用" } }
+      }
+    },
+    "ai.agent.module-empty": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "None detected" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "未检测到" } }
+      }
+    },
+    "ai.agent.form.app": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "App" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "应用" } }
+      }
+    },
+    "ai.agent.form.cli": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "CLI" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "命令行" } }
+      }
+    },
+    "ai.agent.form.cloud": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Cloud" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "云端" } }
+      }
+    },
+    "ai.agent.form-factors": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Form factors" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "形态" } }
       }
     },
     "ai.overview.clis": {
@@ -3345,6 +3417,22 @@
         }
       }
     },
+    "ai.cli.aliases": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aliases"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "别名"
+          }
+        }
+      }
+    },
     "ai.cli.empty": {
       "localizations": {
         "en": {
@@ -3441,6 +3529,22 @@
         }
       }
     },
+    "ai.group.scope": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scope"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "范围"
+          }
+        }
+      }
+    },
     "ai.group.select": {
       "localizations": {
         "en": {
@@ -3453,6 +3557,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "选择一个分组"
+          }
+        }
+      }
+    },
+    "ai.group.shared-plugins": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Global Plugins"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全局插件"
+          }
+        }
+      }
+    },
+    "ai.group.shared-skills": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Global Skills"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全局 Skill"
           }
         }
       }
@@ -3933,6 +4069,790 @@
           "stringUnit": {
             "state": "translated",
             "value": "共享"
+          }
+        }
+      }
+    },
+    "ai.update.cancel": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel Check"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取消检查"
+          }
+        }
+      }
+    },
+    "ai.update.check-now": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check for Updates"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "检查更新"
+          }
+        }
+      }
+    },
+    "ai.update.check-selected": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check Selected for Updates"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "检查所选更新"
+          }
+        }
+      }
+    },
+    "ai.update.deferred": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manual updates arrive in a later step."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "手动更新将在后续步骤中提供。"
+          }
+        }
+      }
+    },
+    "ai.update.evidence.application": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Application bundle"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "应用程序包"
+          }
+        }
+      }
+    },
+    "ai.update.evidence.cli": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CLI probe"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CLI 探测"
+          }
+        }
+      }
+    },
+    "ai.update.evidence.conflict": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Version conflict"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "版本冲突"
+          }
+        }
+      }
+    },
+    "ai.update.evidence.package": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Package receipt"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "包收据"
+          }
+        }
+      }
+    },
+    "ai.update.evidence.plugin": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plugin manifest"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "插件清单"
+          }
+        }
+      }
+    },
+    "ai.update.evidence.skill": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skill manifest"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skill 清单"
+          }
+        }
+      }
+    },
+    "ai.update.evidence.unknown": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No trusted version"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有可信版本"
+          }
+        }
+      }
+    },
+    "ai.update.latest": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Latest"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最新"
+          }
+        }
+      }
+    },
+    "ai.update.plan.supported": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready to check"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可检查"
+          }
+        }
+      }
+    },
+    "ai.update.plan.unsupported": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No update source"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无更新来源"
+          }
+        }
+      }
+    },
+    "ai.update.read-only-footer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update checks are read-only. SpacePilot never installs or modifies AI tools in this step."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更新检查是只读操作。此步骤中 SpacePilot 不会安装或修改 AI 工具。"
+          }
+        }
+      }
+    },
+    "ai.update.section": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Updates"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更新"
+          }
+        }
+      }
+    },
+    "ai.update.status": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更新"
+          }
+        }
+      }
+    },
+    "ai.update.status.available": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update available"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有可用更新"
+          }
+        }
+      }
+    },
+    "ai.update.status.checking": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在检查…"
+          }
+        }
+      }
+    },
+    "ai.update.status.failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check failed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "检查失败"
+          }
+        }
+      }
+    },
+    "ai.update.status.unknown": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unknown"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未知"
+          }
+        }
+      }
+    },
+    "ai.update.status.unsupported": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unsupported"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不支持"
+          }
+        }
+      }
+    },
+    "ai.update.status.up-to-date": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Up to date"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已是最新"
+          }
+        }
+      }
+    },
+    "ai.update.summary.available": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Available updates"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可用更新"
+          }
+        }
+      }
+    },
+    "ai.update.summary.failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Failed checks"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "检查失败"
+          }
+        }
+      }
+    },
+    "ai.update.summary.unknown": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unknown"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未知"
+          }
+        }
+      }
+    },
+    "ai.update.summary.unsupported": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unsupported"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不支持"
+          }
+        }
+      }
+    },
+    "ai.update.summary.up-to-date": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Up to date"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已是最新"
+          }
+        }
+      }
+    },
+    "ai.update.update-selected": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update Selected…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更新所选…"
+          }
+        }
+      }
+    },
+    "ai.update.confirm.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update Selected Tools"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更新所选工具"
+          }
+        }
+      }
+    },
+    "ai.update.confirm.executable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Will update"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将更新"
+          }
+        }
+      }
+    },
+    "ai.update.confirm.skipped": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cannot update"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法更新"
+          }
+        }
+      }
+    },
+    "ai.update.confirm.button": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirm Update"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "确认更新"
+          }
+        }
+      }
+    },
+    "ai.update.confirm.close": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭"
+          }
+        }
+      }
+    },
+    "ai.update.confirm.warning": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Package managers may run each package's own install scripts. SpacePilot runs a fixed command per tool and never uses a shell."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "包管理器可能会运行每个包自身的安装脚本。SpacePilot 对每个工具仅运行固定命令，绝不使用 shell。"
+          }
+        }
+      }
+    },
+    "ai.update.confirm.via": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "via"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通过"
+          }
+        }
+      }
+    },
+    "ai.update.confirm.running": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Updating…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在更新…"
+          }
+        }
+      }
+    },
+    "ai.update.skip.unsupported": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No trusted update source"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无可信更新来源"
+          }
+        }
+      }
+    },
+    "ai.update.skip.check-only": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check only — no automatic update"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅可检查 — 不支持自动更新"
+          }
+        }
+      }
+    },
+    "ai.update.skip.not-checked": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not checked yet"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚未检查"
+          }
+        }
+      }
+    },
+    "ai.update.skip.already-latest": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Already up to date"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已是最新"
+          }
+        }
+      }
+    },
+    "ai.update.skip.no-target": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No target version"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无目标版本"
+          }
+        }
+      }
+    },
+    "ai.update.skip.invalid-target": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invalid target version"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目标版本无效"
+          }
+        }
+      }
+    },
+    "ai.update.outcome.succeeded": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Updated"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已更新"
+          }
+        }
+      }
+    },
+    "ai.update.outcome.manager-unavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manager unavailable"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "管理器不可用"
+          }
+        }
+      }
+    },
+    "ai.update.outcome.failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Failed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "失败"
+          }
+        }
+      }
+    },
+    "ai.update.outcome.timed-out": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Timed out"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "超时"
+          }
+        }
+      }
+    },
+    "ai.update.outcome.cancelled": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancelled"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已取消"
+          }
+        }
+      }
+    },
+    "ai.update.outcome.version-mismatch": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Version mismatch"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "版本不匹配"
           }
         }
       }
