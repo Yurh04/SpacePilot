@@ -76,7 +76,7 @@ struct ApplicationsView: View {
                     uninstall: uninstall,
                     reset: reset
                 )
-                .frame(width: 280)
+                .frame(minWidth: 220, idealWidth: 280, maxWidth: 280)
 
                 if let application = selectedApplication(in: applications) {
                     ApplicationDetail(
@@ -86,14 +86,14 @@ struct ApplicationsView: View {
                         uninstall: { uninstall(application) },
                         reset: { reset(application) }
                     )
-                    .frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ContentUnavailableView(
                         L10n.text(.application),
                         systemImage: "square.grid.2x2",
                         description: Text(L10n.text(.applicationOnlyHighConfidence))
                     )
-                    .frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
             .navigationTitle(L10n.applications())
@@ -327,22 +327,14 @@ private struct ApplicationDetail: View {
 
             Divider()
 
-            HStack(spacing: 12) {
-                ApplicationMetric(
-                    title: L10n.text(.applicationTotalSpace),
-                    value: ByteCount.string(projection.totalSize),
-                    systemImage: "internaldrive"
-                )
-                ApplicationMetric(
-                    title: L10n.text(.application),
-                    value: ByteCount.string(application.allocatedSize),
-                    systemImage: "app"
-                )
-                ApplicationMetric(
-                    title: L10n.text(.applicationRelated),
-                    value: projection.associations.count.formatted(),
-                    systemImage: "link"
-                )
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    metricViews(minimumWidth: 110)
+                }
+
+                VStack(spacing: 8) {
+                    metricViews()
+                }
             }
             .padding(16)
 
@@ -426,6 +418,28 @@ private struct ApplicationDetail: View {
                 }
             }
         )
+    }
+
+    @ViewBuilder
+    private func metricViews(minimumWidth: CGFloat? = nil) -> some View {
+        ApplicationMetric(
+            title: L10n.text(.applicationTotalSpace),
+            value: ByteCount.string(projection.totalSize),
+            systemImage: "internaldrive"
+        )
+        .frame(minWidth: minimumWidth)
+        ApplicationMetric(
+            title: L10n.text(.application),
+            value: ByteCount.string(application.allocatedSize),
+            systemImage: "app"
+        )
+        .frame(minWidth: minimumWidth)
+        ApplicationMetric(
+            title: L10n.text(.applicationRelated),
+            value: projection.associations.count.formatted(),
+            systemImage: "link"
+        )
+        .frame(minWidth: minimumWidth)
     }
 
 }

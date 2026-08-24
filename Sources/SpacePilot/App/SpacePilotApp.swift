@@ -8,8 +8,7 @@ struct SpacePilotApp: App {
 
     var body: some Scene {
         WindowGroup {
-            AppRootView(model: model)
-                .frame(minWidth: 1_000, minHeight: 680)
+            AppWindowContent(model: model)
 #if DEBUG
                 .preferredColorScheme(
                     ProcessInfo.processInfo.environment["SPACEPILOT_FORCE_DARK"] == "1" ? .dark : nil
@@ -21,6 +20,14 @@ struct SpacePilotApp: App {
         Settings {
             SettingsView(model: model)
         }
+    }
+}
+
+struct AppWindowContent: View {
+    @Bindable var model: AppModel
+
+    var body: some View {
+        AppRootView(model: model)
     }
 }
 

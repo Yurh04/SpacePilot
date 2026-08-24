@@ -29,8 +29,9 @@ final class StorageWorkbenchArchitectureTests: XCTestCase {
         let source = try storageViewSource()
 
         XCTAssertTrue(source.contains(
-            ".frame(minWidth: 190, idealWidth: 220, maxWidth: 250)"
+            ".frame(minWidth: 160, idealWidth: 220, maxWidth: 250)"
         ))
+        XCTAssertTrue(source.contains(".frame(minWidth: 0)"))
         XCTAssertTrue(source.contains("ViewThatFits(in: .horizontal)"))
         XCTAssertTrue(source.contains(".width(min: 120, ideal: 180)"))
         XCTAssertTrue(source.contains(".width(min: 80, ideal: 95)"))

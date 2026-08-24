@@ -19,10 +19,10 @@ struct StorageView: View {
 
                 HSplitView {
                     categoryBrowser(projection)
-                        .frame(minWidth: 190, idealWidth: 220, maxWidth: 250)
+                        .frame(minWidth: 160, idealWidth: 220, maxWidth: 250)
 
                     itemsWorkspace(projection)
-                        .frame(minWidth: 420)
+                        .frame(minWidth: 0)
                 }
             }
             .onChange(of: categorySelection) {

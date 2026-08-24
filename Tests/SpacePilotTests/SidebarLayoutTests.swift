@@ -9,9 +9,10 @@ final class SidebarLayoutTests: XCTestCase {
             encoding: .utf8
         )
 
+        XCTAssertTrue(source.contains("private static let minimumWidth: CGFloat = 160"))
         XCTAssertTrue(source.contains("private static let stableWidth: CGFloat = 220"))
-        XCTAssertTrue(source.contains(".frame(width: Self.stableWidth)"))
-        XCTAssertTrue(source.contains("min: Self.stableWidth"))
+        XCTAssertFalse(source.contains(".frame(width: Self.stableWidth)"))
+        XCTAssertTrue(source.contains("min: Self.minimumWidth"))
         XCTAssertTrue(source.contains("ideal: Self.stableWidth"))
         XCTAssertTrue(source.contains("max: Self.stableWidth"))
     }

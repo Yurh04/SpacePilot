@@ -448,7 +448,7 @@ public extension ApplicationAssociationKnowledgeBase {
     /// Built-in version 1 examples. All results are deliberately inspect-only.
     static let builtInV1 = ApplicationAssociationKnowledgeBase(
         schemaVersion: 1,
-        contentVersion: "1.3.0",
+        contentVersion: "1.4.0",
         rules: [
             ApplicationAssociationKnowledgeRule(
                 id: "product.openai.chatgpt-codex.v1",
@@ -469,6 +469,31 @@ public extension ApplicationAssociationKnowledgeBase {
                         template: "Library/Application Support/OpenAI/Codex",
                         category: .application,
                         risk: .sensitive,
+                        confidence: .high,
+                        ownership: .owned
+                    )
+                ]
+            ),
+            ApplicationAssociationKnowledgeRule(
+                id: "product.bytedance.doubao-data.v1",
+                match: ApplicationAssociationKnowledgeMatch(
+                    bundleIdentifiers: ["com.bot.pc.doubao"],
+                    teamIdentifiers: ["96L78H6LMH"]
+                ),
+                paths: [
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: "Library/Application Support/Doubao",
+                        category: .application,
+                        risk: .sensitive,
+                        confidence: .high,
+                        ownership: .owned
+                    ),
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: "Library/Caches/Doubao",
+                        category: .cache,
+                        risk: .rebuildable,
                         confidence: .high,
                         ownership: .owned
                     )

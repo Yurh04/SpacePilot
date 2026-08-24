@@ -337,6 +337,78 @@ final class ApplicationDetailAnalyzerTests: XCTestCase {
         XCTAssertEqual(association.confidence, .medium)
         XCTAssertEqual(association.ownership, .shared)
     }
+
+    func testHigherConfidenceKnowledgeRuleReplacesSameStandardPath()
+        async throws
+    {
+        let home = try TemporaryTree(files: [
+            "Library/Application Support/Doubao/state.db": 31
+        ])
+        let built = try TestAppBuilder.make(
+            name: "Doubao",
+            bundleID: "com.bot.pc.doubao",
+            version: "1.0",
+            executableBytes: 16
+        )
+        let application = ApplicationRecord(
+            name: "Doubao",
+            bundleIdentifier: "com.bot.pc.doubao",
+            version: "1.0",
+            url: built.appURL,
+            executableURL: nil,
+            allocatedSize: 16
+        )
+        let knowledgeBase = ApplicationAssociationKnowledgeBase(
+            schemaVersion: 1,
+            contentVersion: "test",
+            rules: [
+                ApplicationAssociationKnowledgeRule(
+                    id: "doubao.v1",
+                    match: ApplicationAssociationKnowledgeMatch(
+                        bundleIdentifiers: ["com.bot.pc.doubao"]
+                    ),
+                    paths: [
+                        ApplicationAssociationPathRule(
+                            scope: .homeDirectory,
+                            template: "Library/Application Support/Doubao",
+                            category: .application,
+                            risk: .sensitive,
+                            confidence: .high,
+                            ownership: .owned
+                        )
+                    ]
+                )
+            ]
+        )
+        let analyzer = ApplicationDetailAnalyzer(
+            spotlightFinder: SpotlightApplicationCandidateFinder(
+                query: FixedSpotlightCandidateQuery(urls: [])
+            ),
+            knowledgeBase: knowledgeBase
+        )
+
+        let result = try await analyzer.analyze(
+            application: application,
+            homeDirectory: home.url
+        )
+        let expectedPath = home.url.appending(
+            path: "Library/Application Support/Doubao",
+            directoryHint: .isDirectory
+        ).standardizedFileURL
+        let matchingItems = result.items.filter {
+            $0.url.standardizedFileURL == expectedPath
+        }
+        let item = try XCTUnwrap(matchingItems.first)
+        let association = try XCTUnwrap(result.associations.first {
+            $0.itemID == item.id
+        })
+
+        XCTAssertEqual(matchingItems.count, 1)
+        XCTAssertEqual(item.risk, .sensitive)
+        XCTAssertEqual(association.evidence, .knownRule)
+        XCTAssertEqual(association.confidence, .high)
+        XCTAssertEqual(association.ownership, .owned)
+    }
 }
 
 private struct FixedSpotlightCandidateQuery:

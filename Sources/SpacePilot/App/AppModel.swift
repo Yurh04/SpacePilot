@@ -762,7 +762,6 @@ final class AppModel {
 
     private func apply(snapshot: ScanSnapshot) {
         latestSnapshot = snapshot
-        projection = nil
         cancelAIQueryProjection()
         projectionPublicationTask?.cancel()
         projectionWorker?.cancel()

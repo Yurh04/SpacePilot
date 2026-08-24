@@ -63,4 +63,14 @@ swift test
 
 发布检查会生成 `dist/SpacePilot.app` 和 `dist/SpacePilot.zip`，使用本机 ad-hoc Hardened Runtime 签名，仅用于开发和测试。通过网站、Homebrew Cask 或其他渠道公开分发时，不必上架 Mac App Store，但需要使用所有者的 Apple Developer 账号完成 Developer ID 签名和 Apple 公证。
 
-产品规格位于 `docs/superpowers/specs/2026-07-22-spacepilot-design.md`，实施计划位于 `docs/superpowers/plans/2026-07-22-spacepilot-implementation.md`。
+## 项目文档
+
+- `AGENTS.md`：新开发者和新 Agent 的低成本入口与工作约束。
+- `docs/PROJECT_STATUS.md`：当前阶段、已实现内容、缺口与下一步。
+- `docs/FEATURE_MATRIX.md`：功能完成度矩阵。
+- `docs/ARCHITECTURE.md`：系统边界、数据流与并发模型。
+- `docs/CODE_MAP.md`：按任务定位源码与测试，避免全仓库阅读。
+- `docs/DECISIONS.md`：隐私、安全、扫描、AI 资产和分发决策。
+- `docs/CURRENT_WORK.md`：当前工作和跨 Agent 交接记录。
+
+`docs/superpowers/` 下的规格与实施计划保留为历史设计资料，不作为当前开发进度的唯一依据。

@@ -112,13 +112,41 @@ public struct ApplicationDetailAnalyzer: Sendable {
         let knowledgeURLs = knowledgeCandidates.map {
             $0.url.standardizedFileURL.resolvingSymlinksInPath()
         }
+        let knowledgeConfidenceByPath = knowledgeCandidates.reduce(
+            into: [String: AssociationConfidence]()
+        ) { result, candidate in
+            let path = candidate.url.standardizedFileURL
+                .resolvingSymlinksInPath().path
+            result[path] = max(
+                result[path] ?? .low,
+                candidate.confidence
+            )
+        }
+        let standardConfidenceByItemID = unresolvedStandardAssociations.reduce(
+            into: [UUID: AssociationConfidence]()
+        ) { result, association in
+            result[association.itemID] = max(
+                result[association.itemID] ?? .low,
+                association.confidence
+            )
+        }
         let supersededStandardItemIDs = Set(
             unresolvedStandardItems.compactMap { item -> UUID? in
                 let itemURL = item.url.standardizedFileURL
                     .resolvingSymlinksInPath()
-                return knowledgeURLs.contains(where: {
+                if knowledgeURLs.contains(where: {
                     Self.isStrictDescendant(itemURL, of: $0)
-                }) ? item.id : nil
+                }) {
+                    return item.id
+                }
+                guard let knowledgeConfidence = knowledgeConfidenceByPath[
+                    itemURL.path
+                ], let standardConfidence = standardConfidenceByItemID[
+                    item.id
+                ], knowledgeConfidence > standardConfidence else {
+                    return nil
+                }
+                return item.id
             }
         )
         let standardItems = unresolvedStandardItems.filter {

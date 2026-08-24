@@ -11,8 +11,8 @@ final class ApplicationAssociationKnowledgeBaseTests: XCTestCase {
 
         XCTAssertEqual(decoded, original)
         XCTAssertEqual(decoded.schemaVersion, 1)
-        XCTAssertEqual(decoded.contentVersion, "1.3.0")
-        XCTAssertEqual(decoded.rules.count, 16)
+        XCTAssertEqual(decoded.contentVersion, "1.4.0")
+        XCTAssertEqual(decoded.rules.count, 17)
     }
 
     func testMatchesExactBundleAndTeamIdentifiers() throws {
@@ -472,6 +472,71 @@ final class ApplicationAssociationKnowledgeBaseTests: XCTestCase {
         XCTAssertEqual(claude.risk, .sensitive)
         XCTAssertEqual(claude.confidence, .high)
         XCTAssertEqual(claude.ownership, .shared)
+    }
+
+    func testBuiltInDoubaoRuleMatchesOnlyExactMainBundleIdentifier() throws {
+        let fixture = try Fixture()
+        let doubao = try ApplicationAssociationKnowledgeBase.builtInV1
+            .candidates(
+                for: fixture.context(
+                    bundleIdentifier: "com.bot.pc.doubao",
+                    teamIdentifier: "96L78H6LMH"
+                ),
+                homeDirectory: fixture.home
+            )
+            .filter { $0.ruleID == "product.bytedance.doubao-data.v1" }
+
+        XCTAssertEqual(
+            Set(doubao.map(\.url.path)),
+            [
+                fixture.home.appending(
+                    path: "Library/Application Support/Doubao"
+                ).path,
+                fixture.home.appending(path: "Library/Caches/Doubao").path
+            ]
+        )
+        XCTAssertEqual(doubao.count, 2)
+        XCTAssertTrue(doubao.allSatisfy {
+            $0.confidence == .high
+                && $0.ownership == .owned
+                && $0.disposition == .inspectOnly
+        })
+        XCTAssertEqual(
+            doubao.first {
+                $0.url.path.hasSuffix("Library/Application Support/Doubao")
+            }?.risk,
+            .sensitive
+        )
+        XCTAssertEqual(
+            doubao.first {
+                $0.url.path.hasSuffix("Library/Caches/Doubao")
+            }?.risk,
+            .rebuildable
+        )
+
+        let lookalike = try ApplicationAssociationKnowledgeBase.builtInV1
+            .candidates(
+                for: fixture.context(
+                    bundleIdentifier: "com.bot.pc.doubao.preview",
+                    teamIdentifier: "96L78H6LMH"
+                ),
+                homeDirectory: fixture.home
+            )
+        XCTAssertFalse(lookalike.contains {
+            $0.ruleID == "product.bytedance.doubao-data.v1"
+        })
+
+        let wrongTeam = try ApplicationAssociationKnowledgeBase.builtInV1
+            .candidates(
+                for: fixture.context(
+                    bundleIdentifier: "com.bot.pc.doubao",
+                    teamIdentifier: "OTHERTEAM"
+                ),
+                homeDirectory: fixture.home
+            )
+        XCTAssertFalse(wrongTeam.contains {
+            $0.ruleID == "product.bytedance.doubao-data.v1"
+        })
     }
 
     private func knowledgeBase(
