@@ -25,6 +25,12 @@ final class StorageWorkbenchArchitectureTests: XCTestCase {
         ))
     }
 
+    func testStorageTableNameColumnShowsTheSystemFileIcon() throws {
+        let source = try storageViewSource()
+
+        XCTAssertTrue(source.contains("FileSystemItemIcon(url: item.url)"))
+    }
+
     func testStorageWorkbenchFitsTheMinimumSupportedWindowWidth() throws {
         let source = try storageViewSource()
 

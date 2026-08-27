@@ -124,18 +124,21 @@ struct StorageView: View {
                         ? L10n.text(.storageLargestItems)
                         : L10n.text(.storageOldItems)
                     ) { item in
-                        Text(item.url.lastPathComponent)
-                            .lineLimit(1)
-                            .contextMenu {
-                                Button(L10n.text(.revealFinder)) {
-                                    FinderReveal.reveal(item.url)
-                                }
-                                if item.risk == .safe {
-                                    Button(L10n.text(.cleanupReview)) {
-                                        reviewCleanup([item])
-                                    }
+                        HStack(spacing: 8) {
+                            FileSystemItemIcon(url: item.url)
+                            Text(item.url.lastPathComponent)
+                                .lineLimit(1)
+                        }
+                        .contextMenu {
+                            Button(L10n.text(.revealFinder)) {
+                                FinderReveal.reveal(item.url)
+                            }
+                            if item.risk == .safe {
+                                Button(L10n.text(.cleanupReview)) {
+                                    reviewCleanup([item])
                                 }
                             }
+                        }
                     }
                     .width(min: 120, ideal: 180)
                     TableColumn(L10n.location()) { item in

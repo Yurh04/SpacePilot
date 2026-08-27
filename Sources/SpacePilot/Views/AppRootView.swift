@@ -47,8 +47,12 @@ struct AppRootView: View {
             OverviewView(
                 projection: model.projection?.overview,
                 hasSnapshot: model.latestSnapshot != nil,
+                latestCleanup: model.cleanupHistory.first,
                 startScan: { model.startScan(scope: .full) },
-                reviewCleanup: model.prepareCleanup
+                reviewCleanup: model.prepareCleanup,
+                openStorage: { model.selection = .storage },
+                openApplications: { model.selection = .applications },
+                openHistory: { model.selection = .history }
             )
         case .storage:
             StorageView(

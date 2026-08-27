@@ -7,8 +7,9 @@ final class OverviewChartArchitectureTests: XCTestCase {
 
         XCTAssertTrue(source.contains("DiskCapacityChart("))
         XCTAssertTrue(source.contains("AnalyzedCategoryChart("))
-        XCTAssertTrue(source.contains("ViewThatFits(in: .horizontal)"))
-        XCTAssertTrue(source.contains("minWidth: 900"))
+        XCTAssertTrue(source.contains("GridItem(.adaptive(minimum: 300)"))
+        XCTAssertFalse(source.contains(".frame(minWidth: 720)"))
+        XCTAssertFalse(source.contains(".frame(minWidth: 900)"))
     }
 
     func testOverviewOnlyRendersWholeDiskChartWhenCapacityIsProven() throws {
@@ -83,14 +84,14 @@ final class OverviewChartArchitectureTests: XCTestCase {
         XCTAssertTrue(source.contains(".accessibilityRepresentation"))
     }
 
-    func testRecommendationsRemainAfterTheChartSection() throws {
+    func testRecommendationsAppearBeforeTheSecondaryChartSection() throws {
         let source = try source(at: "Sources/SpacePilot/Views/Overview/OverviewView.swift")
-        let chart = try XCTUnwrap(source.range(of: "ViewThatFits(in: .horizontal)"))
-        let recommendations = try XCTUnwrap(
-            source.range(of: "Section(L10n.text(.overviewSafeRecommendations))")
+        let recommendations = try XCTUnwrap(source.range(of: "cleanupOpportunities(projection)"))
+        let charts = try XCTUnwrap(
+            source.range(of: "spaceDetails(projection)")
         )
 
-        XCTAssertLessThan(chart.lowerBound, recommendations.lowerBound)
+        XCTAssertLessThan(recommendations.lowerBound, charts.lowerBound)
     }
 
     private func source(at relativePath: String) throws -> String {

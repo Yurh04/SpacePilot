@@ -79,9 +79,23 @@ enum L10n {
         static let overviewLimitedCoverage = Self(key: "overview.limited-coverage", english: "Limited coverage")
         static let overviewLimitedCoverageDescription = Self(key: "overview.limited-coverage-description", english: "Some folders could not be read. Results show only verified data.")
         static let overviewNoRecommendations = Self(key: "overview.no-recommendations", english: "No safe cleanup recommendations yet.")
+        static let overviewQuickActions = Self(key: "overview.quick-actions", english: "Quick actions")
+        static let overviewRecentCleanup = Self(key: "overview.recent-cleanup", english: "Recent cleanup")
+        static let overviewRescan = Self(key: "overview.rescan", english: "Rescan")
+        static let overviewReviewSafeCleanup = Self(key: "overview.review-safe-cleanup", english: "Review safe cleanup")
         static let overviewSafeRecommendations = Self(key: "overview.safe-recommendations", english: "Safe recommendations")
+        static let overviewSpaceDetails = Self(key: "overview.space-details", english: "Space details")
         static let overviewStartScan = Self(key: "overview.start-scan", english: "Start Scan")
+        static let overviewStatusAttention = Self(key: "overview.status-attention", english: "Storage is getting tight")
+        static let overviewStatusCritical = Self(key: "overview.status-critical", english: "Storage is critically low")
+        static let overviewStatusHealthy = Self(key: "overview.status-healthy", english: "Storage looks healthy")
+        static let overviewStatusUnknown = Self(key: "overview.status-unknown", english: "Disk status unavailable")
+        static let overviewStorageStatus = Self(key: "overview.storage-status", english: "Storage status")
         static let overviewStorageGlance = Self(key: "overview.storage-glance", english: "Storage at a glance")
+        static let overviewTopOpportunities = Self(key: "overview.top-opportunities", english: "Top cleanup opportunities")
+        static let overviewViewApplications = Self(key: "overview.view-applications", english: "View application storage")
+        static let overviewViewHistory = Self(key: "overview.view-history", english: "View history")
+        static let overviewViewLargestItems = Self(key: "overview.view-largest-items", english: "View largest items")
         static let overviewWorksLocally = Self(key: "overview.works-locally", english: "SpacePilot works locally and indexes metadata only.")
         static let pluginDiagnosticEmptySkill = Self(key: "plugins.diagnostic-empty-skill", english: "A Plugin skill declaration was rejected or empty.")
         static let pluginDiagnosticGeneric = Self(key: "plugins.diagnostic-generic", english: "Plugin discovery reported an issue.")
@@ -153,7 +167,12 @@ enum L10n {
         "overview.disk-capacity-chart", "overview.disk-capacity-unavailable-description",
         "overview.disk-total", "overview.disk-used", "overview.internal-disk-used", "overview.limited-coverage",
         "overview.limited-coverage-description", "overview.no-recommendations", "overview.review-cleanup",
-        "overview.safe-recommendations", "overview.start-scan", "overview.storage-glance",
+        "overview.quick-actions", "overview.recent-cleanup", "overview.rescan",
+        "overview.review-safe-cleanup", "overview.safe-recommendations", "overview.space-details",
+        "overview.start-scan", "overview.status-attention", "overview.status-critical",
+        "overview.status-healthy", "overview.status-unknown", "overview.storage-status", "overview.storage-glance",
+        "overview.top-opportunities", "overview.view-applications", "overview.view-history",
+        "overview.view-largest-items",
         "overview.works-locally", "plugins.diagnostic-empty-skill", "plugins.diagnostic-generic",
         "plugins.diagnostic-invalid-manifest", "plugins.diagnostic-missing-manifest",
         "plugins.diagnostic-path-inaccessible",

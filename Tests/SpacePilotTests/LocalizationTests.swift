@@ -202,7 +202,21 @@ final class LocalizationTests: XCTestCase {
             "overview.disk-capacity-unavailable-description": (
                 "Whole-disk capacity is unavailable. Only locally analyzed data is shown.",
                 "无法获取整个磁盘的容量。当前仅显示本地已分析的数据。"
-            )
+            ),
+            "overview.storage-status": ("Storage status", "储存状态"),
+            "overview.status-healthy": ("Storage looks healthy", "储存空间充足"),
+            "overview.status-attention": ("Storage is getting tight", "储存空间需要注意"),
+            "overview.status-critical": ("Storage is critically low", "储存空间严重不足"),
+            "overview.status-unknown": ("Disk status unavailable", "无法判断磁盘状态"),
+            "overview.quick-actions": ("Quick actions", "快捷操作"),
+            "overview.review-safe-cleanup": ("Review safe cleanup", "检查安全清理"),
+            "overview.view-largest-items": ("View largest items", "查看最大项目"),
+            "overview.view-applications": ("View application storage", "查看应用占用"),
+            "overview.rescan": ("Rescan", "重新扫描"),
+            "overview.top-opportunities": ("Top cleanup opportunities", "优先清理建议"),
+            "overview.space-details": ("Space details", "空间详情"),
+            "overview.recent-cleanup": ("Recent cleanup", "最近清理"),
+            "overview.view-history": ("View history", "查看历史")
         ]
 
         for (key, values) in expected {
@@ -270,7 +284,7 @@ final class LocalizationTests: XCTestCase {
         let english = try stringsTable(at: resources.appending(path: "en.lproj/Localizable.strings"))
         let chinese = try stringsTable(at: resources.appending(path: "zh-Hans.lproj/Localizable.strings"))
 
-        XCTAssertEqual(L10n.allKeys.count, 220)
+        XCTAssertEqual(L10n.allKeys.count, 234)
         XCTAssertEqual(Set(catalogStrings.keys), L10n.allKeys)
         XCTAssertEqual(Set(english.keys), L10n.allKeys)
         XCTAssertEqual(Set(chinese.keys), L10n.allKeys)

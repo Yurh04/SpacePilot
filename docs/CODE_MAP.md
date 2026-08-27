@@ -24,7 +24,7 @@
 | SQLite 快照、索引和统计 | `Sources/SpacePilotCore/Persistence/SQLiteIndexStore.swift`、`IndexSchema.swift` | `SQLiteIndexStoreTests.swift` |
 | 快照和所有权核心模型 | `Models/ScanSnapshot.swift`、`ScannedItem.swift`、`StorageIntelligence.swift` | `ModelAggregationTests.swift` |
 | 界面投影和数量限制 | `Models/AppSnapshotProjection.swift`、`ViewProjections.swift` | `ViewProjectionTests.swift` |
-| 概览和储存界面 | `Views/Overview/`、`Views/Storage/StorageView.swift` | 对应界面架构测试 |
+| 概览和储存界面 | `Views/Overview/`、`Views/Storage/StorageView.swift` | `OverviewDashboardStateTests.swift`、`OverviewChartArchitectureTests.swift`、储存界面架构测试 |
 
 ## 应用程序
 

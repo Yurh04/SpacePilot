@@ -3520,6 +3520,90 @@
           }
         }
       }
+    },
+    "overview.quick-actions": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Quick actions" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "快捷操作" } }
+      }
+    },
+    "overview.recent-cleanup": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Recent cleanup" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "最近清理" } }
+      }
+    },
+    "overview.rescan": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Rescan" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "重新扫描" } }
+      }
+    },
+    "overview.review-safe-cleanup": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Review safe cleanup" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "检查安全清理" } }
+      }
+    },
+    "overview.space-details": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Space details" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "空间详情" } }
+      }
+    },
+    "overview.status-attention": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Storage is getting tight" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "储存空间需要注意" } }
+      }
+    },
+    "overview.status-critical": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Storage is critically low" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "储存空间严重不足" } }
+      }
+    },
+    "overview.status-healthy": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Storage looks healthy" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "储存空间充足" } }
+      }
+    },
+    "overview.status-unknown": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Disk status unavailable" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "无法判断磁盘状态" } }
+      }
+    },
+    "overview.storage-status": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Storage status" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "储存状态" } }
+      }
+    },
+    "overview.top-opportunities": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Top cleanup opportunities" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "优先清理建议" } }
+      }
+    },
+    "overview.view-applications": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "View application storage" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "查看应用占用" } }
+      }
+    },
+    "overview.view-history": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "View history" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "查看历史" } }
+      }
+    },
+    "overview.view-largest-items": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "View largest items" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "查看最大项目" } }
+      }
     }
   },
   "version": "1.0"

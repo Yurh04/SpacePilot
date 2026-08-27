@@ -5,6 +5,10 @@ import SwiftUI
 struct AnalyzedCategoryChart: View {
     let categories: [StorageCategorySummary]
 
+    static func axisLabel(for bytes: Int64) -> String {
+        ByteCount.string(max(0, bytes))
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(verbatim: L10n.text(.overviewAnalyzedCategoriesChart))
@@ -31,6 +35,17 @@ struct AnalyzedCategoryChart: View {
                         y: .value(L10n.text(.category), L10n.name(for: summary.category))
                     )
                     .foregroundStyle(Color.accentColor)
+                }
+                .chartXAxis {
+                    AxisMarks { value in
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel {
+                            if let bytes = value.as(Int64.self) {
+                                Text(verbatim: Self.axisLabel(for: bytes))
+                            }
+                        }
+                    }
                 }
                 .frame(height: 220)
                 .accessibilityRepresentation {
