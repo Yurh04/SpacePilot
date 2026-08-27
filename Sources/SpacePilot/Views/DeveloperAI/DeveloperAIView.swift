@@ -21,15 +21,57 @@ struct DeveloperAIView: View {
     // subviews) so switching sections never resets a page's selection when
     // SwiftUI destroys/recreates the conditional child subtree.
     @State private var selectedAIEntryID: String?
-    @State private var selectedSkillID: UUID?
-    @State private var selectedPluginID: UUID?
-    @State private var selectedCLIID: String?
+    @State private var selectedSkillGroupID: String?
+    @State private var selectedSkillID: Set<UUID> = []
+    @State private var selectedPluginGroupID: String?
+    @State private var selectedPluginID: Set<UUID> = []
+    @State private var selectedCLIID: Set<String> = []
 
-    private var registryOnlyApplications: [AIApplicationJoin.RegistryOnlyApplication] {
-        guard let projection else { return [] }
-        return AIApplicationJoin.registryOnlyApplications(
-            deepApplications: projection.applications.map(\.application),
-            registryApplications: model.aiManagementProjection.applications
+    /// The unified Agent projection: every piece of evidence sharing a
+    /// `definitionID` collapses into one Agent, split by fixed locality.
+    private var agentProjection: AIAgentProjection {
+        AIAgentProjection(records: model.aiManagementProjection.records)
+    }
+
+    /// Skills/plugins fed to the per-Agent detail modules. The detail projection
+    /// keeps only assets owned by the selected Agent's definition, so passing the
+    /// full discovered set (global + project) is safe and never leaks shared or
+    /// other-Agent assets into a given Agent's module.
+    private func agentSkills(_ projection: DeveloperAIProjection) -> [SkillRecord] {
+        projection.allSkills + model.projectAIAssetSkills
+    }
+
+    private func agentPlugins(_ projection: DeveloperAIProjection) -> [PluginRecord] {
+        projection.allPlugins + model.projectAIAssetPlugins
+    }
+
+    /// Allocated sizes keyed by each Agent data/config root's canonical path,
+    /// aggregated from the snapshot items already in memory. Computed once here
+    /// (not per row) and shared across every Agent's Data & Storage module. No
+    /// file-system access happens: `AIAgentDetailProjection.storageSizes` is a
+    /// pure bucketing over items the scan already produced.
+    private var agentStorageSizesByPath: [String: Int64] {
+        let items = model.latestSnapshot?.items ?? []
+        guard !items.isEmpty else { return [:] }
+        let agents = agentProjection.localAgents + agentProjection.remoteAgents
+        var merged: [String: Int64] = [:]
+        for agent in agents {
+            for (path, size) in AIAgentDetailProjection.storageSizes(items: items, forAgent: agent) {
+                merged[path] = size
+            }
+        }
+        return merged
+    }
+
+    /// Drives the confirmation sheet from the model's pending plan. Dismissing
+    /// the sheet routes through `cancelAIUpdateExecution` so it has zero side
+    /// effects when nothing is executing.
+    private var updateSheetBinding: Binding<Bool> {
+        Binding(
+            get: { model.pendingUpdatePlan != nil },
+            set: { presented in
+                if !presented { model.cancelAIUpdateExecution() }
+            }
         )
     }
 
@@ -48,6 +90,18 @@ struct DeveloperAIView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .navigationTitle(L10n.developerAI())
+            .sheet(isPresented: updateSheetBinding) {
+                if let plan = model.pendingUpdatePlan {
+                    AIUpdateConfirmSheet(
+                        plan: plan,
+                        isExecuting: model.isExecutingAIUpdates,
+                        results: model.aiUpdateExecutionResults,
+                        executionError: model.aiUpdateExecutionError,
+                        onConfirm: model.confirmAIUpdateExecution,
+                        onClose: model.cancelAIUpdateExecution
+                    )
+                }
+            }
         } else if hasSnapshot {
             ProgressView(L10n.preparingSummary())
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -75,35 +129,78 @@ struct DeveloperAIView: View {
                 globalSkillCount: projection.allSkills.count,
                 globalPluginCount: projection.allPlugins.count,
                 isDiscovering: model.isDiscoveringAITools,
-                discoveryError: model.aiDiscoveryError
+                discoveryError: model.aiDiscoveryError,
+                updateSummary: model.aiUpdateSummary,
+                isCheckingUpdates: model.isCheckingAIUpdates,
+                updateError: model.aiUpdateError,
+                onCheckUpdates: model.checkAIUpdatesNow,
+                onCancelUpdateCheck: model.cancelAIUpdateCheck
             )
         case .apps:
-            AIAppsSectionView(
-                model: model,
-                projection: projection,
-                registryOnlyApplications: registryOnlyApplications,
+            AIAgentsSectionView(
+                projection: agentProjection,
+                skills: agentSkills(projection),
+                plugins: agentPlugins(projection),
+                storageSizesByPath: agentStorageSizesByPath,
                 selectedEntryID: $selectedAIEntryID,
                 isDiscovering: model.isDiscoveringAITools,
                 discoveryError: model.aiDiscoveryError
             )
         case .skills:
             GlobalSkillsView(
-                skills: projection.allSkills,
+                skills: projection.allSkills + model.projectAIAssetSkills,
+                plugins: projection.allPlugins + model.projectAIAssetPlugins,
+                discoveredToolIDs: model.aiManagementProjection.discoveredToolDefinitionIDs,
+                approvedProjectRoots: model.approvedProjectRoots,
+                approvedProjectRootIssues: model.approvedProjectRootIssues,
+                projectScanIssues: model.projectAIAssetScanIssues,
+                isScanningProjects: model.isScanningProjectAIAssets,
+                projectScanError: model.projectAIAssetError,
                 searchText: model.searchText,
+                onAddProjectRoot: model.addApprovedProjectRoot,
+                onRemoveProjectRoot: model.removeApprovedProjectRoot,
+                updateResults: model.aiUpdateResults,
+                isCheckingUpdates: model.isCheckingAIUpdates,
+                updateAssets: model.aiUpdateAssets,
+                onCheckSelectedUpdates: model.checkAIUpdatesForSelection,
+                onUpdateSelected: model.prepareAIUpdateExecution,
+                onCancelUpdateCheck: model.cancelAIUpdateCheck,
+                selectedGroupID: $selectedSkillGroupID,
                 selection: $selectedSkillID
             )
         case .plugins:
             GlobalPluginsView(
-                plugins: projection.allPlugins,
+                plugins: projection.allPlugins + model.projectAIAssetPlugins,
+                discoveredToolIDs: model.aiManagementProjection.discoveredToolDefinitionIDs,
+                approvedProjectRoots: model.approvedProjectRoots,
+                approvedProjectRootIssues: model.approvedProjectRootIssues,
+                projectScanIssues: model.projectAIAssetScanIssues,
+                isScanningProjects: model.isScanningProjectAIAssets,
+                projectScanError: model.projectAIAssetError,
                 searchText: model.searchText,
+                onAddProjectRoot: model.addApprovedProjectRoot,
+                onRemoveProjectRoot: model.removeApprovedProjectRoot,
+                updateResults: model.aiUpdateResults,
+                isCheckingUpdates: model.isCheckingAIUpdates,
+                updateAssets: model.aiUpdateAssets,
+                onCheckSelectedUpdates: model.checkAIUpdatesForSelection,
+                onUpdateSelected: model.prepareAIUpdateExecution,
+                onCancelUpdateCheck: model.cancelAIUpdateCheck,
+                selectedGroupID: $selectedPluginGroupID,
                 selection: $selectedPluginID
             )
         case .cli:
             CLIToolsView(
-                clis: model.aiManagementProjection.clis,
+                clis: agentProjection.cliTools,
                 searchText: model.searchText,
                 isDiscovering: model.isDiscoveringAITools,
                 discoveryError: model.aiDiscoveryError,
+                updateResults: model.aiUpdateResults,
+                isCheckingUpdates: model.isCheckingAIUpdates,
+                updateAssets: model.aiUpdateAssets,
+                onCheckSelectedUpdates: model.checkAIUpdatesForSelection,
+                onUpdateSelected: model.prepareAIUpdateExecution,
+                onCancelUpdateCheck: model.cancelAIUpdateCheck,
                 selection: $selectedCLIID
             )
         }

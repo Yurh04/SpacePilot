@@ -152,6 +152,128 @@ final class AIManagementDiscoveryTests: XCTestCase {
         XCTAssertNil(model.aiDiscoveryError)
     }
 
+    func testProjectAssetScanFailureDoesNotClearGlobalProjectionOrScanError() async {
+        struct Boom: Error {}
+        let directory = try! Self.temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = AppModel(
+            runtime: nil,
+            homeDirectory: Self.home,
+            discoverAITools: { _, _ in [Self.record(name: "Codex")] },
+            scanProjectAIAssets: { _ in throw Boom() }
+        )
+        await model.applySnapshotForTesting(Self.snapshot())
+        model.errorMessage = "scan-error"
+
+        await model.addApprovedProjectRootForTesting(directory)
+
+        XCTAssertEqual(model.aiManagementProjection.records.map(\.displayName), ["Codex"])
+        XCTAssertEqual(model.errorMessage, "scan-error")
+        XCTAssertNotNil(model.projectAIAssetError)
+    }
+
+    func testProjectAssetScanPublishesOnlyNewestApprovedRootGeneration() async {
+        let first = try! Self.temporaryDirectory()
+        let second = try! Self.temporaryDirectory()
+        defer {
+            try? FileManager.default.removeItem(at: first)
+            try? FileManager.default.removeItem(at: second)
+        }
+        let gate = AsyncGate()
+        let model = AppModel(
+            runtime: nil,
+            homeDirectory: Self.home,
+            discoverAITools: { _, _ in [] },
+            scanProjectAIAssets: { roots in
+                if roots.count == 1, roots.first?.canonicalRootURL == first {
+                    await gate.wait()
+                    return ProjectAIAssetScanResult(
+                        skills: [Self.skill(name: "old", project: roots[0].identity)],
+                        plugins: [],
+                        issues: []
+                    )
+                }
+                return ProjectAIAssetScanResult(
+                    skills: [Self.skill(name: "new", project: roots[0].identity)],
+                    plugins: [],
+                    issues: []
+                )
+            }
+        )
+
+        model.addApprovedProjectRoot(first)
+        await model.addApprovedProjectRootForTesting(second)
+        await gate.open()
+
+        XCTAssertEqual(model.projectAIAssetSkills.map(\.name), ["new"])
+    }
+
+    func testAIUpdateCheckPublishesResultsWithoutClobberingScanError() async {
+        let key = AIUpdateAssetKey(kind: .cli, owner: .tool(definitionID: "codex"), canonicalLocation: "/bin/codex")
+        let model = AppModel(
+            runtime: nil,
+            homeDirectory: Self.home,
+            discoverAITools: { _, _ in [] },
+            checkAIUpdates: { _ in [Self.updateResult(key: key, status: .updateAvailable, latest: "1.1.0")] }
+        )
+        model.errorMessage = "scan-error"
+
+        await model.checkAIUpdatesForTesting()
+
+        XCTAssertEqual(model.aiUpdateResults[key]?.status, .updateAvailable)
+        XCTAssertEqual(model.errorMessage, "scan-error")
+        XCTAssertNil(model.aiUpdateError)
+        XCTAssertFalse(model.isCheckingAIUpdates)
+    }
+
+    func testAIUpdateCheckFailureKeepsExistingResultsAndScanError() async {
+        struct Boom: Error {}
+        let key = AIUpdateAssetKey(kind: .cli, owner: .tool(definitionID: "codex"), canonicalLocation: "/bin/codex")
+        let model = AppModel(
+            runtime: nil,
+            homeDirectory: Self.home,
+            discoverAITools: { _, _ in [] },
+            checkAIUpdates: { _ in throw Boom() }
+        )
+        model.aiUpdateResults = [key: Self.updateResult(key: key, status: .updateAvailable, latest: "1.1.0")]
+        model.errorMessage = "scan-error"
+
+        await model.checkAIUpdatesForTesting()
+
+        XCTAssertEqual(model.aiUpdateResults[key]?.status, .updateAvailable)
+        XCTAssertEqual(model.errorMessage, "scan-error")
+        XCTAssertNotNil(model.aiUpdateError)
+    }
+
+    func testAIUpdateCheckPublishesOnlyNewestGeneration() async {
+        let oldKey = AIUpdateAssetKey(kind: .cli, owner: .tool(definitionID: "old"), canonicalLocation: "/bin/old")
+        let newKey = AIUpdateAssetKey(kind: .cli, owner: .tool(definitionID: "new"), canonicalLocation: "/bin/new")
+        let gate = AsyncGate()
+        let counter = CallCounter()
+        let model = AppModel(
+            runtime: nil,
+            homeDirectory: Self.home,
+            discoverAITools: { _, _ in [] },
+            checkAIUpdates: { _ in
+                let attempt = await counter.incrementReturning()
+                if attempt == 1 {
+                    await gate.wait()
+                    return [Self.updateResult(key: oldKey)]
+                }
+                return [Self.updateResult(key: newKey)]
+            }
+        )
+
+        let stale = model.startAIUpdateCheckForTesting()
+        model.cancelAIUpdateCheck()
+        await model.checkAIUpdatesForTesting()
+        await gate.open()
+        await stale?.value
+
+        XCTAssertNil(model.aiUpdateResults[oldKey])
+        XCTAssertEqual(model.aiUpdateResults[newKey]?.status, .upToDate)
+    }
+
     // MARK: - Fixtures
 
     private static let home = URL(fileURLWithPath: "/Users/test")
@@ -163,6 +285,47 @@ final class AIManagementDiscoveryTests: XCTestCase {
             displayName: name,
             owner: .tool(definitionID: name)
         )
+    }
+
+    private nonisolated static func skill(name: String, project: AIProjectIdentity) -> SkillRecord {
+        SkillRecord(
+            id: UUID(),
+            name: name,
+            summary: "",
+            url: URL(fileURLWithPath: "/tmp/\(name)/SKILL.md"),
+            allocatedSize: 1,
+            scope: .agentSpecific(agent: "Codex"),
+            visibleAgents: ["Codex"],
+            parentPluginID: nil,
+            fingerprint: name,
+            conflict: nil,
+            managementStatus: .standalone,
+            owner: .tool(definitionID: "codex"),
+            locationScope: .project(project)
+        )
+    }
+
+    private nonisolated static func updateResult(
+        key: AIUpdateAssetKey,
+        status: UpdateStatus = .upToDate,
+        latest: String = "1.0.0"
+    ) -> UpdateCheckResult {
+        UpdateCheckResult(
+            assetKey: key,
+            displayName: key.canonicalLocation,
+            localVersion: .resolved(VersionEvidence(version: "1.0.0", source: .cliProbe, confidence: .high)),
+            latestVersion: latest,
+            status: status,
+            checkedAt: .now,
+            failure: nil
+        )
+    }
+
+    private nonisolated static func temporaryDirectory() throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "SpacePilotProjectScan-\(UUID().uuidString)", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
     }
 
     private nonisolated static func snapshot(aiName: String = "Codex") -> ScanSnapshot {

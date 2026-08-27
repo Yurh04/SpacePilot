@@ -24,6 +24,11 @@ public struct AIToolEvidence: Codable, Hashable, Sendable {
     public var bundleIdentifier: String?
     public var applicationURL: URL?
     public var executableURL: URL?
+    /// Fixed alias executables (for example `trae-cli` / `trae-agent`) that
+    /// canonically resolve to the same `executableURL`. Kept as read-only
+    /// evidence so the UI shows one CLI with its known aliases rather than
+    /// duplicate rows; the aliases are never executed on their own.
+    public var aliasExecutableURLs: [URL]
     public var detectedVersion: String?
     public var dataRoots: [URL]
     public var skillRoots: [URL]
@@ -34,6 +39,7 @@ public struct AIToolEvidence: Codable, Hashable, Sendable {
         bundleIdentifier: String? = nil,
         applicationURL: URL? = nil,
         executableURL: URL? = nil,
+        aliasExecutableURLs: [URL] = [],
         detectedVersion: String? = nil,
         dataRoots: [URL] = [],
         skillRoots: [URL] = [],
@@ -43,11 +49,39 @@ public struct AIToolEvidence: Codable, Hashable, Sendable {
         self.bundleIdentifier = bundleIdentifier
         self.applicationURL = applicationURL
         self.executableURL = executableURL
+        self.aliasExecutableURLs = aliasExecutableURLs
         self.detectedVersion = detectedVersion
         self.dataRoots = dataRoots
         self.skillRoots = skillRoots
         self.pluginRoots = pluginRoots
         self.configDirectories = configDirectories
+    }
+
+    // Custom Codable so older snapshots that predate `aliasExecutableURLs`
+    // decode without error (defaults to empty) and never break history.
+    enum CodingKeys: String, CodingKey {
+        case bundleIdentifier
+        case applicationURL
+        case executableURL
+        case aliasExecutableURLs
+        case detectedVersion
+        case dataRoots
+        case skillRoots
+        case pluginRoots
+        case configDirectories
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        bundleIdentifier = try container.decodeIfPresent(String.self, forKey: .bundleIdentifier)
+        applicationURL = try container.decodeIfPresent(URL.self, forKey: .applicationURL)
+        executableURL = try container.decodeIfPresent(URL.self, forKey: .executableURL)
+        aliasExecutableURLs = try container.decodeIfPresent([URL].self, forKey: .aliasExecutableURLs) ?? []
+        detectedVersion = try container.decodeIfPresent(String.self, forKey: .detectedVersion)
+        dataRoots = try container.decodeIfPresent([URL].self, forKey: .dataRoots) ?? []
+        skillRoots = try container.decodeIfPresent([URL].self, forKey: .skillRoots) ?? []
+        pluginRoots = try container.decodeIfPresent([URL].self, forKey: .pluginRoots) ?? []
+        configDirectories = try container.decodeIfPresent([URL].self, forKey: .configDirectories) ?? []
     }
 
     /// Merges another evidence value into this one. Scalar fields prefer an
@@ -57,14 +91,15 @@ public struct AIToolEvidence: Codable, Hashable, Sendable {
         bundleIdentifier = bundleIdentifier ?? other.bundleIdentifier
         applicationURL = applicationURL ?? other.applicationURL
         executableURL = executableURL ?? other.executableURL
+        aliasExecutableURLs = Self.mergeURLsForDiscovery(aliasExecutableURLs, other.aliasExecutableURLs)
         detectedVersion = detectedVersion ?? other.detectedVersion
-        dataRoots = Self.mergeURLs(dataRoots, other.dataRoots)
-        skillRoots = Self.mergeURLs(skillRoots, other.skillRoots)
-        pluginRoots = Self.mergeURLs(pluginRoots, other.pluginRoots)
-        configDirectories = Self.mergeURLs(configDirectories, other.configDirectories)
+        dataRoots = Self.mergeURLsForDiscovery(dataRoots, other.dataRoots)
+        skillRoots = Self.mergeURLsForDiscovery(skillRoots, other.skillRoots)
+        pluginRoots = Self.mergeURLsForDiscovery(pluginRoots, other.pluginRoots)
+        configDirectories = Self.mergeURLsForDiscovery(configDirectories, other.configDirectories)
     }
 
-    private static func mergeURLs(_ lhs: [URL], _ rhs: [URL]) -> [URL] {
+    static func mergeURLsForDiscovery(_ lhs: [URL], _ rhs: [URL]) -> [URL] {
         var seen = Set<String>()
         var result: [URL] = []
         for url in lhs + rhs {

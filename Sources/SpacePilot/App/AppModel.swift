@@ -41,6 +41,51 @@ final class AppModel {
     /// A read-only error surface for AI discovery. Deliberately separate from
     /// `errorMessage` so a discovery failure never clobbers the main scan error.
     var aiDiscoveryError: String?
+    var approvedProjectRoots: [ApprovedProjectRoot] = []
+    var approvedProjectRootIssues: [ApprovedProjectRootIssue] = []
+    var projectAIAssetSkills: [SkillRecord] = []
+    var projectAIAssetPlugins: [PluginRecord] = []
+    var projectAIAssetScanIssues: [ProjectAIAssetScanIssue] = []
+    var isScanningProjectAIAssets = false
+    var projectAIAssetError: String?
+    var aiUpdateResults: [AIUpdateAssetKey: UpdateCheckResult] = [:]
+    var isCheckingAIUpdates = false
+    var aiUpdateError: String?
+    /// The user-confirmable execution plan currently presented in the confirm
+    /// sheet. Non-nil drives sheet presentation; building it never touches the
+    /// network, disk, or a process — it only classifies the current selection.
+    var pendingUpdatePlan: UpdateExecutionPlan?
+    /// True while the confirmed plan is executing. The sheet stays open and shows
+    /// per-step progress; the user can cancel.
+    var isExecutingAIUpdates = false
+    /// Per-step results from the last confirmed execution, shown in the sheet.
+    var aiUpdateExecutionResults: [UpdateExecutionStepResult] = []
+    var aiUpdateExecutionError: String?
+
+    var aiUpdateSummary: UpdateCheckSummary {
+        UpdateCheckSummary(results: Array(aiUpdateResults.values))
+    }
+
+    /// Full in-memory update inventory (assets + fixed execution capabilities).
+    /// Built without package receipts so it stays off-disk/off-network; the CLI
+    /// execution capabilities (Codex/Aiden/Aider) are attached from the fixed
+    /// definition table and are sufficient for the first execution batch.
+    private var aiUpdateInventory: AIUpdateAssetInventory {
+        AIUpdateAssetBuilder.inventory(
+            snapshot: latestSnapshot,
+            managementProjection: aiManagementProjection,
+            projectSkills: projectAIAssetSkills,
+            projectPlugins: projectAIAssetPlugins
+        )
+    }
+
+    /// Read-only, in-memory update-asset inventory used purely to build a
+    /// selection plan for the UI. It never touches the network or disk (package
+    /// receipts are omitted here); those `.package` assets are checked only by
+    /// the live update-check worker.
+    var aiUpdateAssets: [AIUpdateAsset] {
+        aiUpdateInventory.assets
+    }
 
     var isPreparingAIQuery: Bool {
         guard selection == .developerAI,
@@ -71,6 +116,8 @@ final class AppModel {
     private var fileSystemChangeReconciler: FileSystemChangeReconciler?
     private var pendingAutomaticRefreshScope: ScanScope?
     private let runtime: SpacePilotRuntime?
+    private let approvedProjectRootStore: any ApprovedProjectRootStoring
+    private let approvedProjectRootValidator = ApprovedProjectRootValidator()
 
     // MARK: - AI discovery
 
@@ -98,6 +145,21 @@ final class AppModel {
     /// Set when the user explicitly refreshes the Developer & AI view; consumed
     /// by the next `apply(snapshot:)` to force a fresh discovery pass.
     private var pendingForceAIDiscovery = false
+    private let scanProjectAIAssets: @Sendable ([ApprovedProjectRoot]) async throws -> ProjectAIAssetScanResult
+    private var projectAIAssetWorker: Task<ProjectAIAssetScanResult, Error>?
+    private var projectAIAssetPublicationTask: Task<Void, Never>?
+    private var projectAIAssetGeneration = 0
+    private var lastProjectAIAssetFingerprint: ProjectAIAssetFingerprint?
+    private let checkAIUpdates: @Sendable (AIUpdateCheckInput) async throws -> [UpdateCheckResult]
+    private var aiUpdateWorker: Task<[UpdateCheckResult], Error>?
+    private var aiUpdatePublicationTask: Task<Void, Never>?
+    private var aiUpdateGeneration = 0
+    /// Injected update executor. Receives a fully-resolved, user-confirmed plan
+    /// and runs each fixed manager executable off the MainActor. Injecting it
+    /// keeps execution tests free of real processes; production wires the safe
+    /// `AIUpdateExecutor`.
+    private let executeAIUpdates: @Sendable (UpdateExecutionPlan) async -> [UpdateExecutionStepResult]
+    private var aiUpdateExecutionTask: Task<Void, Never>?
 
     init() {
         do {
@@ -108,6 +170,10 @@ final class AppModel {
         }
         self.discoverAITools = Self.liveAIToolDiscovery
         self.aiDiscoveryHomeURL = runtime?.homeDirectory
+        self.approvedProjectRootStore = UserDefaultsApprovedProjectRootStore()
+        self.scanProjectAIAssets = Self.liveProjectAIAssetScan
+        self.checkAIUpdates = Self.liveAIUpdateCheck
+        self.executeAIUpdates = Self.makeLiveAIUpdateExecutor(homeDirectory: runtime?.homeDirectory)
         Task { await loadSavedState() }
     }
 
@@ -117,11 +183,19 @@ final class AppModel {
     init(
         runtime: SpacePilotRuntime?,
         homeDirectory: URL,
-        discoverAITools: @escaping @Sendable (ScanSnapshot, URL) async throws -> [AIToolRecord]
+        discoverAITools: @escaping @Sendable (ScanSnapshot, URL) async throws -> [AIToolRecord],
+        approvedProjectRootStore: any ApprovedProjectRootStoring = InMemoryApprovedProjectRootStore(),
+        scanProjectAIAssets: (@Sendable ([ApprovedProjectRoot]) async throws -> ProjectAIAssetScanResult)? = nil,
+        checkAIUpdates: (@Sendable (AIUpdateCheckInput) async throws -> [UpdateCheckResult])? = nil,
+        executeAIUpdates: (@Sendable (UpdateExecutionPlan) async -> [UpdateExecutionStepResult])? = nil
     ) {
         self.runtime = runtime
         self.aiDiscoveryHomeURL = homeDirectory
         self.discoverAITools = discoverAITools
+        self.approvedProjectRootStore = approvedProjectRootStore
+        self.scanProjectAIAssets = scanProjectAIAssets ?? Self.liveProjectAIAssetScan
+        self.checkAIUpdates = checkAIUpdates ?? Self.liveAIUpdateCheck
+        self.executeAIUpdates = executeAIUpdates ?? Self.makeLiveAIUpdateExecutor(homeDirectory: homeDirectory)
     }
 
     /// The production discovery function: builds a snapshot-backed locator and a
@@ -130,6 +204,69 @@ final class AppModel {
         let locator = SnapshotAIApplicationLocator(snapshot: snapshot)
         let registry = AIToolRegistry(applicationLocator: locator)
         return try await registry.discover(homeDirectory: homeDirectory)
+    }
+
+    private static let liveProjectAIAssetScan: @Sendable ([ApprovedProjectRoot]) async throws -> ProjectAIAssetScanResult = { roots in
+        try await ProjectAIAssetScanner(skillScanner: SkillScanner()).scan(approvedRoots: roots)
+    }
+
+    private static let liveAIUpdateCheck: @Sendable (AIUpdateCheckInput) async throws -> [UpdateCheckResult] = { input in
+        let packageFacts = try AIToolPackageInventory().installedPackages(homeDirectory: input.homeDirectory)
+        let inventory = AIUpdateAssetBuilder.inventory(
+            snapshot: input.snapshot,
+            managementProjection: input.managementProjection,
+            projectSkills: input.projectSkills,
+            projectPlugins: input.projectPlugins,
+            packageFacts: packageFacts
+        )
+        // When the user checks a specific multi-selection, only request the
+        // selected supported keys; unsupported keys never produce a request.
+        let checkable: [AIUpdateAsset]
+        if let selectedKeys = input.selectedKeys {
+            checkable = inventory.assets.filter { $0.capability != nil && selectedKeys.contains($0.key) }
+        } else {
+            checkable = inventory.assets.filter { $0.capability != nil }
+        }
+        let checked = await AIUpdateChecker().check(checkable)
+        return inventory.unsupportedResults + checked
+    }
+
+    /// Builds the production update executor bound to a home directory. Uses the
+    /// safe `AIUpdateExecutor` with fixed manager locator + installed-version
+    /// re-probe. When no home directory is available it degrades to a no-op that
+    /// reports every step as `managerUnavailable`, never running anything.
+    private static func makeLiveAIUpdateExecutor(
+        homeDirectory: URL?
+    ) -> @Sendable (UpdateExecutionPlan) async -> [UpdateExecutionStepResult] {
+        guard let homeDirectory else {
+            return { plan in
+                plan.executable.map {
+                    UpdateExecutionStepResult(
+                        key: $0.key,
+                        displayName: $0.displayName,
+                        targetVersion: $0.targetVersion,
+                        outcome: .managerUnavailable,
+                        logSummary: "manager unavailable"
+                    )
+                }
+            }
+        }
+        return { plan in
+            let runner = DefaultCLIProcessRunner()
+            let locator = LocalUpdateManagerLocator(homeDirectory: homeDirectory)
+            let probe = LocalInstalledVersionProbe(
+                runner: runner,
+                managerLocator: locator,
+                homeDirectory: homeDirectory
+            )
+            let executor = AIUpdateExecutor(
+                runner: runner,
+                managerLocator: locator,
+                versionProbe: probe,
+                homeDirectory: homeDirectory
+            )
+            return await executor.execute(plan)
+        }
     }
 
     func startScan(
@@ -381,6 +518,7 @@ final class AppModel {
 
     private func loadSavedState() async {
         guard let runtime else { return }
+        loadApprovedProjectRoots()
         do {
             if let snapshot = try await runtime.store.latestSnapshot() {
                 apply(snapshot: snapshot)
@@ -396,6 +534,58 @@ final class AppModel {
             Self.logger.error(
                 "Could not start storage monitoring: \(error.localizedDescription, privacy: .public)"
             )
+        }
+    }
+
+    private func loadApprovedProjectRoots() {
+        do {
+            let result = try approvedProjectRootStore.load()
+            approvedProjectRoots = result.roots
+            approvedProjectRootIssues = result.issues
+            startProjectAIAssetScan(force: true)
+        } catch {
+            approvedProjectRootIssues = [.invalidPayload]
+        }
+    }
+
+    func addApprovedProjectRoot(_ url: URL) {
+        do {
+            let roots = try approvedProjectRootValidator.adding(
+                url,
+                to: approvedProjectRoots,
+                homeDirectory: aiDiscoveryHomeURL
+            )
+            try approvedProjectRootStore.replace(roots)
+            approvedProjectRoots = roots
+            approvedProjectRootIssues = []
+            startProjectAIAssetScan(force: true)
+        } catch let error as ApprovedProjectRootMutationError {
+            approvedProjectRootIssues = [Self.issue(for: error)]
+        } catch {
+            approvedProjectRootIssues = [.invalidPayload]
+        }
+    }
+
+    func removeApprovedProjectRoot(id: String) {
+        do {
+            let roots = approvedProjectRootValidator.removing(id: id, from: approvedProjectRoots)
+            try approvedProjectRootStore.replace(roots)
+            approvedProjectRoots = roots
+            approvedProjectRootIssues = []
+            startProjectAIAssetScan(force: true)
+        } catch {
+            approvedProjectRootIssues = [.invalidPayload]
+        }
+    }
+
+    private static func issue(for error: ApprovedProjectRootMutationError) -> ApprovedProjectRootIssue {
+        switch error {
+        case .filesystemRootRejected: .filesystemRootRejected
+        case .homeDirectoryRejected: .homeDirectoryRejected
+        case .notDirectory: .notDirectory
+        case .unreadableDirectory: .unreadableDirectory
+        case .duplicateRoot: .duplicateRoot
+        case .overlappingRoot: .overlappingRoot
         }
     }
 
@@ -927,6 +1117,216 @@ final class AppModel {
         isDiscoveringAITools = false
     }
 
+    func checkAIUpdatesNow() {
+        startAIUpdateCheck(selectedKeys: nil)
+    }
+
+    /// Checks updates for a specific multi-selection of stable asset keys. Only
+    /// the selected supported keys produce network requests; results are merged
+    /// into any existing results rather than replacing the whole table.
+    func checkAIUpdatesForSelection(_ keys: Set<AIUpdateAssetKey>) {
+        guard !keys.isEmpty else { return }
+        startAIUpdateCheck(selectedKeys: keys)
+    }
+
+    private func startAIUpdateCheck(selectedKeys: Set<AIUpdateAssetKey>?) {
+        guard !isCheckingAIUpdates,
+              let homeDirectory = aiDiscoveryHomeURL else { return }
+        let input = AIUpdateCheckInput(
+            snapshot: latestSnapshot,
+            managementProjection: aiManagementProjection,
+            projectSkills: projectAIAssetSkills,
+            projectPlugins: projectAIAssetPlugins,
+            homeDirectory: homeDirectory,
+            selectedKeys: selectedKeys
+        )
+        let fingerprint = AIUpdateCheckFingerprint(input: input)
+        aiUpdatePublicationTask?.cancel()
+        aiUpdateWorker?.cancel()
+        aiUpdateGeneration &+= 1
+        let generation = aiUpdateGeneration
+        isCheckingAIUpdates = true
+        aiUpdateError = nil
+
+        let check = checkAIUpdates
+        let worker = Task.detached(priority: .utility) { [input, check] in
+            try await check(input)
+        }
+        aiUpdateWorker = worker
+        aiUpdatePublicationTask = Task { [weak self] in
+            do {
+                let results = try await worker.value
+                guard let self,
+                      !Task.isCancelled,
+                      self.aiUpdateGeneration == generation,
+                      AIUpdateCheckFingerprint(input: self.currentAIUpdateCheckInput(homeDirectory: homeDirectory, selectedKeys: selectedKeys)) == fingerprint else { return }
+                if selectedKeys == nil {
+                    self.aiUpdateResults = Dictionary(uniqueKeysWithValues: results.map { ($0.assetKey, $0) })
+                } else {
+                    // Merge a selective check into existing results so previously
+                    // checked keys are preserved.
+                    var merged = self.aiUpdateResults
+                    for result in results { merged[result.assetKey] = result }
+                    self.aiUpdateResults = merged
+                }
+                self.isCheckingAIUpdates = false
+                self.aiUpdateWorker = nil
+                self.aiUpdatePublicationTask = nil
+            } catch is CancellationError {
+                return
+            } catch {
+                guard let self,
+                      self.aiUpdateGeneration == generation,
+                      AIUpdateCheckFingerprint(input: self.currentAIUpdateCheckInput(homeDirectory: homeDirectory, selectedKeys: selectedKeys)) == fingerprint else { return }
+                self.aiUpdateError = error.localizedDescription
+                self.isCheckingAIUpdates = false
+                self.aiUpdateWorker = nil
+                self.aiUpdatePublicationTask = nil
+            }
+        }
+    }
+
+    func cancelAIUpdateCheck() {
+        aiUpdatePublicationTask?.cancel()
+        aiUpdateWorker?.cancel()
+        aiUpdatePublicationTask = nil
+        aiUpdateWorker = nil
+        aiUpdateGeneration &+= 1
+        isCheckingAIUpdates = false
+    }
+
+    /// Builds a user-confirmable execution plan for a multi-selection and opens
+    /// the confirmation sheet. This is pure classification: it never starts a
+    /// process, contacts the network, or writes anything. Even a selection that
+    /// resolves to zero executable steps still presents the sheet so the user
+    /// sees per-item "cannot update" reasons instead of a dead button.
+    func prepareAIUpdateExecution(_ keys: Set<AIUpdateAssetKey>) {
+        guard !keys.isEmpty else { return }
+        let inventory = aiUpdateInventory
+        pendingUpdatePlan = UpdateExecutionPlan(
+            selectedKeys: keys,
+            assets: inventory.assets,
+            executionCapabilities: inventory.executionCapabilities,
+            results: aiUpdateResults
+        )
+        aiUpdateExecutionResults = []
+        aiUpdateExecutionError = nil
+    }
+
+    /// Dismisses the confirmation sheet with zero side effects when no execution
+    /// is in flight; cancels an in-flight execution otherwise.
+    func cancelAIUpdateExecution() {
+        aiUpdateExecutionTask?.cancel()
+        aiUpdateExecutionTask = nil
+        isExecutingAIUpdates = false
+        pendingUpdatePlan = nil
+    }
+
+    /// Runs the currently-pending plan after the user confirms. Only the
+    /// `executable` items run; skipped items were already surfaced in the sheet.
+    /// Execution happens off the MainActor via the injected executor; results are
+    /// published back for display. Nothing runs if there is no executable step.
+    func confirmAIUpdateExecution() {
+        guard let plan = pendingUpdatePlan, plan.hasExecutable, !isExecutingAIUpdates else { return }
+        isExecutingAIUpdates = true
+        aiUpdateExecutionError = nil
+        aiUpdateExecutionResults = []
+        let execute = executeAIUpdates
+        aiUpdateExecutionTask = Task { [weak self] in
+            let results = await execute(plan)
+            guard let self, !Task.isCancelled else { return }
+            self.aiUpdateExecutionResults = results
+            self.isExecutingAIUpdates = false
+            self.aiUpdateExecutionTask = nil
+            // Reflect confirmed successes into the check results so the status
+            // columns update without requiring a fresh network check.
+            for result in results {
+                if case .succeeded(let installed) = result.outcome,
+                   let previous = self.aiUpdateResults[result.key] {
+                    self.aiUpdateResults[result.key] = UpdateCheckResult(
+                        assetKey: previous.assetKey,
+                        displayName: previous.displayName,
+                        localVersion: VersionEvidenceResolver.resolve([
+                            VersionEvidence(version: installed, source: .cliProbe, confidence: .high)
+                        ]),
+                        latestVersion: installed,
+                        status: .upToDate,
+                        checkedAt: Date(),
+                        failure: nil
+                    )
+                }
+            }
+        }
+    }
+
+    private func currentAIUpdateCheckInput(homeDirectory: URL, selectedKeys: Set<AIUpdateAssetKey>? = nil) -> AIUpdateCheckInput {
+        AIUpdateCheckInput(
+            snapshot: latestSnapshot,
+            managementProjection: aiManagementProjection,
+            projectSkills: projectAIAssetSkills,
+            projectPlugins: projectAIAssetPlugins,
+            homeDirectory: homeDirectory,
+            selectedKeys: selectedKeys
+        )
+    }
+
+    private func startProjectAIAssetScan(force: Bool) {
+        let roots = approvedProjectRoots
+        let fingerprint = ProjectAIAssetFingerprint(roots: roots)
+        if !force,
+           isScanningProjectAIAssets == false,
+           lastProjectAIAssetFingerprint == fingerprint {
+            return
+        }
+        projectAIAssetPublicationTask?.cancel()
+        projectAIAssetWorker?.cancel()
+        projectAIAssetGeneration &+= 1
+        let generation = projectAIAssetGeneration
+        if roots.isEmpty {
+            projectAIAssetSkills = []
+            projectAIAssetPlugins = []
+            projectAIAssetScanIssues = []
+            projectAIAssetError = nil
+            isScanningProjectAIAssets = false
+            lastProjectAIAssetFingerprint = fingerprint
+            return
+        }
+        isScanningProjectAIAssets = true
+        projectAIAssetError = nil
+        let scanner = scanProjectAIAssets
+        let worker = Task.detached(priority: .utility) { [roots, scanner] in
+            try await scanner(roots)
+        }
+        projectAIAssetWorker = worker
+        projectAIAssetPublicationTask = Task { [weak self] in
+            do {
+                let result = try await worker.value
+                guard let self,
+                      !Task.isCancelled,
+                      self.projectAIAssetGeneration == generation,
+                      ProjectAIAssetFingerprint(roots: self.approvedProjectRoots) == fingerprint else { return }
+                self.projectAIAssetSkills = result.skills
+                self.projectAIAssetPlugins = result.plugins
+                self.projectAIAssetScanIssues = result.issues
+                self.projectAIAssetError = nil
+                self.isScanningProjectAIAssets = false
+                self.lastProjectAIAssetFingerprint = fingerprint
+                self.projectAIAssetWorker = nil
+                self.projectAIAssetPublicationTask = nil
+            } catch is CancellationError {
+                return
+            } catch {
+                guard let self,
+                      self.projectAIAssetGeneration == generation,
+                      ProjectAIAssetFingerprint(roots: self.approvedProjectRoots) == fingerprint else { return }
+                self.projectAIAssetError = error.localizedDescription
+                self.isScanningProjectAIAssets = false
+                self.projectAIAssetWorker = nil
+                self.projectAIAssetPublicationTask = nil
+            }
+        }
+    }
+
     #if DEBUG
     /// Test-only seam: drives a snapshot through the same `apply(snapshot:)`
     /// entry point production uses, optionally forcing a fresh discovery pass,
@@ -947,6 +1347,22 @@ final class AppModel {
         pendingForceAIDiscovery = force
         apply(snapshot: snapshot)
         return aiDiscoveryPublicationTask
+    }
+
+    func addApprovedProjectRootForTesting(_ url: URL) async {
+        addApprovedProjectRoot(url)
+        await projectAIAssetPublicationTask?.value
+    }
+
+    func checkAIUpdatesForTesting() async {
+        checkAIUpdatesNow()
+        await aiUpdatePublicationTask?.value
+    }
+
+    @discardableResult
+    func startAIUpdateCheckForTesting() -> Task<Void, Never>? {
+        checkAIUpdatesNow()
+        return aiUpdatePublicationTask
     }
     #endif
 
@@ -1009,5 +1425,79 @@ private struct AIDiscoveryFingerprint: Equatable, Sendable {
             ))
         }
         self.entries = entries.sorted()
+    }
+}
+
+private struct ProjectAIAssetFingerprint: Equatable, Sendable {
+    private let entries: [String]
+
+    init(roots: [ApprovedProjectRoot]) {
+        entries = roots.map { $0.id + "|" + $0.canonicalRootURL.path }.sorted()
+    }
+}
+
+struct AIUpdateCheckInput: Sendable {
+    let snapshot: ScanSnapshot?
+    let managementProjection: AIManagementProjection
+    let projectSkills: [SkillRecord]
+    let projectPlugins: [PluginRecord]
+    let homeDirectory: URL
+    /// When non-nil, only these stable asset keys are checked (a user's
+    /// multi-selection). Nil means the Overview "check all" behavior.
+    var selectedKeys: Set<AIUpdateAssetKey>? = nil
+}
+
+private struct AIUpdateCheckFingerprint: Equatable, Sendable {
+    private let entries: [String]
+
+    init(input: AIUpdateCheckInput) {
+        var values: [String] = []
+        values.append("home:\(input.homeDirectory.standardizedFileURL.path)")
+        if let snapshot = input.snapshot {
+            values.append("snapshot:\(snapshot.id.uuidString)")
+            values.append(contentsOf: snapshot.applications.map {
+                "app:\($0.id.uuidString):\($0.version ?? ""):\($0.url.standardizedFileURL.path)"
+            })
+            values.append(contentsOf: snapshot.plugins.map {
+                "plugin:\($0.id.uuidString):\($0.version ?? ""):\($0.url.standardizedFileURL.path)"
+            })
+            values.append(contentsOf: snapshot.skills.map {
+                "skill:\($0.id.uuidString):\($0.url.standardizedFileURL.path)"
+            })
+        }
+        values.append(contentsOf: input.managementProjection.clis.map {
+            "cli:\($0.id):\($0.evidence.detectedVersion ?? ""):\($0.evidence.executableURL?.standardizedFileURL.path ?? "")"
+        })
+        values.append(contentsOf: input.projectSkills.map {
+            "project-skill:\($0.id.uuidString):\($0.url.standardizedFileURL.path)"
+        })
+        values.append(contentsOf: input.projectPlugins.map {
+            "project-plugin:\($0.id.uuidString):\($0.version ?? ""):\($0.url.standardizedFileURL.path)"
+        })
+        entries = values.sorted()
+    }
+}
+
+struct InMemoryApprovedProjectRootStore: ApprovedProjectRootStoring {
+    private final class Box: @unchecked Sendable {
+        var roots: [ApprovedProjectRoot]
+
+        init(roots: [ApprovedProjectRoot]) {
+            self.roots = roots
+        }
+    }
+
+    private let box: Box
+
+    init(roots: [ApprovedProjectRoot] = []) {
+        self.box = Box(roots: roots)
+    }
+
+    func load() throws -> ApprovedProjectRootValidationResult {
+        ApprovedProjectRootValidator().validateStored(box.roots)
+    }
+
+    func replace(_ roots: [ApprovedProjectRoot]) throws {
+        box.roots = roots
     }
 }

@@ -16,9 +16,21 @@ enum L10n {
         static let aiPrivacy = Self(key: "ai.privacy", english: "Privacy")
         static let aiSearching = Self(key: "ai.searching", english: "Searching…")
         static let aiSection = Self(key: "ai.section", english: "Section")
-        static let aiSectionApps = Self(key: "ai.section.apps", english: "AI Apps")
+        static let aiSectionApps = Self(key: "ai.section.apps", english: "AI Agents")
         static let aiSectionCLI = Self(key: "ai.section.cli", english: "CLI Tools")
-        static let aiOverviewApps = Self(key: "ai.overview.apps", english: "AI apps")
+        static let aiOverviewApps = Self(key: "ai.overview.apps", english: "AI Agents")
+        static let aiAgentsLocal = Self(key: "ai.agents.local", english: "Local Agents")
+        static let aiAgentsRemote = Self(key: "ai.agents.remote", english: "Remote Agents")
+        static let aiAgentsLocalEmpty = Self(key: "ai.agents.local-empty", english: "No local agents found")
+        static let aiAgentsRemoteEmpty = Self(key: "ai.agents.remote-empty", english: "No remote agents found")
+        static let aiAgentsSelect = Self(key: "ai.agents.select", english: "Select an AI Agent")
+        static let aiAgentStorage = Self(key: "ai.agent.storage", english: "Data & Storage")
+        static let aiAgentNotApplicable = Self(key: "ai.agent.not-applicable", english: "Not applicable")
+        static let aiAgentModuleEmpty = Self(key: "ai.agent.module-empty", english: "None detected")
+        static let aiAgentFormApp = Self(key: "ai.agent.form.app", english: "App")
+        static let aiAgentFormCLI = Self(key: "ai.agent.form.cli", english: "CLI")
+        static let aiAgentFormCloud = Self(key: "ai.agent.form.cloud", english: "Cloud")
+        static let aiAgentFormFactors = Self(key: "ai.agent.form-factors", english: "Form factors")
         static let aiOverviewCLIs = Self(key: "ai.overview.clis", english: "CLI tools")
         static let aiOverviewPartialCoverage = Self(key: "ai.overview.partial-coverage", english: "Partial coverage")
         static let aiOverviewDiscovering = Self(key: "ai.overview.discovering", english: "Discovering AI tools…")
@@ -27,7 +39,72 @@ enum L10n {
         static let aiCLIOwner = Self(key: "ai.cli.owner", english: "Owner")
         static let aiCLIStatus = Self(key: "ai.cli.status", english: "Status")
         static let aiCLIAvailable = Self(key: "ai.cli.available", english: "Available")
+        static let aiCLIAliases = Self(key: "ai.cli.aliases", english: "Aliases")
         static let aiCLIEmpty = Self(key: "ai.cli.empty", english: "No CLI tools found")
+        static let aiGroupBundled = Self(key: "ai.group.bundled", english: "Bundled")
+        static let aiGroupEmpty = Self(key: "ai.group.empty", english: "No ownership groups")
+        static let aiGroupGlobal = Self(key: "ai.group.global", english: "Global")
+        static let aiGroupNoItems = Self(key: "ai.group.no-items", english: "No items in this group")
+        static let aiGroupProject = Self(key: "ai.group.project", english: "Project")
+        static let aiGroupScope = Self(key: "ai.group.scope", english: "Scope")
+        static let aiGroupSelect = Self(key: "ai.group.select", english: "Select a group")
+        static let aiGroupSharedPlugins = Self(key: "ai.group.shared-plugins", english: "Global Plugins")
+        static let aiGroupSharedSkills = Self(key: "ai.group.shared-skills", english: "Global Skills")
+        static let aiGroupSystem = Self(key: "ai.group.system", english: "System")
+        static let aiGroupUnknown = Self(key: "ai.group.unknown", english: "Unknown")
+        static let aiProjectAddFolder = Self(key: "ai.project.add-folder", english: "Add Project Folder…")
+        static let aiProjectNoApprovedFolders = Self(key: "ai.project.no-approved-folders", english: "No approved project folders")
+        static let aiProjectRemoveFolder = Self(key: "ai.project.remove-folder", english: "Remove Project")
+        static let aiProjectScanning = Self(key: "ai.project.scanning", english: "Scanning project assets…")
+        static let aiUpdateCancel = Self(key: "ai.update.cancel", english: "Cancel Check")
+        static let aiUpdateCheckNow = Self(key: "ai.update.check-now", english: "Check for Updates")
+        static let aiUpdateCheckSelected = Self(key: "ai.update.check-selected", english: "Check Selected for Updates")
+        static let aiUpdateSelected = Self(key: "ai.update.update-selected", english: "Update Selected…")
+        static let aiUpdateDeferred = Self(key: "ai.update.deferred", english: "Manual updates arrive in a later step.")
+        static let aiUpdateConfirmTitle = Self(key: "ai.update.confirm.title", english: "Update Selected Tools")
+        static let aiUpdateConfirmExecutable = Self(key: "ai.update.confirm.executable", english: "Will update")
+        static let aiUpdateConfirmSkipped = Self(key: "ai.update.confirm.skipped", english: "Cannot update")
+        static let aiUpdateConfirmButton = Self(key: "ai.update.confirm.button", english: "Confirm Update")
+        static let aiUpdateConfirmClose = Self(key: "ai.update.confirm.close", english: "Close")
+        static let aiUpdateConfirmWarning = Self(key: "ai.update.confirm.warning", english: "Package managers may run each package's own install scripts. SpacePilot runs a fixed command per tool and never uses a shell.")
+        static let aiUpdateConfirmVia = Self(key: "ai.update.confirm.via", english: "via")
+        static let aiUpdateConfirmRunning = Self(key: "ai.update.confirm.running", english: "Updating…")
+        static let aiUpdateSkipUnsupported = Self(key: "ai.update.skip.unsupported", english: "No trusted update source")
+        static let aiUpdateSkipCheckOnly = Self(key: "ai.update.skip.check-only", english: "Check only — no automatic update")
+        static let aiUpdateSkipNotChecked = Self(key: "ai.update.skip.not-checked", english: "Not checked yet")
+        static let aiUpdateSkipAlreadyLatest = Self(key: "ai.update.skip.already-latest", english: "Already up to date")
+        static let aiUpdateSkipNoTarget = Self(key: "ai.update.skip.no-target", english: "No target version")
+        static let aiUpdateSkipInvalidTarget = Self(key: "ai.update.skip.invalid-target", english: "Invalid target version")
+        static let aiUpdateOutcomeSucceeded = Self(key: "ai.update.outcome.succeeded", english: "Updated")
+        static let aiUpdateOutcomeManagerUnavailable = Self(key: "ai.update.outcome.manager-unavailable", english: "Manager unavailable")
+        static let aiUpdateOutcomeFailed = Self(key: "ai.update.outcome.failed", english: "Failed")
+        static let aiUpdateOutcomeTimedOut = Self(key: "ai.update.outcome.timed-out", english: "Timed out")
+        static let aiUpdateOutcomeCancelled = Self(key: "ai.update.outcome.cancelled", english: "Cancelled")
+        static let aiUpdateOutcomeVersionMismatch = Self(key: "ai.update.outcome.version-mismatch", english: "Version mismatch")
+        static let aiUpdatePlanSupported = Self(key: "ai.update.plan.supported", english: "Ready to check")
+        static let aiUpdatePlanUnsupported = Self(key: "ai.update.plan.unsupported", english: "No update source")
+        static let aiUpdateEvidenceApplication = Self(key: "ai.update.evidence.application", english: "Application bundle")
+        static let aiUpdateEvidenceCLI = Self(key: "ai.update.evidence.cli", english: "CLI probe")
+        static let aiUpdateEvidenceConflict = Self(key: "ai.update.evidence.conflict", english: "Version conflict")
+        static let aiUpdateEvidencePackage = Self(key: "ai.update.evidence.package", english: "Package receipt")
+        static let aiUpdateEvidencePlugin = Self(key: "ai.update.evidence.plugin", english: "Plugin manifest")
+        static let aiUpdateEvidenceSkill = Self(key: "ai.update.evidence.skill", english: "Skill manifest")
+        static let aiUpdateEvidenceUnknown = Self(key: "ai.update.evidence.unknown", english: "No trusted version")
+        static let aiUpdateLatest = Self(key: "ai.update.latest", english: "Latest")
+        static let aiUpdateReadOnlyFooter = Self(key: "ai.update.read-only-footer", english: "Update checks are read-only. SpacePilot never installs or modifies AI tools in this step.")
+        static let aiUpdateSection = Self(key: "ai.update.section", english: "Updates")
+        static let aiUpdateStatus = Self(key: "ai.update.status", english: "Update")
+        static let aiUpdateStatusAvailable = Self(key: "ai.update.status.available", english: "Update available")
+        static let aiUpdateStatusChecking = Self(key: "ai.update.status.checking", english: "Checking…")
+        static let aiUpdateStatusFailed = Self(key: "ai.update.status.failed", english: "Check failed")
+        static let aiUpdateStatusUnknown = Self(key: "ai.update.status.unknown", english: "Unknown")
+        static let aiUpdateStatusUnsupported = Self(key: "ai.update.status.unsupported", english: "Unsupported")
+        static let aiUpdateStatusUpToDate = Self(key: "ai.update.status.up-to-date", english: "Up to date")
+        static let aiUpdateSummaryAvailable = Self(key: "ai.update.summary.available", english: "Available updates")
+        static let aiUpdateSummaryFailed = Self(key: "ai.update.summary.failed", english: "Failed checks")
+        static let aiUpdateSummaryUnknown = Self(key: "ai.update.summary.unknown", english: "Unknown")
+        static let aiUpdateSummaryUnsupported = Self(key: "ai.update.summary.unsupported", english: "Unsupported")
+        static let aiUpdateSummaryUpToDate = Self(key: "ai.update.summary.up-to-date", english: "Up to date")
         static let aiSkillsEmpty = Self(key: "ai.skills.empty", english: "No skills indexed")
         static let aiAppsDiscovered = Self(key: "ai.apps.discovered", english: "Discovered")
         static let aiStateNotScanned = Self(key: "ai.state.not-scanned", english: "Run a scan to discover AI tools.")
@@ -140,9 +217,39 @@ enum L10n {
         "ai.privacy", "ai.searching", "ai.section", "ai.select-application",
         "ai.skills-visible", "ai.storage-breakdown", "ai.total-indexed-space",
         "ai.section.apps", "ai.section.cli", "ai.overview.apps", "ai.overview.clis",
+        "ai.agents.local", "ai.agents.remote", "ai.agents.local-empty", "ai.agents.remote-empty",
+        "ai.agents.select", "ai.agent.storage", "ai.agent.not-applicable", "ai.agent.module-empty",
+        "ai.agent.form.app", "ai.agent.form.cli", "ai.agent.form.cloud", "ai.agent.form-factors",
         "ai.overview.partial-coverage", "ai.overview.discovering", "ai.overview.discovery-issue",
         "ai.cli.executable", "ai.cli.owner", "ai.cli.status", "ai.cli.available",
-        "ai.cli.empty", "ai.skills.empty", "ai.apps.discovered",
+        "ai.cli.aliases",
+        "ai.cli.empty", "ai.group.bundled", "ai.group.empty", "ai.group.global",
+        "ai.group.no-items", "ai.group.project", "ai.group.scope", "ai.group.select", "ai.group.system",
+        "ai.group.shared-plugins", "ai.group.shared-skills",
+        "ai.group.unknown", "ai.project.add-folder", "ai.project.no-approved-folders",
+        "ai.project.remove-folder", "ai.project.scanning", "ai.skills.empty", "ai.apps.discovered",
+        "ai.project.issue.descriptor-escape", "ai.project.issue.duplicate", "ai.project.issue.invalid-descriptor",
+        "ai.project.issue.home-rejected", "ai.project.issue.invalid-payload", "ai.project.issue.missing", "ai.project.issue.no-supported-assets",
+        "ai.project.issue.not-directory", "ai.project.issue.overlap", "ai.project.issue.plugin-child-escape",
+        "ai.project.issue.root-rejected", "ai.project.issue.symlink-duplicate", "ai.project.issue.tampered",
+        "ai.project.issue.unreadable", "ai.update.cancel", "ai.update.check-now",
+        "ai.update.check-selected", "ai.update.update-selected", "ai.update.deferred",
+        "ai.update.confirm.title", "ai.update.confirm.executable", "ai.update.confirm.skipped",
+        "ai.update.confirm.button", "ai.update.confirm.close", "ai.update.confirm.warning",
+        "ai.update.confirm.via", "ai.update.confirm.running",
+        "ai.update.skip.unsupported", "ai.update.skip.check-only", "ai.update.skip.not-checked",
+        "ai.update.skip.already-latest", "ai.update.skip.no-target", "ai.update.skip.invalid-target",
+        "ai.update.outcome.succeeded", "ai.update.outcome.manager-unavailable", "ai.update.outcome.failed",
+        "ai.update.outcome.timed-out", "ai.update.outcome.cancelled", "ai.update.outcome.version-mismatch",
+        "ai.update.plan.supported", "ai.update.plan.unsupported",
+        "ai.update.evidence.application", "ai.update.evidence.cli", "ai.update.evidence.conflict",
+        "ai.update.evidence.package", "ai.update.evidence.plugin", "ai.update.evidence.skill",
+        "ai.update.evidence.unknown", "ai.update.latest", "ai.update.read-only-footer",
+        "ai.update.section", "ai.update.status", "ai.update.status.available",
+        "ai.update.status.checking", "ai.update.status.failed", "ai.update.status.unknown",
+        "ai.update.status.unsupported", "ai.update.status.up-to-date", "ai.update.summary.available",
+        "ai.update.summary.failed", "ai.update.summary.unknown", "ai.update.summary.unsupported",
+        "ai.update.summary.up-to-date",
         "ai.state.not-scanned", "ai.state.no-results",
         "ai.coverage.permission-denied", "ai.coverage.timeout", "ai.coverage.output-truncated",
         "ai.coverage.invalid-output", "ai.coverage.unavailable", "ai.owner.shared",
@@ -472,6 +579,16 @@ enum L10n {
         }
     }
 
+    static func scopeDetailLabel(_ detail: AIAssetScopeDetail, locale: Locale? = nil) -> String {
+        switch detail {
+        case .global: text(.aiGroupGlobal, locale: locale)
+        case .project(let project): text(.aiGroupProject, locale: locale) + " · " + project.displayName
+        case .bundled: text(.aiGroupBundled, locale: locale)
+        case .system: text(.aiGroupSystem, locale: locale)
+        case .unattributed: text(.aiGroupUnknown, locale: locale)
+        }
+    }
+
     static func name(for status: SkillManagementStatus, locale: Locale? = nil) -> String {
         switch status {
         case .standalone: value("skill.status.standalone", default: "Standalone", locale: locale)
@@ -490,6 +607,43 @@ enum L10n {
         }
     }
 
+    static func name(for source: VersionEvidenceSource, locale: Locale? = nil) -> String {
+        switch source {
+        case .applicationBundle: value("ai.update.evidence.application", default: "Application bundle", locale: locale)
+        case .cliProbe: value("ai.update.evidence.cli", default: "CLI probe", locale: locale)
+        case .packageReceipt: value("ai.update.evidence.package", default: "Package receipt", locale: locale)
+        case .pluginManifest: value("ai.update.evidence.plugin", default: "Plugin manifest", locale: locale)
+        case .skillManifest: value("ai.update.evidence.skill", default: "Skill manifest", locale: locale)
+        }
+    }
+
+    static func name(for issue: ApprovedProjectRootIssue, locale: Locale? = nil) -> String {
+        switch issue {
+        case .invalidPayload: value("ai.project.issue.invalid-payload", default: "Project approval settings could not be read.", locale: locale)
+        case .tamperedIdentity: value("ai.project.issue.tampered", default: "A project approval entry was ignored because its identity did not match its path.", locale: locale)
+        case .missingPath: value("ai.project.issue.missing", default: "An approved project folder no longer exists.", locale: locale)
+        case .notDirectory: value("ai.project.issue.not-directory", default: "The selected project path is not a folder.", locale: locale)
+        case .unreadableDirectory: value("ai.project.issue.unreadable", default: "A project folder cannot be read.", locale: locale)
+        case .filesystemRootRejected: value("ai.project.issue.root-rejected", default: "The filesystem root cannot be approved as a project.", locale: locale)
+        case .homeDirectoryRejected: value("ai.project.issue.home-rejected", default: "Choose a project folder, not your home folder.", locale: locale)
+        case .duplicateRoot: value("ai.project.issue.duplicate", default: "That project folder is already approved.", locale: locale)
+        case .symlinkAliasDuplicate: value("ai.project.issue.symlink-duplicate", default: "That folder points to an already approved project.", locale: locale)
+        case .overlappingRoot: value("ai.project.issue.overlap", default: "Parent and child project folders cannot both be approved.", locale: locale)
+        }
+    }
+
+    static func name(for issue: ProjectAIAssetScanIssue, locale: Locale? = nil) -> String {
+        switch issue {
+        case .invalidDescriptor: value("ai.project.issue.invalid-descriptor", default: "A fixed project asset path was rejected.", locale: locale)
+        case .descriptorEscapesProjectRoot: value("ai.project.issue.descriptor-escape", default: "A project asset path escaped the approved folder.", locale: locale)
+        case .pluginChildEscapesProjectRoot: value("ai.project.issue.plugin-child-escape", default: "A plugin folder escaped the approved project.", locale: locale)
+        case .projectRootMissing: value("ai.project.issue.missing", default: "An approved project folder no longer exists.", locale: locale)
+        case .projectRootNotDirectory: value("ai.project.issue.not-directory", default: "The selected project path is not a folder.", locale: locale)
+        case .projectRootUnreadable: value("ai.project.issue.unreadable", default: "A project folder cannot be read.", locale: locale)
+        case .noSupportedAssets: value("ai.project.issue.no-supported-assets", default: "No supported project asset locations are defined.", locale: locale)
+        }
+    }
+
     static func name(for owner: AIToolOwner, locale: Locale? = nil) -> String {
         switch owner {
         case .shared: value("ai.owner.shared", default: "Shared", locale: locale)
@@ -500,7 +654,7 @@ enum L10n {
     static func aiSectionTitle(for section: AIManagementSection, locale: Locale? = nil) -> String {
         switch section {
         case .overview: overview(locale: locale)
-        case .apps: value("ai.section.apps", default: "AI Apps", locale: locale)
+        case .apps: value("ai.section.apps", default: "AI Agents", locale: locale)
         case .skills: skills(locale: locale)
         case .plugins: plugins(locale: locale)
         case .cli: value("ai.section.cli", default: "CLI Tools", locale: locale)

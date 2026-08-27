@@ -21,8 +21,10 @@
 | AI | ChatGPT 与 Codex 统一产品族 | 已完成 | 应用、数据、Skill 和 Plugin 合并统计 |
 | AI | Claude 深度本地数据分析 | 已完成 | 只分析本地元数据 |
 | AI | Ollama/OpenCode 和任意 AI 工具 | 部分完成 | 不同工具目前覆盖深度不同 |
-| AI 管理 | AI 应用、Plugin、Skill、CLI 工具 | 已完成 | 只读清单和诊断 |
-| Skill | 全局/Codex/Claude/Plugin/系统范围 | 已完成 | 检测重复、冲突和覆盖关系 |
+| AI 管理 | 本地/远程 Agent、Plugin、Skill、CLI 工具 | 已完成 | 按 Agent、所有者和范围分组，展示可信安装证据与覆盖诊断 |
+| AI 管理 | 用户批准项目中的 AI 资产 | 已完成 | 只扫描明确批准的有界项目根目录，拒绝越界和失效配置 |
+| AI 管理 | 版本检查和受控更新 | 已完成 | 仅固定工具定义和预定义包管理器命令可执行；需用户选择并确认，冲突或不支持项保持只读 |
+| Skill | 全局/Codex/Claude/Plugin/系统/项目范围 | 已完成 | 检测重复、冲突、所有者和覆盖关系 |
 | Skill | 在不同 Agent 目录间移动 Skill | 不计划 | 明确的产品安全决策 |
 | Plugin | 清单、组件、Skill 和诊断 | 已完成 | Plugin 管理缓存保持只读 |
 | 清理 | 逐项选择和敏感项确认 | 已完成 | Managed 项不能直接清理 |

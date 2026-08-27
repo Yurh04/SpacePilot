@@ -48,6 +48,9 @@
 | ChatGPT/Codex 产品族合并 | `AI/AIApplicationProductFamilyMerger.swift` | `AIApplicationProductFamilyMergerTests.swift` |
 | 已知工具注册和发现 | `AI/Discovery/AIToolRegistry.swift`、`KnownAIToolDefinitions.swift` | `AIToolRegistryTests.swift` |
 | AI 应用/CLI 合并和安全版本探测 | `AIApplicationJoin.swift`、`SafeCLIVersionProbe.swift` | 对应测试 |
+| Agent 投影、详情和资产分组 | `AIAgentProjection.swift`、`AIAgentDetailProjection.swift`、`AIAssetGroupingProjection.swift` | 对应投影测试 |
+| 用户批准项目和项目 AI 资产 | `ApprovedProjectRoot.swift`、`ProjectRootApprovalPolicy.swift`、`ProjectAIAssetScanner.swift` | 对应批准策略和扫描测试 |
+| 版本检查、选择计划和受控更新 | `AIUpdateChecking.swift`、`AIUpdateSelectionPlan.swift`、`AIUpdateExecutor.swift` | `AIUpdateCheckingTests.swift`、`AIUpdateExecutionTests.swift` |
 | Plugin 目录、清单和组件 | `Sources/SpacePilotCore/Plugins/` | `PluginRootDiscoveryTests.swift`、`PluginScannerTests.swift` |
 | Skill 目录、清单和冲突 | `Sources/SpacePilotCore/Skills/` | `SkillScannerTests.swift`、`SkillConflictDetectorTests.swift` |
 | 开发与 AI 界面 | `Sources/SpacePilot/Views/DeveloperAI/` | `DeveloperAIArchitectureTests.swift`、AI 管理测试 |

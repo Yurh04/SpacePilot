@@ -54,6 +54,21 @@ public struct AIManagementProjection: Sendable, Equatable {
 
     public var isEmpty: Bool { records.isEmpty }
 
+    /// The stable definition IDs of every AI tool that was actually discovered on
+    /// this machine (installed app, CLI, or tool-owned skill/plugin record). The
+    /// Skills/Plugins sidebar seeds a group for each of these so a discovered AI
+    /// with zero skills/plugins still appears (with an honest empty right pane),
+    /// rather than the sidebar only reflecting owners present in asset records.
+    public var discoveredToolDefinitionIDs: Set<String> {
+        var ids: Set<String> = []
+        for record in records {
+            if case .tool(let definitionID) = record.owner {
+                ids.insert(definitionID)
+            }
+        }
+        return ids
+    }
+
     // MARK: - Deterministic ordering
 
     /// A total, stable ordering: by kind, then display name (case-insensitive),

@@ -63,15 +63,22 @@ public struct SafeCLIProbeResult: Sendable, Equatable {
     public let executableURL: URL?
     public let version: String?
     public let coverageFailure: AIToolCoverageFailure?
+    /// Fixed, code-owned alias paths that resolve to the *same* canonical
+    /// executable as `executableURL` (for example `trae-cli` / `trae-agent`
+    /// pointing at `traex`). Surfaced as read-only evidence; never executed
+    /// separately and never turned into a second CLI record.
+    public let aliasExecutableURLs: [URL]
 
     public init(
         executableURL: URL?,
         version: String?,
-        coverageFailure: AIToolCoverageFailure?
+        coverageFailure: AIToolCoverageFailure?,
+        aliasExecutableURLs: [URL] = []
     ) {
         self.executableURL = executableURL
         self.version = version
         self.coverageFailure = coverageFailure
+        self.aliasExecutableURLs = aliasExecutableURLs
     }
 }
 
@@ -89,12 +96,61 @@ public struct SafeCLIVersionProbe: Sendable {
     /// A whitelisted probe: fixed candidate executable locations and fixed
     /// version arguments. No field here is ever sourced from external data.
     struct ProbeSpec: Sendable {
+        /// Fixed executable basename. Manager templates append this basename;
+        /// they never read package manifests or shell PATH.
+        let basename: String
         /// Absolute candidate paths, tried in order.
         let absoluteCandidatePaths: [String]
         /// Home-relative candidate paths, resolved against the home directory.
         let homeRelativeCandidatePaths: [String]
+        /// Fixed app-bundled executable paths, never discovered by display name
+        /// or filesystem search.
+        let appBundledAbsoluteCandidatePaths: [String]
+        /// Fixed `uv` tool package names. Each expands to the code-owned template
+        /// `~/.local/share/uv/tools/<package>/bin/<basename>`; the package token
+        /// is a definition constant, never read from a manifest or shell.
+        let uvToolPackages: [String]
+        /// Fixed npm package identifiers (for example `@openai/codex`,
+        /// `@dp/one-cli`, `botmux`) installed under a Node manager version root.
+        /// A FNM/NVM `installation/bin/<basename>` (or `bin/<basename>`) candidate
+        /// is only accepted when the *same* version root also contains
+        /// `.../lib/node_modules/<packageID>`. This proves the executable belongs
+        /// to the expected published package instead of trusting any file that
+        /// merely shares the basename. The identifier is a code constant; it is
+        /// never read from a manifest, receipt, or shell. Empty means the tool
+        /// is not distributed via a Node manager and gets no FNM/NVM candidate.
+        let nodePackageIdentifiers: [String]
+        /// Fixed alias basenames that resolve (via canonical symlink resolution)
+        /// to the same executable as the primary candidate. Used as read-only
+        /// evidence only; never executed independently.
+        let aliasBasenames: [String]
         /// Fixed arguments used to request the version (for example `--version`).
         let versionArguments: [String]
+
+        init(
+            basename: String,
+            absoluteCandidatePaths: [String],
+            homeRelativeCandidatePaths: [String],
+            appBundledAbsoluteCandidatePaths: [String] = [],
+            uvToolPackages: [String] = [],
+            nodePackageIdentifiers: [String] = [],
+            aliasBasenames: [String] = [],
+            versionArguments: [String]
+        ) {
+            self.basename = basename
+            self.absoluteCandidatePaths = absoluteCandidatePaths
+            self.homeRelativeCandidatePaths = homeRelativeCandidatePaths
+            self.appBundledAbsoluteCandidatePaths = appBundledAbsoluteCandidatePaths
+            self.uvToolPackages = uvToolPackages
+            self.nodePackageIdentifiers = nodePackageIdentifiers
+            self.aliasBasenames = aliasBasenames
+            self.versionArguments = versionArguments
+        }
+    }
+
+    private struct ProbeCandidate: Sendable {
+        let executableURL: URL
+        let environment: [String: String]
     }
 
     /// The only environment the child ever sees. Deliberately minimal, but the
@@ -109,48 +165,151 @@ public struct SafeCLIVersionProbe: Sendable {
     /// The whitelist. Keys must match `AIToolDefinition.cliProbeID`.
     static let whitelist: [String: ProbeSpec] = [
         "codex": ProbeSpec(
+            basename: "codex",
             absoluteCandidatePaths: ["/usr/local/bin/codex", "/opt/homebrew/bin/codex"],
             homeRelativeCandidatePaths: [".local/bin/codex"],
+            appBundledAbsoluteCandidatePaths: ["/Applications/ChatGPT.app/Contents/Resources/codex"],
+            nodePackageIdentifiers: ["@openai/codex"],
             versionArguments: ["--version"]
         ),
         "claude": ProbeSpec(
+            basename: "claude",
             absoluteCandidatePaths: ["/usr/local/bin/claude", "/opt/homebrew/bin/claude"],
             homeRelativeCandidatePaths: [".local/bin/claude"],
+            nodePackageIdentifiers: ["@anthropic-ai/claude-code"],
             versionArguments: ["--version"]
         ),
         "cursor": ProbeSpec(
+            basename: "cursor",
             absoluteCandidatePaths: ["/usr/local/bin/cursor", "/opt/homebrew/bin/cursor"],
             homeRelativeCandidatePaths: [],
             versionArguments: ["--version"]
         ),
         "windsurf": ProbeSpec(
+            basename: "windsurf",
             absoluteCandidatePaths: ["/usr/local/bin/windsurf", "/opt/homebrew/bin/windsurf"],
             homeRelativeCandidatePaths: [],
             versionArguments: ["--version"]
         ),
         "gemini": ProbeSpec(
+            basename: "gemini",
             absoluteCandidatePaths: ["/usr/local/bin/gemini", "/opt/homebrew/bin/gemini"],
             homeRelativeCandidatePaths: [".local/bin/gemini"],
+            nodePackageIdentifiers: ["@google/gemini-cli"],
             versionArguments: ["--version"]
         ),
         "opencode": ProbeSpec(
+            basename: "opencode",
             absoluteCandidatePaths: ["/usr/local/bin/opencode", "/opt/homebrew/bin/opencode"],
             homeRelativeCandidatePaths: [".local/bin/opencode"],
+            nodePackageIdentifiers: ["opencode-ai"],
             versionArguments: ["--version"]
         ),
         "aider": ProbeSpec(
+            basename: "aider",
             absoluteCandidatePaths: ["/usr/local/bin/aider", "/opt/homebrew/bin/aider"],
             homeRelativeCandidatePaths: [".local/bin/aider"],
             versionArguments: ["--version"]
         ),
+        "aiden": ProbeSpec(
+            basename: "aiden",
+            absoluteCandidatePaths: ["/usr/local/bin/aiden", "/opt/homebrew/bin/aiden"],
+            homeRelativeCandidatePaths: [".local/bin/aiden"],
+            versionArguments: ["--version"]
+        ),
+        "trae": ProbeSpec(
+            basename: "trae",
+            absoluteCandidatePaths: ["/usr/local/bin/trae", "/opt/homebrew/bin/trae"],
+            homeRelativeCandidatePaths: [".local/bin/trae"],
+            versionArguments: ["--version"]
+        ),
+        "traework": ProbeSpec(
+            basename: "traework",
+            absoluteCandidatePaths: ["/usr/local/bin/traework", "/opt/homebrew/bin/traework"],
+            homeRelativeCandidatePaths: [".local/bin/traework"],
+            versionArguments: ["--version"]
+        ),
+        "antigravity": ProbeSpec(
+            basename: "antigravity",
+            absoluteCandidatePaths: ["/usr/local/bin/antigravity", "/opt/homebrew/bin/antigravity"],
+            homeRelativeCandidatePaths: [".local/bin/antigravity"],
+            versionArguments: ["--version"]
+        ),
         "copilot": ProbeSpec(
+            basename: "copilot",
             absoluteCandidatePaths: ["/usr/local/bin/copilot", "/opt/homebrew/bin/copilot"],
             homeRelativeCandidatePaths: [],
             versionArguments: ["--version"]
         ),
         "ollama": ProbeSpec(
+            basename: "ollama",
             absoluteCandidatePaths: ["/usr/local/bin/ollama", "/opt/homebrew/bin/ollama"],
             homeRelativeCandidatePaths: [],
+            versionArguments: ["--version"]
+        ),
+        // ByteDance / third-party CLIs confirmed on the target machine. All are
+        // resolved through fixed, code-owned templates (FNM node-versions, uv
+        // tool roots, Homebrew, or an exact home-relative install path). None
+        // read the shell PATH or a package manifest.
+        "merlin-cli": ProbeSpec(
+            basename: "merlin-cli",
+            absoluteCandidatePaths: [],
+            homeRelativeCandidatePaths: [".merlin-cli/bin/merlin-cli"],
+            versionArguments: ["--version"]
+        ),
+        "one": ProbeSpec(
+            basename: "one",
+            absoluteCandidatePaths: ["/usr/local/bin/one", "/opt/homebrew/bin/one"],
+            homeRelativeCandidatePaths: [".local/bin/one"],
+            nodePackageIdentifiers: ["@dp/one-cli"],
+            versionArguments: ["--version"]
+        ),
+        "bytedcli": ProbeSpec(
+            basename: "bytedcli",
+            absoluteCandidatePaths: ["/usr/local/bin/bytedcli", "/opt/homebrew/bin/bytedcli"],
+            homeRelativeCandidatePaths: [".local/bin/bytedcli"],
+            nodePackageIdentifiers: ["@bytedance-dev/bytedcli"],
+            versionArguments: ["--version"]
+        ),
+        "opencli": ProbeSpec(
+            basename: "opencli",
+            absoluteCandidatePaths: ["/usr/local/bin/opencli", "/opt/homebrew/bin/opencli"],
+            homeRelativeCandidatePaths: [".local/bin/opencli"],
+            nodePackageIdentifiers: ["@jackwener/opencli"],
+            versionArguments: ["--version"]
+        ),
+        "botmux": ProbeSpec(
+            basename: "botmux",
+            absoluteCandidatePaths: ["/usr/local/bin/botmux", "/opt/homebrew/bin/botmux"],
+            homeRelativeCandidatePaths: [".local/bin/botmux"],
+            nodePackageIdentifiers: ["botmux"],
+            versionArguments: ["--version"]
+        ),
+        "traex": ProbeSpec(
+            basename: "traex",
+            absoluteCandidatePaths: [],
+            homeRelativeCandidatePaths: [".local/share/traex/current/traex"],
+            aliasBasenames: ["trae-cli", "trae-agent"],
+            versionArguments: ["--version"]
+        ),
+        "lark-cli": ProbeSpec(
+            basename: "lark-cli",
+            absoluteCandidatePaths: ["/opt/homebrew/bin/lark-cli", "/usr/local/bin/lark-cli"],
+            homeRelativeCandidatePaths: [".local/bin/lark-cli"],
+            versionArguments: ["--version"]
+        ),
+        "aime": ProbeSpec(
+            basename: "aime",
+            absoluteCandidatePaths: [],
+            homeRelativeCandidatePaths: [".local/bin/aime"],
+            uvToolPackages: ["togo-cli"],
+            versionArguments: ["--version"]
+        ),
+        "mira": ProbeSpec(
+            basename: "mira",
+            absoluteCandidatePaths: [],
+            homeRelativeCandidatePaths: [".local/bin/mira"],
+            uvToolPackages: ["togo-cli"],
             versionArguments: ["--version"]
         )
     ]
@@ -195,8 +354,8 @@ public struct SafeCLIVersionProbe: Sendable {
             throw UnknownProbeError(probeID: probeID)
         }
 
-        let candidates = candidateURLs(for: spec, homeDirectory: homeDirectory)
-        guard let executableURL = candidates.first(where: { locator.isExecutableFile(at: $0) }) else {
+        let candidates = probeCandidates(for: spec, homeDirectory: homeDirectory)
+        guard let candidate = candidates.first(where: { locator.isExecutableFile(at: $0.executableURL) }) else {
             return SafeCLIProbeResult(
                 executableURL: nil,
                 version: nil,
@@ -204,14 +363,24 @@ public struct SafeCLIVersionProbe: Sendable {
             )
         }
 
+        // Fixed alias basenames (for example `trae-cli` / `trae-agent`) that
+        // canonically resolve to the *same* executable are surfaced as read-only
+        // evidence so the UI shows one CLI with its known aliases instead of
+        // duplicate rows. They are never executed independently.
+        let aliasURLs = resolvedAliasEvidence(
+            for: spec,
+            primary: candidate.executableURL,
+            homeDirectory: homeDirectory
+        )
+
         try Task.checkCancellation()
 
         let output: CLIProcessOutput
         do {
             output = try await runner.run(
-                executableURL: executableURL,
+                executableURL: candidate.executableURL,
                 arguments: spec.versionArguments,
-                environment: Self.fixedEnvironment,
+                environment: candidate.environment,
                 timeout: timeout,
                 maximumOutputBytes: maximumOutputBytes
             )
@@ -219,9 +388,10 @@ public struct SafeCLIVersionProbe: Sendable {
             throw CancellationError()
         } catch {
             return SafeCLIProbeResult(
-                executableURL: executableURL,
+                executableURL: candidate.executableURL,
                 version: nil,
-                coverageFailure: .unavailable
+                coverageFailure: .unavailable,
+                aliasExecutableURLs: aliasURLs
             )
         }
 
@@ -231,9 +401,10 @@ public struct SafeCLIVersionProbe: Sendable {
 
         if output.didTimeout {
             return SafeCLIProbeResult(
-                executableURL: executableURL,
+                executableURL: candidate.executableURL,
                 version: nil,
-                coverageFailure: .timeout
+                coverageFailure: .timeout,
+                aliasExecutableURLs: aliasURLs
             )
         }
 
@@ -242,25 +413,223 @@ public struct SafeCLIVersionProbe: Sendable {
 
         if output.terminationStatus != 0 || parsed == nil {
             return SafeCLIProbeResult(
-                executableURL: executableURL,
+                executableURL: candidate.executableURL,
                 version: parsed,
-                coverageFailure: .invalidOutput
+                coverageFailure: .invalidOutput,
+                aliasExecutableURLs: aliasURLs
             )
         }
 
         return SafeCLIProbeResult(
-            executableURL: executableURL,
+            executableURL: candidate.executableURL,
             version: parsed,
-            coverageFailure: output.outputTruncated ? .outputTruncated : nil
+            coverageFailure: output.outputTruncated ? .outputTruncated : nil,
+            aliasExecutableURLs: aliasURLs
         )
     }
 
-    private func candidateURLs(for spec: ProbeSpec, homeDirectory: URL) -> [URL] {
-        let absolute = spec.absoluteCandidatePaths.map { URL(filePath: $0) }
-        let homeRelative = spec.homeRelativeCandidatePaths.map {
-            homeDirectory.appending(path: $0, directoryHint: .notDirectory)
+    /// Resolves the fixed alias basenames for a spec, keeping only those that
+    /// canonically resolve to the same executable as the primary candidate. The
+    /// alias search location is a code constant (`~/.local/bin/<alias>`); nothing
+    /// is read from PATH or a manifest. The returned URLs are the alias paths as
+    /// declared (pre-resolution) so the UI can show the alias name the user
+    /// knows, deduplicated and deterministically ordered.
+    private func resolvedAliasEvidence(
+        for spec: ProbeSpec,
+        primary: URL,
+        homeDirectory: URL
+    ) -> [URL] {
+        guard !spec.aliasBasenames.isEmpty else { return [] }
+        let canonicalPrimary = primary.standardizedFileURL.resolvingSymlinksInPath().path
+        var seen = Set<String>()
+        var result: [URL] = []
+        for alias in spec.aliasBasenames.sorted() {
+            let aliasURL = homeDirectory.appending(
+                path: ".local/bin/\(alias)",
+                directoryHint: .notDirectory
+            )
+            guard locator.isExecutableFile(at: aliasURL) else { continue }
+            let canonicalAlias = aliasURL.standardizedFileURL.resolvingSymlinksInPath().path
+            guard canonicalAlias == canonicalPrimary else { continue }
+            if seen.insert(aliasURL.standardizedFileURL.path).inserted {
+                result.append(aliasURL)
+            }
         }
-        return absolute + homeRelative
+        return result
+    }
+
+    private func probeCandidates(for spec: ProbeSpec, homeDirectory: URL) -> [ProbeCandidate] {
+        var candidates: [ProbeCandidate] = []
+        // Generic basename candidates (fixed absolute dirs, ~/.local/bin, and the
+        // pnpm global bin) carry no package identity, so any executable that
+        // merely shares the basename would be executed and attributed. They are
+        // only allowed for tools that are NOT distributed as a known npm package.
+        // Node-package tools must instead be resolved through the package-ID
+        // gated FNM/NVM/uv manager templates (plus fixed app-bundled exact paths)
+        // below, so `/usr/local/bin/one`, `~/.local/bin/one`, and
+        // `~/Library/pnpm/bin/one` never bypass the `@dp/one-cli` check.
+        if spec.nodePackageIdentifiers.isEmpty {
+            candidates.append(contentsOf: spec.absoluteCandidatePaths.map {
+                ProbeCandidate(executableURL: URL(filePath: $0), environment: Self.fixedEnvironment)
+            })
+            candidates.append(contentsOf: spec.homeRelativeCandidatePaths.map {
+                ProbeCandidate(
+                    executableURL: homeDirectory.appending(path: $0, directoryHint: .notDirectory),
+                    environment: Self.fixedEnvironment
+                )
+            })
+            candidates.append(ProbeCandidate(
+                executableURL: homeDirectory.appending(path: "Library/pnpm/bin/\(spec.basename)", directoryHint: .notDirectory),
+                environment: Self.fixedEnvironment
+            ))
+        }
+        // FNM/NVM candidates are only offered for tools distributed as a known
+        // npm package. Each candidate is accepted only when its own version root
+        // also contains `.../lib/node_modules/<packageID>` for one of the fixed
+        // identifiers, so a random executable that merely shares the basename in
+        // some Node version's bin directory is never executed or attributed.
+        if !spec.nodePackageIdentifiers.isEmpty {
+            candidates.append(contentsOf: versionedManagerCandidates(
+                homeDirectory: homeDirectory,
+                managerRootRelativePath: ".local/share/fnm/node-versions",
+                executableTail: "installation/bin/\(spec.basename)",
+                nodeModulesTail: "installation/lib/node_modules",
+                requiredPackageIdentifiers: spec.nodePackageIdentifiers
+            ))
+            candidates.append(contentsOf: versionedManagerCandidates(
+                homeDirectory: homeDirectory,
+                managerRootRelativePath: ".nvm/versions/node",
+                executableTail: "bin/\(spec.basename)",
+                nodeModulesTail: "lib/node_modules",
+                requiredPackageIdentifiers: spec.nodePackageIdentifiers
+            ))
+        }
+        // Fixed `uv` tool layout: ~/.local/share/uv/tools/<package>/bin/<basename>.
+        // Both the package token and the basename are definition constants. The
+        // canonical tool root must stay inside the canonical uv tools manager
+        // root (rejecting a symlinked package dir that escapes the tree), and
+        // the canonical executable must stay inside that tool root.
+        if !spec.uvToolPackages.isEmpty {
+            let uvToolsRoot = homeDirectory
+                .appending(path: ".local/share/uv/tools", directoryHint: .isDirectory)
+                .standardizedFileURL
+                .resolvingSymlinksInPath()
+            for package in spec.uvToolPackages {
+                let toolRoot = uvToolsRoot
+                    .appending(path: package, directoryHint: .isDirectory)
+                    .standardizedFileURL
+                    .resolvingSymlinksInPath()
+                guard toolRoot.hasPathComponentPrefix(uvToolsRoot) else { continue }
+                let executableURL = toolRoot.appending(path: "bin/\(spec.basename)", directoryHint: .notDirectory)
+                let canonicalExecutable = executableURL.standardizedFileURL.resolvingSymlinksInPath()
+                guard canonicalExecutable.hasPathComponentPrefix(toolRoot) else { continue }
+                candidates.append(ProbeCandidate(
+                    executableURL: canonicalExecutable,
+                    environment: Self.fixedEnvironment
+                ))
+            }
+        }
+        candidates.append(contentsOf: spec.appBundledAbsoluteCandidatePaths.map {
+            ProbeCandidate(executableURL: URL(filePath: $0), environment: Self.fixedEnvironment)
+        })
+
+        var seen = Set<String>()
+        return candidates.filter { candidate in
+            seen.insert(candidate.executableURL.standardizedFileURL.path).inserted
+        }
+    }
+
+    private func versionedManagerCandidates(
+        homeDirectory: URL,
+        managerRootRelativePath: String,
+        executableTail: String,
+        nodeModulesTail: String,
+        requiredPackageIdentifiers: [String]
+    ) -> [ProbeCandidate] {
+        let managerRoot = homeDirectory.appending(path: managerRootRelativePath, directoryHint: .isDirectory)
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
+        guard let versions = try? FileManager.default.contentsOfDirectory(
+            at: managerRoot,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+
+        return versions.compactMap { versionDirectory -> (candidate: ProbeCandidate, versionName: String)? in
+            let canonicalVersionDirectory = versionDirectory.standardizedFileURL.resolvingSymlinksInPath()
+            guard canonicalVersionDirectory.hasPathComponentPrefix(managerRoot),
+                  (try? canonicalVersionDirectory.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else {
+                return nil
+            }
+            // Require that this version root actually installed one of the fixed
+            // npm packages. Without this the probe would run any executable that
+            // merely shares the basename in a Node version's bin directory and
+            // attribute it to the AI tool. The node_modules root is kept inside
+            // the version directory (symlink escape rejected) before it is used.
+            guard Self.versionRootInstalledExpectedPackage(
+                canonicalVersionDirectory: canonicalVersionDirectory,
+                nodeModulesTail: nodeModulesTail,
+                requiredPackageIdentifiers: requiredPackageIdentifiers
+            ) else {
+                return nil
+            }
+            let executableURL = canonicalVersionDirectory.appending(path: executableTail, directoryHint: .notDirectory)
+            let canonicalExecutable = executableURL.standardizedFileURL.resolvingSymlinksInPath()
+            let installBin = canonicalExecutable.deletingLastPathComponent()
+            guard canonicalExecutable.hasPathComponentPrefix(canonicalVersionDirectory),
+                  installBin.hasPathComponentPrefix(canonicalVersionDirectory) else {
+                return nil
+            }
+            return (ProbeCandidate(
+                executableURL: canonicalExecutable,
+                environment: Self.environment(prependingVerifiedBin: installBin)
+            ), canonicalVersionDirectory.lastPathComponent)
+        }
+        .sorted { lhs, rhs in
+            let lhsKey = VersionSortKey(lhs.versionName)
+            let rhsKey = VersionSortKey(rhs.versionName)
+            if lhsKey != rhsKey { return lhsKey > rhsKey }
+            return lhs.candidate.executableURL.path < rhs.candidate.executableURL.path
+        }
+        .map(\.candidate)
+    }
+
+    /// Returns true when the Node version root contains an installed package
+    /// directory for one of the fixed identifiers under its `node_modules`. A
+    /// scoped identifier such as `@openai/codex` is resolved a component at a
+    /// time and the canonical package directory must stay inside the version
+    /// root's `node_modules`, so a symlinked package that escapes the tree is
+    /// rejected. Only directory existence is checked; nothing is read or run.
+    private static func versionRootInstalledExpectedPackage(
+        canonicalVersionDirectory: URL,
+        nodeModulesTail: String,
+        requiredPackageIdentifiers: [String]
+    ) -> Bool {
+        let nodeModulesRoot = canonicalVersionDirectory
+            .appending(path: nodeModulesTail, directoryHint: .isDirectory)
+            .standardizedFileURL
+            .resolvingSymlinksInPath()
+        guard nodeModulesRoot.hasPathComponentPrefix(canonicalVersionDirectory) else { return false }
+        for identifier in requiredPackageIdentifiers {
+            var packageURL = nodeModulesRoot
+            for component in identifier.split(separator: "/", omittingEmptySubsequences: true) {
+                packageURL = packageURL.appending(path: String(component), directoryHint: .isDirectory)
+            }
+            let canonicalPackage = packageURL.standardizedFileURL.resolvingSymlinksInPath()
+            guard canonicalPackage.hasPathComponentPrefix(nodeModulesRoot) else { continue }
+            var isDirectory: ObjCBool = false
+            if FileManager.default.fileExists(atPath: canonicalPackage.path, isDirectory: &isDirectory),
+               isDirectory.boolValue {
+                return true
+            }
+        }
+        return false
+    }
+
+    private static func environment(prependingVerifiedBin bin: URL) -> [String: String] {
+        var environment = fixedEnvironment
+        environment["PATH"] = bin.path + ":" + (fixedEnvironment["PATH"] ?? "")
+        return environment
     }
 
     /// Extracts a plausible version string from captured output. To reject
@@ -513,5 +882,43 @@ private extension Duration {
     var seconds: Double {
         let components = self.components
         return Double(components.seconds) + Double(components.attoseconds) / 1e18
+    }
+}
+
+private struct VersionSortKey: Comparable, Equatable {
+    let numericComponents: [Int]
+    let fallback: String
+
+    init(_ raw: String) {
+        let trimmed = raw.trimmingCharacters(in: CharacterSet(charactersIn: "vV"))
+        let parts = trimmed.split(separator: ".").map(String.init)
+        let parsed = parts.map { Int($0) }
+        if !parsed.isEmpty, parsed.allSatisfy({ $0 != nil }) {
+            self.numericComponents = parsed.map { $0 ?? 0 }
+        } else {
+            self.numericComponents = []
+        }
+        self.fallback = raw
+    }
+
+    static func < (lhs: VersionSortKey, rhs: VersionSortKey) -> Bool {
+        if !lhs.numericComponents.isEmpty || !rhs.numericComponents.isEmpty {
+            let count = max(lhs.numericComponents.count, rhs.numericComponents.count)
+            for index in 0..<count {
+                let lhsValue = index < lhs.numericComponents.count ? lhs.numericComponents[index] : 0
+                let rhsValue = index < rhs.numericComponents.count ? rhs.numericComponents[index] : 0
+                if lhsValue != rhsValue { return lhsValue < rhsValue }
+            }
+        }
+        return lhs.fallback < rhs.fallback
+    }
+}
+
+private extension URL {
+    func hasPathComponentPrefix(_ prefix: URL) -> Bool {
+        let components = pathComponents
+        let prefixComponents = prefix.pathComponents
+        guard prefixComponents.count <= components.count else { return false }
+        return Array(components.prefix(prefixComponents.count)) == prefixComponents
     }
 }

@@ -158,6 +158,32 @@ final class LocalizationTests: XCTestCase {
         XCTAssertEqual(L10n.noPluginsInstalled(locale: Locale(identifier: "zh-Hans")), "未安装插件")
     }
 
+    func testAIGroupingLabelsAreTranslated() {
+        XCTAssertEqual(L10n.text(.aiGroupGlobal, locale: Locale(identifier: "en")), "Global")
+        XCTAssertEqual(L10n.text(.aiGroupGlobal, locale: Locale(identifier: "zh-Hans")), "全局")
+        XCTAssertEqual(L10n.text(.aiGroupNoItems, locale: Locale(identifier: "en")), "No items in this group")
+        XCTAssertEqual(L10n.text(.aiGroupNoItems, locale: Locale(identifier: "zh-Hans")), "此分组中没有项目")
+    }
+
+    func testAIProjectApprovalLabelsAreTranslated() {
+        let english = Locale(identifier: "en")
+        let chinese = Locale(identifier: "zh-Hans")
+
+        XCTAssertEqual(L10n.text(.aiProjectAddFolder, locale: english), "Add Project Folder…")
+        XCTAssertEqual(L10n.text(.aiProjectAddFolder, locale: chinese), "添加项目文件夹…")
+        XCTAssertEqual(
+            L10n.name(for: ApprovedProjectRootIssue.homeDirectoryRejected, locale: english),
+            "Choose a project folder, not your home folder."
+        )
+        XCTAssertEqual(
+            L10n.name(for: ProjectAIAssetScanIssue.noSupportedAssets, locale: chinese),
+            "没有已定义的受支持项目资产位置。"
+        )
+        XCTAssertEqual(L10n.text(.aiUpdateCheckNow, locale: english), "Check for Updates")
+        XCTAssertEqual(L10n.text(.aiUpdateStatusUnsupported, locale: chinese), "不支持")
+        XCTAssertEqual(L10n.name(for: VersionEvidenceSource.packageReceipt, locale: english), "Package receipt")
+    }
+
     func testSelectiveCleanupAndStorageWorkbenchUseBothLanguages() {
         let english = Locale(identifier: "en")
         let chinese = Locale(identifier: "zh-Hans")
@@ -284,7 +310,7 @@ final class LocalizationTests: XCTestCase {
         let english = try stringsTable(at: resources.appending(path: "en.lproj/Localizable.strings"))
         let chinese = try stringsTable(at: resources.appending(path: "zh-Hans.lproj/Localizable.strings"))
 
-        XCTAssertEqual(L10n.allKeys.count, 234)
+        XCTAssertEqual(L10n.allKeys.count, 325)
         XCTAssertEqual(Set(catalogStrings.keys), L10n.allKeys)
         XCTAssertEqual(Set(english.keys), L10n.allKeys)
         XCTAssertEqual(Set(chinese.keys), L10n.allKeys)
