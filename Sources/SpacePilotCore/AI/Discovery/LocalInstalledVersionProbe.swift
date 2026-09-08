@@ -62,7 +62,11 @@ public struct LocalInstalledVersionProbe: InstalledVersionProbing {
             let text = (String(data: output.standardOutput, encoding: .utf8) ?? "")
                 + "\n"
                 + (String(data: output.standardError, encoding: .utf8) ?? "")
-            return Self.parseVersion(from: text, packageIdentifier: packageIdentifier)
+            return Self.parseVersion(
+                from: text,
+                packageIdentifier: packageIdentifier,
+                comparator: manager.versionComparator
+            )
         } catch {
             return nil
         }
@@ -71,33 +75,48 @@ public struct LocalInstalledVersionProbe: InstalledVersionProbing {
     /// Parses "<package>@<version>" or "<package> <version>" occurrences from a
     /// manager listing, returning the first version associated with the exact
     /// package identifier. Only trusted constant package identifiers are matched.
-    static func parseVersion(from text: String, packageIdentifier: String) -> String? {
+    /// A candidate token is accepted only when it parses under the manager's
+    /// version scheme (`comparator`), so a PyPI version such as `1.2.post1` is
+    /// not silently rejected by a strict SemVer check.
+    static func parseVersion(
+        from text: String,
+        packageIdentifier: String,
+        comparator: VersionComparatorKind
+    ) -> String? {
         for rawLine in text.split(whereSeparator: { $0.isNewline }) {
             let line = rawLine.trimmingCharacters(in: .whitespaces)
             // "name@version" (npm/pnpm) — the package identifier may itself
             // contain a scope "@scope/name", so match on the LAST "@".
             if line.contains(packageIdentifier) {
-                let scanned = scanTrailingVersion(line: line, packageIdentifier: packageIdentifier)
+                let scanned = scanTrailingVersion(
+                    line: line,
+                    packageIdentifier: packageIdentifier,
+                    comparator: comparator
+                )
                 if let scanned { return scanned }
             }
         }
         return nil
     }
 
-    private static func scanTrailingVersion(line: String, packageIdentifier: String) -> String? {
+    private static func scanTrailingVersion(
+        line: String,
+        packageIdentifier: String,
+        comparator: VersionComparatorKind
+    ) -> String? {
         // Find "<packageIdentifier>@<version>" first.
         if let range = line.range(of: packageIdentifier + "@") {
             let rest = line[range.upperBound...]
             let token = rest.prefix { !$0.isWhitespace }
             let candidate = String(token)
-            if SemVerComparator.compare(candidate, candidate) != nil { return candidate }
+            if VersionComparator.isValid(candidate, kind: comparator) { return candidate }
         }
         // Fallback "<packageIdentifier> <version>" (pipx --short style).
         if let range = line.range(of: packageIdentifier) {
             let rest = line[range.upperBound...].drop { $0.isWhitespace }
             let token = rest.prefix { !$0.isWhitespace }
             let candidate = String(token)
-            if SemVerComparator.compare(candidate, candidate) != nil { return candidate }
+            if VersionComparator.isValid(candidate, kind: comparator) { return candidate }
         }
         return nil
     }

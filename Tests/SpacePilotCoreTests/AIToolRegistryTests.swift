@@ -40,6 +40,29 @@ final class AIToolRegistryTests: XCTestCase {
         }
     }
 
+    /// Emits a distinct version string per executable basename, so a discovery
+    /// pass that probes several CLIs concurrently can be checked for correct
+    /// per-definition attribution (no result routed to the wrong tool).
+    private struct VersionByBasenameRunner: CLIProcessRunning {
+        let versions: [String: String]
+        func run(
+            executableURL: URL,
+            arguments: [String],
+            environment: [String: String],
+            timeout: Duration,
+            maximumOutputBytes: Int
+        ) async throws -> CLIProcessOutput {
+            let version = versions[executableURL.lastPathComponent] ?? "0.0.0"
+            return CLIProcessOutput(
+                standardOutput: Data("\(version)\n".utf8),
+                standardError: Data(),
+                terminationStatus: 0,
+                didTimeout: false,
+                outputTruncated: false
+            )
+        }
+    }
+
     private struct NeverExecutableLocator: ExecutableLocating {
         func isExecutableFile(at url: URL) -> Bool { false }
     }
@@ -485,6 +508,23 @@ final class AIToolRegistryTests: XCTestCase {
         XCTAssertEqual(record.evidence.dataRoots.count, 1)
     }
 
+    /// A symlinked root and its real target are the *same* location on disk, so
+    /// evidence merging must collapse them to a single entry. This exercises the
+    /// symlink-resolving half of the canonical key that a purely lexical
+    /// (`standardizedFileURL`-only) normalization would miss: without resolving
+    /// the link, the two distinct spellings survive as duplicate data roots.
+    func testSymlinkedDataRootDeduplicatesAgainstItsTarget() throws {
+        let tree = try TemporaryTree(files: [:])
+        let real = tree.url.appending(path: "real-claude", directoryHint: .isDirectory)
+        let link = tree.url.appending(path: "linked-claude", directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(at: real, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: real)
+
+        let merged = AIToolEvidence.mergeURLsForDiscovery([real], [link])
+
+        XCTAssertEqual(merged.count, 1)
+    }
+
     // MARK: - Stable IDs
 
     func testStableIDIsDeterministicAcrossRuns() async throws {
@@ -513,6 +553,60 @@ final class AIToolRegistryTests: XCTestCase {
             first.first?.id,
             "application:codex:/Applications/Codex.app"
         )
+    }
+
+    // MARK: - Concurrent CLI probing
+
+    /// Probes run concurrently, but each result must be attributed to its own
+    /// definition (no cross-talk between the parallel probes) and the assembled
+    /// record order must stay deterministic across runs.
+    func testConcurrentCLIProbesAttributeVersionsPerDefinitionAndKeepStableOrder() async throws {
+        let tree = try TemporaryTree(files: [:])
+
+        // Three CLI-only tools, each with a distinct home-relative executable.
+        // These probe specs carry no `nodePackageIdentifiers`, so the generic
+        // `~/.local/bin/<basename>` candidate is used directly; a fixture
+        // executable at that path is enough to exercise the probe without
+        // replicating the FNM/NVM package-gated layout that node-distributed
+        // tools (claude, gemini) require.
+        for basename in ["aider", "aiden", "antigravity"] {
+            try makeExecutable(at: tree.url.appending(
+                path: ".local/bin/\(basename)",
+                directoryHint: .notDirectory
+            ))
+        }
+        let definitions = KnownAIToolDefinitions.all
+            .filter { ["aider", "aiden", "antigravity"].contains($0.id) }
+        let registry = AIToolRegistry(
+            definitions: definitions,
+            applicationLocator: StubApplicationLocator(installed: [:]),
+            directoryProbe: StubDirectoryProbe(results: [:]),
+            cliProbe: SafeCLIVersionProbe(
+                runner: VersionByBasenameRunner(versions: [
+                    "aider": "7.8.9",
+                    "aiden": "1.2.3",
+                    "antigravity": "4.5.6"
+                ]),
+                locator: LocalExecutableLocator()
+            )
+        )
+
+        let first = try await registry.discover(homeDirectory: tree.url)
+        let second = try await registry.discover(homeDirectory: tree.url)
+
+        // Order is deterministic despite concurrent probing.
+        XCTAssertEqual(first.map(\.id), second.map(\.id))
+
+        // Each probe's version landed on the correct definition, proving no
+        // result was routed to the wrong tool under concurrency.
+        func version(for definitionID: String) -> String? {
+            first.first {
+                $0.kind == .cli && $0.owner == .tool(definitionID: definitionID)
+            }?.evidence.detectedVersion
+        }
+        XCTAssertEqual(version(for: "aider"), "7.8.9")
+        XCTAssertEqual(version(for: "aiden"), "1.2.3")
+        XCTAssertEqual(version(for: "antigravity"), "4.5.6")
     }
 
     // MARK: - Cancellation propagation

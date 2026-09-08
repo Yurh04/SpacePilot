@@ -115,6 +115,14 @@ public struct AIToolRegistry: Sendable {
     /// definitions. Cancellation is never masked as an empty or `unavailable`
     /// result.
     public func discover(homeDirectory: URL) async throws -> [AIToolRecord] {
+        // CLI probing is the one slow, blocking part of discovery: each probe may
+        // spawn a subprocess and wait up to the per-probe timeout. Run every
+        // probe concurrently up front, then assemble records in the original
+        // serial order below so the output — and thus `dedupedByID`'s
+        // first-appearance ordering — is byte-for-byte identical to a fully
+        // serial pass.
+        let probeResults = try await probeAllCLIs(homeDirectory: homeDirectory)
+
         var records: [AIToolRecord] = []
 
         for definition in definitions {
@@ -146,15 +154,10 @@ public struct AIToolRegistry: Sendable {
                 records.append(appRecord)
             }
 
-            if let probeID = definition.cliProbeID {
-                if let cliRecord = try await cliRecord(
-                    for: definition,
-                    owner: owner,
-                    probeID: probeID,
-                    homeDirectory: homeDirectory
-                ) {
-                    records.append(cliRecord)
-                }
+            if definition.cliProbeID != nil,
+               let result = probeResults[definition.id],
+               let cliRecord = cliRecord(from: result, for: definition, owner: owner) {
+                records.append(cliRecord)
             }
 
             records.append(contentsOf: rootRecords(
@@ -172,6 +175,76 @@ public struct AIToolRegistry: Sendable {
         }
 
         return dedupedByID(records)
+    }
+
+    /// Runs every definition's CLI version probe concurrently, keyed by the
+    /// owning definition's id. A bounded window caps how many child processes can
+    /// be in flight at once so a machine with many installed CLIs never spawns
+    /// them all simultaneously; probes for tools that are not installed return
+    /// almost immediately without spawning anything.
+    ///
+    /// Cancellation propagates: a cancelled child throws `CancellationError`,
+    /// which `group.next()` rethrows here and which cancels the remaining
+    /// children. Unknown-probe and probe errors are absorbed as "no result" (the
+    /// definition simply produces no CLI record), matching the serial behavior.
+    private func probeAllCLIs(homeDirectory: URL) async throws -> [String: SafeCLIProbeResult] {
+        let probeTargets: [(definitionID: String, probeID: String)] = definitions.compactMap {
+            guard let probeID = $0.cliProbeID else { return nil }
+            return ($0.id, probeID)
+        }
+        guard !probeTargets.isEmpty else { return [:] }
+
+        // Generous enough to probe every realistically-installed CLI at once,
+        // while still bounding the worst case where many probes must time out.
+        let maxConcurrent = 8
+
+        var results: [String: SafeCLIProbeResult] = [:]
+        results.reserveCapacity(probeTargets.count)
+
+        try await withThrowingTaskGroup(
+            of: (String, SafeCLIProbeResult?).self
+        ) { group in
+            var next = 0
+            let window = min(maxConcurrent, probeTargets.count)
+            while next < window {
+                let target = probeTargets[next]
+                group.addTask {
+                    (target.definitionID, try await self.probeResult(probeID: target.probeID, homeDirectory: homeDirectory))
+                }
+                next += 1
+            }
+
+            while let (definitionID, result) = try await group.next() {
+                if let result { results[definitionID] = result }
+                if next < probeTargets.count {
+                    let target = probeTargets[next]
+                    group.addTask {
+                        (target.definitionID, try await self.probeResult(probeID: target.probeID, homeDirectory: homeDirectory))
+                    }
+                    next += 1
+                }
+            }
+        }
+
+        return results
+    }
+
+    /// Probes one CLI, mapping the probe's expected errors to `nil` (no record)
+    /// while re-throwing cancellation so it is never masked as a missing CLI.
+    private func probeResult(
+        probeID: String,
+        homeDirectory: URL
+    ) async throws -> SafeCLIProbeResult? {
+        do {
+            return try await cliProbe.probeVersion(probeID: probeID, homeDirectory: homeDirectory)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch is SafeCLIVersionProbe.UnknownProbeError {
+            // Definition references a probe not in the whitelist; skip silently.
+            return nil
+        } catch {
+            return nil
+        }
     }
 
     // MARK: - Application
@@ -251,28 +324,14 @@ public struct AIToolRegistry: Sendable {
 
     // MARK: - CLI
 
+    /// Builds a CLI record from an already-computed probe result. Pure and
+    /// synchronous: the process work happened in `probeAllCLIs`, so record
+    /// assembly can run in the original serial order without any awaiting.
     private func cliRecord(
+        from result: SafeCLIProbeResult,
         for definition: AIToolDefinition,
-        owner: AIToolOwner,
-        probeID: String,
-        homeDirectory: URL
-    ) async throws -> AIToolRecord? {
-        let result: SafeCLIProbeResult
-        do {
-            result = try await cliProbe.probeVersion(
-                probeID: probeID,
-                homeDirectory: homeDirectory
-            )
-        } catch is CancellationError {
-            // Never mask cancellation as a missing/unavailable CLI.
-            throw CancellationError()
-        } catch is SafeCLIVersionProbe.UnknownProbeError {
-            // Definition references a probe not in the whitelist; skip silently.
-            return nil
-        } catch {
-            return nil
-        }
-
+        owner: AIToolOwner
+    ) -> AIToolRecord? {
         guard let executableURL = result.executableURL else {
             // CLI not installed; no record.
             return nil
@@ -397,9 +456,11 @@ public struct AIToolRegistry: Sendable {
 
     /// Produces a canonical key for a URL, resolving symbolic links and
     /// standardizing the path so that symlinked or `..`-laden paths that point
-    /// at the same location deduplicate correctly.
+    /// at the same location deduplicate correctly. Delegates to the shared
+    /// `canonicalizedDiscoveryPath` so every discovery keying site agrees on one
+    /// normalization order.
     static func canonicalKey(_ url: URL) -> String {
-        url.resolvingSymlinksInPath().standardizedFileURL.path
+        url.canonicalizedDiscoveryPath
     }
 
     // MARK: - Dedup

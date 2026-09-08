@@ -188,7 +188,8 @@ public struct AIUpdateExecutor: Sendable {
                 manager: item.manager,
                 packageIdentifier: item.packageIdentifier
             )
-            if let installed, SemVerComparator.compare(installed, item.targetVersion) == .orderedSame {
+            if let installed,
+               VersionComparator.compare(installed, item.targetVersion, kind: item.manager.versionComparator) == .orderedSame {
                 return .succeeded(installedVersion: installed)
             }
             return .versionMismatch(observed: installed)

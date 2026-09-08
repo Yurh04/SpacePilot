@@ -119,7 +119,7 @@ final class FinderRevealArchitectureTests: XCTestCase {
             at: "Sources/SpacePilot/Views/DeveloperAI/AIApplicationDetailView.swift"
         )
         let workspace = try source(
-            at: "Sources/SpacePilot/Views/DeveloperAI/AIAgentsSectionView.swift"
+            at: "Sources/SpacePilot/Views/DeveloperAI/DeveloperAIView.swift"
         )
 
         XCTAssertGreaterThanOrEqual(
@@ -132,7 +132,7 @@ final class FinderRevealArchitectureTests: XCTestCase {
         XCTAssertTrue(detail.contains(".width(min: 52, ideal: 64, max: 76)"))
         XCTAssertTrue(detail.contains(".width(min: 88, ideal: 110, max: 124)"))
         XCTAssertTrue(detail.contains(".width(min: 76, ideal: 92, max: 104)"))
-        XCTAssertTrue(workspace.contains(".frame(minWidth: 420, maxWidth: .infinity"))
+        XCTAssertTrue(workspace.contains("HSplitView"))
         XCTAssertTrue(detail.contains("GeometryReader { geometry in"))
         XCTAssertTrue(detail.contains("PluginTableLayoutMode(availableWidth: geometry.size.width)"))
         XCTAssertTrue(detail.contains("private var compactPluginTable"))
@@ -147,7 +147,7 @@ final class FinderRevealArchitectureTests: XCTestCase {
             at: "Sources/SpacePilot/Views/Applications/ApplicationsView.swift"
         )
         let developerAI = try source(
-            at: "Sources/SpacePilot/Views/DeveloperAI/AIAgentsSectionView.swift"
+            at: "Sources/SpacePilot/Views/DeveloperAI/DeveloperAIView.swift"
         )
         let developerAIShell = try source(
             at: "Sources/SpacePilot/Views/DeveloperAI/DeveloperAIView.swift"
@@ -167,12 +167,11 @@ final class FinderRevealArchitectureTests: XCTestCase {
         XCTAssertTrue(applications.contains(".simultaneousGesture("))
         XCTAssertTrue(applications.contains("selection = projection.id"))
         XCTAssertTrue(applications.contains("List(visibleAssociations, selection: $selectedAssociationID)"))
-        // AI Agents sidebar uses two flat Lists split by locality (local top,
-        // remote bottom), each with its own unified selection binding and no
-        // per-row tap gesture; each list's native adapter maps clickedRow to that
-        // list's entries[row].
-        XCTAssertTrue(developerAI.contains("List(localAgents, selection: $selectedEntryID)"))
-        XCTAssertTrue(developerAI.contains("List(remoteAgents, selection: $selectedEntryID)"))
+        // The Developer & AI sidebar is one List whose rows are Overview, the
+        // discovered Agents, then the capability rows — all sharing a single
+        // selection binding and with no per-row tap gesture.
+        XCTAssertTrue(developerAI.contains("List(selection: $sidebarRow)"))
+        XCTAssertTrue(developerAI.contains("ForEach(allAgents)"))
         XCTAssertFalse(developerAI.contains(".simultaneousGesture("))
         XCTAssertFalse(developerAI.contains(".onTapGesture(count: 2)"))
         XCTAssertTrue(storage.contains("selection: $selectedItemIDs"))
@@ -225,7 +224,7 @@ final class FinderRevealArchitectureTests: XCTestCase {
     }
 
     func testFallbackHelpersAreUsedAtAIDisplayAndHistorySurfaces() throws {
-        let aiList = try source(at: "Sources/SpacePilot/Views/DeveloperAI/AIAgentsSectionView.swift")
+        let aiList = try source(at: "Sources/SpacePilot/Views/DeveloperAI/DeveloperAIView.swift")
         let aiDetail = try source(at: "Sources/SpacePilot/Views/DeveloperAI/AIApplicationDetailView.swift")
         let history = try source(at: "Sources/SpacePilot/Views/History/CleanupHistoryView.swift")
 

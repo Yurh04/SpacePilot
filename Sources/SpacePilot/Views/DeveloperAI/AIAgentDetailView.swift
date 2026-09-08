@@ -1,37 +1,83 @@
 import SpacePilotCore
 import SwiftUI
 
-/// The detail pane for one selected AI Agent. Renders four modules driven purely
-/// by `AIAgentDetailProjection` (Core does the filtering/counting; this view does
-/// no file-system work):
+/// The detail pane for one selected AI Agent.
 ///
-/// - **Overview** — identity, locality, form factors, detected version, evidence
-///   paths and any coverage issues.
-/// - **Data & Storage** — the Agent's fixed data/config roots with the sizes the
-///   snapshot already computed (never recomputed here).
-/// - **Plugins** / **Skills** — assets owned by this Agent's definition only
-///   (shared assets stay in the Global pages).
+/// Content is split across four top tabs rather than one long scroll, because
+/// the four things a user asks about an Agent are different questions:
 ///
-/// A local Agent always shows all four modules, keeping an honest empty state
-/// when a module has zero items. A remote Agent shows "Not applicable" for the
-/// modules it does not manage locally. Double-click on a table row reveals the
-/// underlying file via the native adapter; there is no per-cell tap gesture.
+/// - **Overview** — identity, version, evidence paths, global instructions,
+///   coverage issues.
+/// - **Storage** — the Agent's data/config roots with sizes from the snapshot.
+/// - **Plugins** — plugins owned by this Agent's definition.
+/// - **Skills** — split by an explicit "This Agent" / "Global" switch, since a
+///   shared Skill is deletable machine-wide while an owned one is not.
+///
+/// MCP servers and Hooks appear under Overview: both are small, config-derived
+/// lists that describe how the Agent is wired, not things it stores.
+///
+/// A local Agent always shows all four tabs, keeping an honest empty state when
+/// one has zero items. A remote Agent shows "Not applicable" for what it does
+/// not manage locally.
 struct AIAgentDetailView: View {
     let detail: AIAgentDetailProjection
+    let mcpServers: [MCPServerRecord]
+    let hooks: [HookRecord]
+    let instructionFiles: [AgentInstructionFile]
+    let configProfile: AgentConfigProfile?
     let revealURL: URL?
     let formFactorLabels: [String]
+    @State private var tab: Tab = .overview
+    @State private var skillsScope: SkillsScope = .agent
+
+    enum Tab: Hashable, CaseIterable {
+        case overview
+        case storage
+        case plugins
+        case skills
+
+        var title: String {
+            switch self {
+            case .overview: L10n.overview()
+            case .storage: L10n.text(.aiAgentStorage)
+            case .plugins: L10n.plugins()
+            case .skills: L10n.skills()
+            }
+        }
+    }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                header
-                overviewModule
-                storageModule
-                pluginsModule
-                skillsModule
+        VStack(alignment: .leading, spacing: 0) {
+            header
+                .padding([.horizontal, .top])
+            Picker("", selection: $tab) {
+                ForEach(Tab.allCases, id: \.self) { Text($0.title).tag($0) }
             }
-            .padding()
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(.horizontal)
+            .padding(.vertical, 10)
+            Divider()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    switch tab {
+                    case .overview:
+                        overviewModule
+                        if let configProfile, !configProfile.isEmpty { modelConfigModule(configProfile) }
+                        if !mcpServers.isEmpty { mcpModule }
+                        if !hooks.isEmpty { hooksModule }
+                    case .storage:
+                        storageModule
+                        if !detail.storageBreakdown.isEmpty { breakdownModule }
+                    case .plugins:
+                        pluginsModule
+                    case .skills:
+                        skillsModule
+                    }
+                }
+                .padding()
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
     }
 
@@ -89,12 +135,119 @@ struct AIAgentDetailView: View {
             ForEach(detail.overview.aliasExecutableURLs, id: \.self) { alias in
                 evidenceRow(L10n.text(.aiCLIAliases), path: alias.path)
             }
+            ForEach(instructionFiles) { file in
+                LabeledContent(L10n.text(.aiAgentInstructions)) {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        // Title if the file declares one, else the file name.
+                        Text(file.title ?? file.url.lastPathComponent)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        // Line count is the useful number here: it says how much is
+                        // being injected into every session.
+                        Text(verbatim: "\(file.url.lastPathComponent) · \(file.lineCount) · \(ByteCount.string(file.allocatedSize))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                        if !file.sections.isEmpty {
+                            Text(file.sections.joined(separator: " · "))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                                .truncationMode(.tail)
+                        }
+                    }
+                }
+            }
             ForEach(sortedCoverage, id: \.self) { failure in
                 LabeledContent(L10n.text(.aiOverviewDiscoveryIssue)) {
                     Text(verbatim: L10n.name(for: failure))
                         .foregroundStyle(.orange)
                         .lineLimit(2)
                         .truncationMode(.tail)
+                }
+            }
+        }
+    }
+
+    // MARK: - Model & config module
+
+    /// Non-secret configuration facts: pinned model, reasoning effort, and whether
+    /// a credential is configured. The credential is shown as presence only —
+    /// never its value — matching the privacy rule that key material is never read.
+    private func modelConfigModule(_ profile: AgentConfigProfile) -> some View {
+        moduleCard(title: L10n.text(.aiConfigSection)) {
+            if let model = profile.model {
+                LabeledContent(L10n.text(.aiConfigModel)) {
+                    Text(model).lineLimit(1).truncationMode(.tail)
+                }
+            }
+            if let effort = profile.reasoningEffort {
+                LabeledContent(L10n.text(.aiConfigReasoningEffort)) {
+                    Text(effort).lineLimit(1).truncationMode(.tail)
+                }
+            }
+            LabeledContent(L10n.text(.aiConfigCredential)) {
+                Text(profile.hasCredential
+                     ? L10n.text(.aiConfigCredentialConfigured)
+                     : L10n.text(.aiConfigCredentialNone))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    // MARK: - MCP / Hooks modules
+
+    private var mcpModule: some View {
+        moduleCard(title: "\(L10n.text(.aiAgentMCP)) (\(mcpServers.count))") {
+            ForEach(mcpServers) { server in
+                HStack(spacing: 8) {
+                    Text(server.name)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Spacer(minLength: 8)
+                    if !server.isEnabled {
+                        // A disabled server is still installed; say so rather
+                        // than hiding it.
+                        Text(L10n.text(.aiMCPDisabled))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Text(server.transport == .unknown ? "—" : server.transport.rawValue)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .contentShape(Rectangle())
+                .contextMenu {
+                    Button(L10n.text(.revealFinder)) { FinderReveal.reveal(server.sourceURL) }
+                }
+            }
+        }
+    }
+
+    private var hooksModule: some View {
+        moduleCard(title: "\(L10n.text(.aiAgentHooks)) (\(hooks.count))") {
+            ForEach(hooks) { hook in
+                HStack(spacing: 8) {
+                    Text(hook.event)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Spacer(minLength: 8)
+                    if !hook.providers.isEmpty {
+                        Text(hook.providers.joined(separator: " · "))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                    Text(verbatim: "×\(hook.handlerCount)")
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+                .contentShape(Rectangle())
+                .contextMenu {
+                    Button(L10n.text(.revealFinder)) { FinderReveal.reveal(hook.sourceURL) }
                 }
             }
         }
@@ -151,6 +304,41 @@ struct AIAgentDetailView: View {
         }
     }
 
+    // MARK: - Space breakdown module
+
+    /// A bar chart of the Agent's footprint by semantic category (conversations,
+    /// logs, cache, model data, …). Bars are scaled to the largest category so
+    /// the visual comparison is meaningful even when one category dominates.
+    private var breakdownModule: some View {
+        let maxSize = detail.storageBreakdown.map(\.allocatedSize).max() ?? 0
+        return moduleCard(title: L10n.text(.aiStorageBreakdown)) {
+            ForEach(detail.storageBreakdown) { entry in
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text(L10n.name(for: entry.category))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        Spacer(minLength: 8)
+                        Text(ByteCount.string(entry.allocatedSize))
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
+                    GeometryReader { geo in
+                        let fraction = maxSize > 0 ? Double(entry.allocatedSize) / Double(maxSize) : 0
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(Color.secondary.opacity(0.18))
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(Color.accentColor)
+                                .frame(width: max(2, geo.size.width * fraction))
+                        }
+                    }
+                    .frame(height: 5)
+                }
+            }
+        }
+    }
+
     // MARK: - Plugins module
 
     private var pluginsModule: some View {
@@ -170,17 +358,57 @@ struct AIAgentDetailView: View {
 
     // MARK: - Skills module
 
+    /// Which skill list the module is showing. Owned skills are the default
+    /// because they are what this Agent uniquely has; global skills are one click
+    /// away and clearly labelled as shared.
+    private enum SkillsScope: Hashable {
+        case agent
+        case global
+    }
+
     private var skillsModule: some View {
-        moduleCard(title: "\(L10n.skills()) (\(detail.skills.count))") {
-            switch detail.skillsAvailability {
-            case .notApplicable:
-                moduleUnavailable(L10n.text(.aiAgentNotApplicable))
-            case .empty:
-                moduleEmpty
-            case .available:
-                ForEach(detail.skills) { skill in
-                    assetRow(name: skill.name, url: skill.url)
+        moduleCard(title: L10n.skills()) {
+            Picker(L10n.text(.aiGroupScope), selection: $skillsScope) {
+                Text(verbatim: L10n.aiSkillsScopeAgent(detail.skills.count)).tag(SkillsScope.agent)
+                Text(verbatim: L10n.aiSkillsScopeGlobal(detail.globalSkills.count)).tag(SkillsScope.global)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(.bottom, 2)
+
+            switch skillsScope {
+            case .agent:
+                skillsList(
+                    records: detail.skills,
+                    availability: detail.skillsAvailability
+                )
+            case .global:
+                skillsList(
+                    records: detail.globalSkills,
+                    availability: detail.globalSkillsAvailability
+                )
+                if !detail.globalSkills.isEmpty {
+                    Text(L10n.text(.aiSkillsGlobalNote))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func skillsList(
+        records: [SkillRecord],
+        availability: AIAgentModuleAvailability
+    ) -> some View {
+        switch availability {
+        case .notApplicable:
+            moduleUnavailable(L10n.text(.aiAgentNotApplicable))
+        case .empty:
+            moduleEmpty
+        case .available:
+            ForEach(records) { skill in
+                assetRow(name: skill.name, url: skill.url)
             }
         }
     }

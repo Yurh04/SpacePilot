@@ -110,6 +110,6 @@ enum AIUpdateKeyBuilder {
     }
 
     private static func canonical(_ url: URL) -> String {
-        url.resolvingSymlinksInPath().standardizedFileURL.path
+        url.canonicalizedDiscoveryPath
     }
 }

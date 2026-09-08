@@ -144,6 +144,12 @@ struct CLIToolsView: View {
                     .truncationMode(.tail)
             }
             .width(min: 80, ideal: 100, max: 120)
+            TableColumn(L10n.text(.aiCLIInstallSource)) {
+                Text(installSourceText(for: $0))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            .width(min: 80, ideal: 100, max: 120)
             TableColumn(L10n.text(.aiCLIStatus)) {
                 Text(updateStatusText(for: $0))
                     .lineLimit(1)
@@ -195,6 +201,20 @@ struct CLIToolsView: View {
 
     private func executablePath(for tool: AIToolRecord) -> String {
         tool.evidence.executableURL?.path ?? "—"
+    }
+
+    /// A short, non-executed label for where the tool was installed, inferred by
+    /// the shared `AIInstallSource` classifier from the executable path. Brand
+    /// names (Homebrew/npm/pipx) are shown verbatim; local and unknown are
+    /// localized.
+    private func installSourceText(for tool: AIToolRecord) -> String {
+        switch AIInstallSource.classify(executableURL: tool.evidence.executableURL) {
+        case .homebrew: return "Homebrew"
+        case .npm: return "npm"
+        case .pipx: return "pipx"
+        case .local: return L10n.text(.aiCLIInstallLocal)
+        case .unknown: return "—"
+        }
     }
 
     /// Honest status: an explicit coverage failure wins over version presence so

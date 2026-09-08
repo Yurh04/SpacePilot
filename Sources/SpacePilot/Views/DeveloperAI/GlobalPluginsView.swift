@@ -22,8 +22,13 @@ struct GlobalPluginsView: View {
     @Binding var selectedGroupID: String?
     @Binding var selection: Set<UUID>
 
+    /// Grouped view of the discovered plugins. Memoised for the same reason as
+    /// the skills page: it is read once per rendered row.
     private var projection: GroupedPluginsProjection {
-        GroupedPluginsProjection(plugins: plugins, discoveredToolIDs: discoveredToolIDs)
+        AIAgentCache.shared.groupedPlugins(
+            plugins: plugins,
+            discoveredToolIDs: discoveredToolIDs
+        )
     }
 
     private var selectedRows: [AIUpdateSelectionPlan.SelectedRow] {

@@ -103,6 +103,7 @@ public struct SkillScanner: SkillScanning {
                 guard let data = try? Data(contentsOf: manifestURL) else { continue }
                 let manifest = parser.parse(data)
                 let metadata = folderMetadata(folder)
+                let symlink = symlinkInfo(for: folder)
                 records.append(SkillRecord(
                     name: manifest.name ?? folder.lastPathComponent,
                     summary: manifest.description ?? "No description",
@@ -118,7 +119,9 @@ public struct SkillScanner: SkillScanning {
                     conflict: nil,
                     managementStatus: managementStatus(for: root.scope),
                     owner: root.owner,
-                    locationScope: root.locationScope
+                    locationScope: root.locationScope,
+                    symlinkTarget: symlink.target,
+                    isSymlinkBroken: symlink.isBroken
                 ))
             }
         }
@@ -133,14 +136,44 @@ public struct SkillScanner: SkillScanning {
             at: root,
             includingPropertiesForKeys: [.isDirectoryKey],
             options: [.skipsHiddenFiles]
-        ))?.filter {
-            (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+        ))?.filter { url in
+            // A real directory, or a symlink that resolves to a directory — a
+            // skill exposed through a symlink (for example a manager that links
+            // its store into the Agent's skills folder) must still be scanned.
+            if (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+                return true
+            }
+            var isDir: ObjCBool = false
+            return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) && isDir.boolValue
         } ?? []
     }
 
     private func folderMetadata(_ root: URL) -> (allocatedSize: Int64, relativeFileNames: [String]) {
         let metadata = ManagedAssetDirectoryMetadata.scan(root: root)
         return (metadata.allocatedSize, metadata.relativeFileNames)
+    }
+
+    /// Reports whether a skill folder is itself a symbolic link, its resolved
+    /// target, and whether that target is missing (a broken link). A skill exposed
+    /// only through a symlink is at the mercy of whatever owns the target: if the
+    /// target's manager is uninstalled the skill silently stops loading, which is
+    /// exactly the kind of fragile dependency the overview surfaces. Only the link
+    /// itself is inspected — no content is read.
+    private func symlinkInfo(for folder: URL) -> (target: URL?, isBroken: Bool) {
+        let fm = FileManager.default
+        let values = try? folder.resourceValues(forKeys: [.isSymbolicLinkKey])
+        guard values?.isSymbolicLink == true else { return (nil, false) }
+        // Resolve the link. `destinationOfSymbolicLink` may be relative, so resolve
+        // it against the link's parent before checking existence.
+        guard let destination = try? fm.destinationOfSymbolicLink(atPath: folder.path) else {
+            return (nil, true)
+        }
+        let target = (destination as NSString).isAbsolutePath
+            ? URL(fileURLWithPath: destination)
+            : folder.deletingLastPathComponent().appending(path: destination)
+        let resolved = target.standardizedFileURL
+        let isBroken = !fm.fileExists(atPath: resolved.path)
+        return (resolved, isBroken)
     }
 
     private func visibleAgents(for scope: SkillScope) -> Set<String> {

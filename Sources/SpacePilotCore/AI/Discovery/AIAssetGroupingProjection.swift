@@ -243,7 +243,7 @@ private struct DedupKey: Hashable {
     let locationScope: AIAssetLocationScope
 
     init(url: URL, owner: AIAssetOwner, locationScope: AIAssetLocationScope) {
-        self.canonicalPath = url.standardizedFileURL.resolvingSymlinksInPath().path
+        self.canonicalPath = url.canonicalizedDiscoveryPath
         self.owner = owner
         self.locationScope = locationScope
     }
@@ -349,8 +349,8 @@ private func totalOrder(
 ) -> Bool {
     let nameOrder = lhsName.localizedCaseInsensitiveCompare(rhsName)
     if nameOrder != .orderedSame { return nameOrder == .orderedAscending }
-    let lhsPath = lhsURL.standardizedFileURL.resolvingSymlinksInPath().path
-    let rhsPath = rhsURL.standardizedFileURL.resolvingSymlinksInPath().path
+    let lhsPath = lhsURL.canonicalizedDiscoveryPath
+    let rhsPath = rhsURL.canonicalizedDiscoveryPath
     if lhsPath != rhsPath { return lhsPath < rhsPath }
     return lhsID < rhsID
 }

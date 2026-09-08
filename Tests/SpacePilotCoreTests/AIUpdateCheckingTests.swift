@@ -15,6 +15,42 @@ final class AIUpdateCheckingTests: XCTestCase {
         XCTAssertEqual(SemVerComparator.compare("1.0.0", "1.1.0-beta", allowsPrerelease: true), .orderedAscending)
     }
 
+    func testPEP440ComparisonCoversReleaseLengthsPrePostDevAndEpoch() {
+        // Release segments of differing lengths (`1.2` == `1.2.0`), which strict
+        // SemVer cannot even parse.
+        XCTAssertEqual(PEP440Comparator.compare("1.2", "1.2.0"), .orderedSame)
+        XCTAssertEqual(PEP440Comparator.compare("1.2", "1.2.1"), .orderedAscending)
+        XCTAssertEqual(PEP440Comparator.compare("2024.1", "2024.2"), .orderedAscending)
+        XCTAssertEqual(PEP440Comparator.compare("v0.72.1", "0.72.1"), .orderedSame)
+        // pre / post / dev ordering.
+        XCTAssertEqual(PEP440Comparator.compare("1.0.0rc1", "1.0.0"), .orderedAscending)
+        XCTAssertEqual(PEP440Comparator.compare("1.0.0a1", "1.0.0b1"), .orderedAscending)
+        XCTAssertEqual(PEP440Comparator.compare("1.0.0", "1.0.0.post1"), .orderedAscending)
+        XCTAssertEqual(PEP440Comparator.compare("1.0.0.dev3", "1.0.0"), .orderedAscending)
+        XCTAssertEqual(PEP440Comparator.compare("1.0.0rc1", "1.0.0rc2"), .orderedAscending)
+        // Epoch dominates the release number.
+        XCTAssertEqual(PEP440Comparator.compare("1!1.0", "2.0"), .orderedDescending)
+        // Newer-only-as-a-prerelease is not an upgrade unless opted in.
+        XCTAssertEqual(PEP440Comparator.compare("1.0.0", "1.1.0rc1"), .orderedDescending)
+        XCTAssertEqual(PEP440Comparator.compare("1.0.0", "1.1.0rc1", allowsPrerelease: true), .orderedAscending)
+        // Unparseable input returns nil rather than a bogus ordering.
+        XCTAssertNil(PEP440Comparator.compare("not-a-version", "1.0.0"))
+        XCTAssertNil(PEP440Comparator.compare(String(repeating: "1", count: 129), "1.0.0"))
+    }
+
+    func testVersionComparatorDispatchesByKind() {
+        // A pypi provider capability must default to the PEP 440 comparator so a
+        // two-segment version resolves instead of being reported as unknown.
+        let pypi = UpdateCapability(providerID: "pypi", providerKind: .pypi, packageIdentifier: "aider-chat")
+        XCTAssertEqual(pypi.comparator, .pep440)
+        XCTAssertEqual(VersionComparator.compare("1.2", "1.3", kind: pypi.comparator), .orderedAscending)
+        XCTAssertTrue(VersionComparator.isValid("0.72.1.post1", kind: .pep440))
+        XCTAssertFalse(VersionComparator.isValid("0.72.1.post1", kind: .semver))
+
+        let npm = UpdateCapability(providerID: "npm", providerKind: .npmRegistry, packageIdentifier: "@openai/codex")
+        XCTAssertEqual(npm.comparator, .semver)
+    }
+
     func testRequestValidationRejectsUnsafeURLsAndAcceptsFixedProviderPaths() throws {
         let npm = UpdateMetadataRequest.npm(package: "@openai/codex")
         let pypi = UpdateMetadataRequest.pypi(package: "aider-chat")
