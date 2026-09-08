@@ -35,58 +35,84 @@ struct DiskCapacityChart: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             Text(verbatim: L10n.text(.overviewDiskCapacityChart))
                 .font(.headline)
                 .accessibilityHidden(true)
 
-            Chart(segments) { segment in
-                SectorMark(
-                    angle: .value(L10n.space(), segment.bytes),
-                    innerRadius: .ratio(0.64),
-                    angularInset: 1
-                )
-                .foregroundStyle(
-                    segment.kind == .used
-                        ? Color.accentColor
-                        : Color.secondary.opacity(0.28)
-                )
-                .annotation(position: .overlay) {
-                    if segment.bytes > 0 {
-                        Text(verbatim: segment.name)
-                            .font(.caption2.weight(.semibold))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(.regularMaterial, in: Capsule())
+            HStack(spacing: 16) {
+                ZStack {
+                    Chart(segments) { segment in
+                        SectorMark(
+                            angle: .value(L10n.space(), segment.bytes),
+                            innerRadius: .ratio(0.72),
+                            angularInset: 1.5
+                        )
+                        .foregroundStyle(
+                            segment.kind == .used
+                                ? Color.accentColor
+                                : Color.secondary.opacity(0.22)
+                        )
                     }
+                    .chartLegend(.hidden)
+
+                    VStack(spacing: 1) {
+                        Text(ByteCount.string(availableBytes))
+                            .font(.headline)
+                            .monospacedDigit()
+                            .minimumScaleFactor(0.75)
+                        Text(verbatim: L10n.text(.overviewDiskAvailable))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(14)
                 }
+                .frame(width: 132, height: 132)
+
+                visibleCapacityValues
             }
-            .frame(height: 220)
+            .accessibilityHidden(true)
             .accessibilityRepresentation {
                 accessibleCapacityValues
             }
-
-            visibleCapacityValues
-                .accessibilityHidden(true)
         }
     }
 
     private var visibleCapacityValues: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            LabeledContent(
+        VStack(alignment: .leading, spacing: 10) {
+            capacityValue(
                 L10n.text(.overviewDiskUsed),
-                value: ByteCount.string(usedBytes)
+                bytes: usedBytes,
+                color: .accentColor
             )
-            LabeledContent(
+            capacityValue(
                 L10n.text(.overviewDiskAvailable),
-                value: ByteCount.string(availableBytes)
+                bytes: availableBytes,
+                color: .secondary.opacity(0.45)
             )
-            LabeledContent(
+            Divider()
+            capacityValue(
                 L10n.text(.overviewDiskTotal),
-                value: ByteCount.string(totalCapacityBytes)
+                bytes: totalCapacityBytes,
+                color: .clear
             )
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func capacityValue(_ title: String, bytes: Int64, color: Color) -> some View {
+        HStack(spacing: 7) {
+            Circle()
+                .fill(color)
+                .frame(width: 7, height: 7)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(verbatim: title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(ByteCount.string(bytes))
+                    .font(.subheadline.weight(.semibold))
+                    .monospacedDigit()
+            }
         }
     }
 

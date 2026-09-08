@@ -2,14 +2,22 @@ import Foundation
 import XCTest
 
 final class OverviewChartArchitectureTests: XCTestCase {
-    func testOverviewComposesBothNativeChartsResponsively() throws {
+    func testOverviewPlacesSpaceDetailsBesideCleanupWithNarrowFallback() throws {
         let source = try source(at: "Sources/SpacePilot/Views/Overview/OverviewView.swift")
 
+        XCTAssertTrue(source.contains("primaryWorkspace("))
+        XCTAssertTrue(source.contains("HStack(alignment: .top, spacing: 12)"))
+        XCTAssertEqual(source.components(separatedBy: ".frame(minWidth: 375").count - 1, 2)
+        XCTAssertTrue(source.contains(".frame(height: 430)"))
+        XCTAssertTrue(source.contains("VStack(alignment: .leading, spacing: 12)"))
+        XCTAssertTrue(source.contains("recentCleanup: state.recentCleanup"))
+        XCTAssertTrue(source.contains("if let recentCleanup"))
+        XCTAssertTrue(source.contains("cleanupWorkspace("))
+        XCTAssertTrue(source.contains("recentCleanupSummary("))
         XCTAssertTrue(source.contains("DiskCapacityChart("))
         XCTAssertTrue(source.contains("AnalyzedCategoryChart("))
-        XCTAssertTrue(source.contains("GridItem(.adaptive(minimum: 300)"))
-        XCTAssertFalse(source.contains(".frame(minWidth: 720)"))
-        XCTAssertFalse(source.contains(".frame(minWidth: 900)"))
+        XCTAssertFalse(source.contains("DisclosureGroup"))
+        XCTAssertFalse(source.contains("isSpaceDetailsExpanded"))
     }
 
     func testOverviewOnlyRendersWholeDiskChartWhenCapacityIsProven() throws {
@@ -24,19 +32,22 @@ final class OverviewChartArchitectureTests: XCTestCase {
 
         XCTAssertTrue(source.contains("import Charts"))
         XCTAssertTrue(source.contains("SectorMark("))
+        XCTAssertTrue(source.contains(".chartLegend(.hidden)"))
+        XCTAssertTrue(source.contains(".frame(width: 132, height: 132)"))
         XCTAssertTrue(source.contains("overviewDiskCapacityChart"))
         XCTAssertTrue(source.contains("overviewDiskTotal"))
         XCTAssertTrue(source.contains("overviewDiskUsed"))
         XCTAssertTrue(source.contains("overviewDiskAvailable"))
-        XCTAssertTrue(source.contains("height: 220"))
     }
 
-    func testDiskSectorsHaveVisibleNonColorLabels() throws {
+    func testDiskCapacityChartPairsTheDonutWithDirectValues() throws {
         let source = try source(at: "Sources/SpacePilot/Views/Overview/DiskCapacityChart.swift")
 
-        XCTAssertTrue(source.contains(".annotation(position: .overlay)"))
-        XCTAssertTrue(source.contains("if segment.bytes > 0"))
-        XCTAssertTrue(source.contains("Text(verbatim: segment.name)"))
+        XCTAssertTrue(source.contains("Text(ByteCount.string(availableBytes))"))
+        XCTAssertTrue(source.contains("visibleCapacityValues"))
+        XCTAssertTrue(source.contains("capacityValue("))
+        XCTAssertTrue(source.contains(".font(.subheadline.weight(.semibold))"))
+        XCTAssertTrue(source.contains(".monospacedDigit()"))
     }
 
     func testVisibleDiskCopiesAreHiddenBehindOneAccessibilityReplacement() throws {
@@ -48,15 +59,19 @@ final class OverviewChartArchitectureTests: XCTestCase {
         XCTAssertTrue(source.contains(".accessibilityRepresentation"))
     }
 
-    func testAnalyzedCategoryChartUsesAccessibleHorizontalBars() throws {
+    func testAnalyzedCategoryChartUsesReadableDirectLabelsAndProportionalBars() throws {
         let source = try source(at: "Sources/SpacePilot/Views/Overview/AnalyzedCategoryChart.swift")
 
-        XCTAssertTrue(source.contains("import Charts"))
-        XCTAssertTrue(source.contains("BarMark("))
-        XCTAssertTrue(source.contains("x: .value"))
-        XCTAssertTrue(source.contains("y: .value"))
+        XCTAssertTrue(source.contains("maxVisibleCategories = 5"))
+        XCTAssertTrue(source.contains("GeometryReader"))
+        XCTAssertTrue(source.contains("Capsule()"))
+        XCTAssertTrue(source.contains("StorageCategoryAppearance.color"))
+        XCTAssertTrue(source.contains("StorageCategoryAppearance.symbol"))
+        XCTAssertTrue(source.contains(".font(.body.weight(.medium))"))
+        XCTAssertTrue(source.contains(".font(.body.weight(.semibold))"))
+        XCTAssertTrue(source.contains("Self.sizeLabel(for: bytes)"))
+        XCTAssertTrue(source.contains("storageOtherAnalyzed"))
         XCTAssertTrue(source.contains("accessibilityRepresentation"))
-        XCTAssertTrue(source.contains("height: 220"))
     }
 
     func testAnalyzedCategoryChartHasACompactLocalizedEmptyState() throws {
@@ -84,14 +99,27 @@ final class OverviewChartArchitectureTests: XCTestCase {
         XCTAssertTrue(source.contains(".accessibilityRepresentation"))
     }
 
-    func testRecommendationsAppearBeforeTheSecondaryChartSection() throws {
+    func testOverviewKeepsThePrimaryViewportCompact() throws {
         let source = try source(at: "Sources/SpacePilot/Views/Overview/OverviewView.swift")
-        let recommendations = try XCTUnwrap(source.range(of: "cleanupOpportunities(projection)"))
-        let charts = try XCTUnwrap(
-            source.range(of: "spaceDetails(projection)")
-        )
 
-        XCTAssertLessThan(recommendations.lowerBound, charts.lowerBound)
+        XCTAssertTrue(source.contains("LazyVStack(alignment: .leading, spacing: 12)"))
+        XCTAssertTrue(source.contains("recommendationPreviewLimit("))
+        XCTAssertTrue(source.contains(".prefix(previewLimit)"))
+        XCTAssertTrue(source.contains("minHeight: 28"))
+        XCTAssertTrue(source.contains("GridItem(.flexible(), spacing: 8)"))
+        XCTAssertTrue(source.contains("GroupBox"))
+        XCTAssertTrue(source.contains(".contentTransition(.numericText())"))
+    }
+
+    func testOverviewIncludesARecentChangesQuickAction() throws {
+        let overview = try source(at: "Sources/SpacePilot/Views/Overview/OverviewView.swift")
+        let root = try source(at: "Sources/SpacePilot/Views/AppRootView.swift")
+
+        XCTAssertTrue(overview.contains("overviewViewRecentChanges"))
+        XCTAssertTrue(overview.contains("clock.arrow.circlepath"))
+        XCTAssertTrue(overview.contains("action: openRecentChanges"))
+        XCTAssertTrue(root.contains("model.storageItemMode = .recent"))
+        XCTAssertTrue(root.contains("mode: $model.storageItemMode"))
     }
 
     private func source(at relativePath: String) throws -> String {

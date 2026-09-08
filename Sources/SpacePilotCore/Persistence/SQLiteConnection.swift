@@ -91,6 +91,12 @@ final class SQLiteConnection {
         guard result == SQLITE_OK else { throw currentError() }
     }
 
+    func bindNull(to index: Int32, in statement: OpaquePointer) throws {
+        guard sqlite3_bind_null(statement, index) == SQLITE_OK else {
+            throw currentError()
+        }
+    }
+
     func stepDone(_ statement: OpaquePointer) throws {
         guard sqlite3_step(statement) == SQLITE_DONE else { throw currentError() }
     }

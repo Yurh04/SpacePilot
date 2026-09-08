@@ -36,6 +36,7 @@ public struct ApplicationDetailAnalyzer: Sendable {
     private let cache: (any ScanResultCaching)?
     private let identityReader: any ApplicationIdentityReading
     private let spotlightFinder: SpotlightApplicationCandidateFinder
+    private let volatileFinder: ApplicationVolatileArtifactFinder
     private let knowledgeBase: ApplicationAssociationKnowledgeBase
 
     public init(
@@ -45,12 +46,15 @@ public struct ApplicationDetailAnalyzer: Sendable {
             ApplicationIdentityReader(),
         spotlightFinder: SpotlightApplicationCandidateFinder =
             SpotlightApplicationCandidateFinder(),
+        volatileFinder: ApplicationVolatileArtifactFinder =
+            ApplicationVolatileArtifactFinder(),
         knowledgeBase: ApplicationAssociationKnowledgeBase = .builtInV1
     ) {
         self.directoryStats = directoryStats
         self.cache = cache
         self.identityReader = identityReader
         self.spotlightFinder = spotlightFinder
+        self.volatileFinder = volatileFinder
         self.knowledgeBase = knowledgeBase
     }
 
@@ -99,6 +103,10 @@ public struct ApplicationDetailAnalyzer: Sendable {
         } else {
             spotlightCandidates = []
         }
+        let volatileCandidates = try volatileFinder.candidates(
+            for: application,
+            identity: identity
+        )
         let knowledgeCandidates = try knowledgeBase.candidates(
             for: ApplicationAssociationKnowledgeContext(
                 applicationName: application.name,
@@ -158,6 +166,7 @@ public struct ApplicationDetailAnalyzer: Sendable {
         let occupiedURLs = standardItems.map(\.url)
         let candidates = mergeCandidates(
             spotlight: spotlightCandidates,
+            volatile: volatileCandidates,
             knowledge: knowledgeCandidates,
             excluding: occupiedURLs,
             application: application,
@@ -267,6 +276,7 @@ public struct ApplicationDetailAnalyzer: Sendable {
 
     private func mergeCandidates(
         spotlight: [SpotlightApplicationCandidate],
+        volatile: [ApplicationVolatileArtifactCandidate],
         knowledge: [ApplicationAssociationKnowledgeCandidate],
         excluding occupiedURLs: [URL],
         application: ApplicationRecord,
@@ -303,6 +313,17 @@ public struct ApplicationDetailAnalyzer: Sendable {
                 confidence: $0.confidence,
                 ownership: $0.confidence == .high ? .owned : .possible,
                 explanation: "Discovered from the local Spotlight index"
+            )
+        })
+        candidates.append(contentsOf: volatile.map {
+            Candidate(
+                url: $0.url,
+                category: .cache,
+                risk: .rebuildable,
+                evidence: $0.evidence,
+                confidence: $0.confidence,
+                ownership: $0.ownership,
+                explanation: "Matched the application's signed bundle namespace in the macOS user temporary area"
             )
         })
 

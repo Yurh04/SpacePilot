@@ -113,6 +113,8 @@ enum L10n {
         static let aiStorageBreakdown = Self(key: "ai.storage-breakdown", english: "Space breakdown")
         static let aiTotalIndexedSpace = Self(key: "ai.total-indexed-space", english: "Total indexed space")
         static let application = Self(key: "app.application", english: "Application")
+        static let applicationAnalysisCompleted = Self(key: "app.analysis-completed", english: "Last analyzed")
+        static let applicationAnalysisInProgress = Self(key: "app.analysis-in-progress", english: "Analyzing related files…")
         static let applicationLastUsed = Self(key: "app.last-used", english: "Last used")
         static let applicationOnlyHighConfidence = Self(key: "app.only-high-confidence", english: "Only high-confidence related files are preselected.")
         static let applicationRelated = Self(key: "app.related", english: "Related")
@@ -158,6 +160,10 @@ enum L10n {
         static let overviewNoRecommendations = Self(key: "overview.no-recommendations", english: "No safe cleanup recommendations yet.")
         static let overviewQuickActions = Self(key: "overview.quick-actions", english: "Quick actions")
         static let overviewRecentCleanup = Self(key: "overview.recent-cleanup", english: "Recent cleanup")
+        static let overviewRecentAdded = Self(key: "overview.recent-added", english: "Added")
+        static let overviewRecentChangesSummary = Self(key: "overview.recent-changes-summary", english: "Changes in the last 7 days")
+        static let overviewRecentGrown = Self(key: "overview.recent-grown", english: "Grown")
+        static let overviewRecentReleased = Self(key: "overview.recent-released", english: "Released")
         static let overviewRescan = Self(key: "overview.rescan", english: "Rescan")
         static let overviewReviewSafeCleanup = Self(key: "overview.review-safe-cleanup", english: "Review safe cleanup")
         static let overviewSafeRecommendations = Self(key: "overview.safe-recommendations", english: "Safe recommendations")
@@ -173,6 +179,7 @@ enum L10n {
         static let overviewViewApplications = Self(key: "overview.view-applications", english: "View application storage")
         static let overviewViewHistory = Self(key: "overview.view-history", english: "View history")
         static let overviewViewLargestItems = Self(key: "overview.view-largest-items", english: "View largest items")
+        static let overviewViewRecentChanges = Self(key: "overview.view-recent-changes", english: "View recent changes")
         static let overviewWorksLocally = Self(key: "overview.works-locally", english: "SpacePilot works locally and indexes metadata only.")
         static let pluginDiagnosticEmptySkill = Self(key: "plugins.diagnostic-empty-skill", english: "A Plugin skill declaration was rejected or empty.")
         static let pluginDiagnosticGeneric = Self(key: "plugins.diagnostic-generic", english: "Plugin discovery reported an issue.")
@@ -189,6 +196,7 @@ enum L10n {
         static let settingsPrivacy = Self(key: "settings.privacy", english: "Privacy")
         static let settingsPrivacyDescription = Self(key: "settings.privacy-description", english: "All analysis stays on this Mac. SpacePilot stores metadata, not conversation or log contents.")
         static let storageAllAnalyzed = Self(key: "storage.all-analyzed", english: "All Analyzed Items")
+        static let storageAnalyzedCategories = Self(key: "storage.analyzed-categories", english: "Analyzed Categories")
         static let storageAvailable = Self(key: "storage.available", english: "Available")
         static let storageCategories = Self(key: "storage.categories", english: "Categories")
         static let storageInternalDisk = Self(key: "storage.internal-disk", english: "Internal Disk")
@@ -198,9 +206,33 @@ enum L10n {
         static let storageNoMatchingDescription = Self(key: "storage.no-matching-description", english: "Choose another category or display mode.")
         static let storageOldItems = Self(key: "storage.old-items", english: "Not modified in 180+ days")
         static let storageOlder180 = Self(key: "storage.older-180", english: "Older than 180 days")
+        static let storageOtherAnalyzed = Self(key: "storage.other-analyzed", english: "Other Analyzed")
         static let storageReviewSafeCleanup = Self(key: "storage.review-safe-cleanup", english: "Review Safe Cleanup")
         static let storageTotalCapacity = Self(key: "storage.total-capacity", english: "Total Capacity")
+        static let storageUnattributed = Self(key: "storage.unattributed", english: "Unanalyzed / System")
+        static let storageUnattributedDescription = Self(key: "storage.unattributed-description", english: "Used space that is not mapped to readable indexed paths. It can include macOS data, snapshots, purgeable storage, and inaccessible folders.")
         static let storageUsed = Self(key: "storage.used", english: "Used")
+        static let storageChangesRecent = Self(key: "storage.changes.recent", english: "Recent Changes")
+        static let storageChangesRange = Self(key: "storage.changes.range", english: "Time Range")
+        static let storageChanges24Hours = Self(key: "storage.changes.24-hours", english: "24 Hours")
+        static let storageChanges7Days = Self(key: "storage.changes.7-days", english: "7 Days")
+        static let storageChanges30Days = Self(key: "storage.changes.30-days", english: "30 Days")
+        static let storageChangesAll = Self(key: "storage.changes.all", english: "All")
+        static let storageChangesAdded = Self(key: "storage.changes.added", english: "Added")
+        static let storageChangesGrown = Self(key: "storage.changes.grown", english: "Grown")
+        static let storageChangesDeleted = Self(key: "storage.changes.deleted", english: "Deleted")
+        static let storageChangesReleased = Self(key: "storage.changes.released", english: "Released")
+        static let storageChangesDiskDelta = Self(key: "storage.changes.disk-delta", english: "Available Space Change")
+        static let storageChangesItem = Self(key: "storage.changes.item", english: "Changed Item")
+        static let storageChangesType = Self(key: "storage.changes.type", english: "Type")
+        static let storageChangesTime = Self(key: "storage.changes.time", english: "Observed")
+        static let storageChangesSize = Self(key: "storage.changes.size", english: "Change")
+        static let storageChangesSafeOnly = Self(key: "storage.changes.safe-only", english: "Safe only")
+        static let storageChangesSafety = Self(key: "storage.changes.safety", english: "Cleanability")
+        static let storageChangesWaitingBaseline = Self(key: "storage.changes.waiting-baseline", english: "Change Tracking Is Ready")
+        static let storageChangesEmpty = Self(key: "storage.changes.empty", english: "No Matching Changes")
+        static let storageChangesEmptyDescription = Self(key: "storage.changes.empty-description", english: "Changes of 100 MB or more will appear here; smaller changes are grouped by folder.")
+        static let storageChangesCoverageGap = Self(key: "storage.changes.coverage-gap", english: "Some file-system events were unavailable. Totals for this period may be incomplete.")
     }
     static let allKeys: Set<String> = [
         "category.ai-data", "category.application", "category.cache", "category.conversation",
@@ -253,7 +285,8 @@ enum L10n {
         "ai.state.not-scanned", "ai.state.no-results",
         "ai.coverage.permission-denied", "ai.coverage.timeout", "ai.coverage.output-truncated",
         "ai.coverage.invalid-output", "ai.coverage.unavailable", "ai.owner.shared",
-        "app.application", "app.association-confidence", "app.last-used",
+        "app.application", "app.analysis-completed", "app.analysis-in-progress",
+        "app.association-confidence", "app.last-used",
         "app.evidence.bundle-id", "app.evidence.container-id", "app.evidence.known-rule",
         "app.evidence.name", "app.evidence.signed-helper", "app.only-high-confidence",
         "app.ownership.owned", "app.ownership.possible", "app.ownership.shared",
@@ -274,12 +307,14 @@ enum L10n {
         "overview.disk-capacity-chart", "overview.disk-capacity-unavailable-description",
         "overview.disk-total", "overview.disk-used", "overview.internal-disk-used", "overview.limited-coverage",
         "overview.limited-coverage-description", "overview.no-recommendations", "overview.review-cleanup",
-        "overview.quick-actions", "overview.recent-cleanup", "overview.rescan",
+        "overview.quick-actions", "overview.recent-cleanup", "overview.recent-added",
+        "overview.recent-changes-summary", "overview.recent-grown", "overview.recent-released",
+        "overview.recent-safe-to-clean", "overview.inaccessible-folder-count", "overview.rescan",
         "overview.review-safe-cleanup", "overview.safe-recommendations", "overview.space-details",
         "overview.start-scan", "overview.status-attention", "overview.status-critical",
         "overview.status-healthy", "overview.status-unknown", "overview.storage-status", "overview.storage-glance",
         "overview.top-opportunities", "overview.view-applications", "overview.view-history",
-        "overview.view-largest-items",
+        "overview.view-largest-items", "overview.view-recent-changes",
         "overview.works-locally", "plugins.diagnostic-empty-skill", "plugins.diagnostic-generic",
         "plugins.diagnostic-invalid-manifest", "plugins.diagnostic-missing-manifest",
         "plugins.diagnostic-path-inaccessible",
@@ -289,10 +324,20 @@ enum L10n {
         "settings.open-disk-access", "settings.privacy", "settings.privacy-description",
         "skill.scope.plugin", "skill.scope.shared", "skill.scope.system", "skill.status.parent-managed",
         "skill.status.read-only", "skill.status.standalone", "storage.all-analyzed",
-        "storage.available", "storage.categories", "storage.internal-disk", "storage.largest",
+        "storage.analyzed-categories", "storage.available", "storage.categories",
+        "storage.internal-disk", "storage.largest",
         "storage.largest-items", "storage.no-matching", "storage.no-matching-description",
-        "storage.old-items", "storage.older-180", "storage.review-safe-cleanup",
-        "storage.total-capacity", "storage.used", "storage.used-of", "storage.visible-items",
+        "storage.old-items", "storage.older-180", "storage.other-analyzed",
+        "storage.review-safe-cleanup", "storage.total-capacity", "storage.unattributed",
+        "storage.unattributed-description", "storage.used", "storage.used-of", "storage.visible-items",
+        "storage.changes.recent", "storage.changes.range", "storage.changes.24-hours",
+        "storage.changes.7-days", "storage.changes.30-days", "storage.changes.all",
+        "storage.changes.added", "storage.changes.grown", "storage.changes.deleted",
+        "storage.changes.released", "storage.changes.disk-delta", "storage.changes.item",
+        "storage.changes.type", "storage.changes.time", "storage.changes.size",
+        "storage.changes.safe-only", "storage.changes.safety",
+        "storage.changes.waiting-baseline", "storage.changes.empty",
+        "storage.changes.empty-description", "storage.changes.coverage-gap",
         "cleanup.outcome.failed", "cleanup.outcome.moved",
         "cleanup.outcome.skipped-changed", "cleanup.outcome.skipped-protected",
         "cleanup.reason.changed-identity", "cleanup.reason.missing-source",
@@ -730,6 +775,24 @@ enum L10n {
 
     static func reviewCleanup(_ space: String, locale: Locale? = nil) -> String {
         format("overview.review-cleanup", default: "Review %@ Cleanup", locale: locale, space)
+    }
+
+    static func recentSafeToClean(_ space: String, locale: Locale? = nil) -> String {
+        format(
+            "overview.recent-safe-to-clean",
+            default: "%@ from recent changes is safe to clean",
+            locale: locale,
+            space
+        )
+    }
+
+    static func inaccessibleFolderCount(_ count: Int, locale: Locale? = nil) -> String {
+        format(
+            "overview.inaccessible-folder-count",
+            default: "%lld inaccessible folders",
+            locale: locale,
+            Int64(count)
+        )
     }
 
     static func itemCount(_ count: Int, locale: Locale? = nil) -> String {

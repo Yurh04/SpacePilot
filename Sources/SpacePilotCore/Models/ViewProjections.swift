@@ -192,7 +192,14 @@ public struct StorageProjection: Sendable {
     public let usedBytes: Int64
     public let availableBytes: Int64
     public let analyzedBytes: Int64
+    /// Used volume space that could not be mapped to readable indexed paths.
+    /// This commonly includes macOS data, snapshots, purgeable storage, and
+    /// folders that the current process cannot read.
+    public let unattributedBytes: Int64
     public let categories: [StorageCategorySummary]
+    /// Category totals used by the whole-disk capacity visualization. Unlike
+    /// `categories`, this also includes discovered application bundles.
+    public let capacityCategories: [StorageCategorySummary]
     public let largestItems: [ScannedItem]
     public let oldItems: [ScannedItem]
     public let largestItemsByCategory: [ItemCategory: [ScannedItem]]
@@ -270,41 +277,52 @@ public struct StorageProjection: Sendable {
             totalCapacity = volume.totalCapacity
             availableBytes = volume.availableCapacity
             usedBytes = max(0, volume.totalCapacity - volume.availableCapacity)
+            unattributedBytes = max(0, usedBytes - analyzedBytes)
         } else {
             totalCapacity = analyzedBytes
             usedBytes = analyzedBytes
             availableBytes = 0
+            unattributedBytes = 0
         }
 
-        if let volume = snapshot.volume {
-            let used = max(0, volume.totalCapacity - volume.availableCapacity)
-            var classified: Int64 = 0
-            // categoryTotals is strictly bounded by ItemCategory.allCases (12).
-            for total in categoryTotals.values {
-                classified += total.allocatedSize
+        func summaries(
+            from totals: [ItemCategory: StorageCategoryAccumulator]
+        ) throws -> [StorageCategorySummary] {
+            var values: [StorageCategorySummary] = []
+            values.reserveCapacity(ItemCategory.allCases.count)
+            for (category, total) in totals {
+                try checkpoint.checkPeriodically()
+                guard total.allocatedSize > 0 else { continue }
+                values.append(StorageCategorySummary(
+                    category: category,
+                    allocatedSize: total.allocatedSize,
+                    itemCount: total.itemCount
+                ))
             }
-            classified += applicationBytes
-            let other = max(0, used - classified)
-            if other > 0 {
-                categoryTotals[.system, default: .init()].allocatedSize += other
-            }
+            let categoryOrder = Dictionary(
+                uniqueKeysWithValues: ItemCategory.allCases.enumerated().map { ($1, $0) }
+            )
+            return try ProjectionCancellationAwareOrdering.sorted(
+                values,
+                by: { lhs, rhs in
+                    if lhs.allocatedSize != rhs.allocatedSize {
+                        return lhs.allocatedSize > rhs.allocatedSize
+                    }
+                    return categoryOrder[lhs.category, default: .max]
+                        < categoryOrder[rhs.category, default: .max]
+                },
+                checkCancellation: checkCancellation
+            )
         }
-        var categoryValues: [StorageCategorySummary] = []
-        categoryValues.reserveCapacity(ItemCategory.allCases.count)
-        for (category, total) in categoryTotals {
-            try checkpoint.checkPeriodically()
-            guard total.allocatedSize > 0 else { continue }
-            categoryValues.append(StorageCategorySummary(
-                category: category,
-                allocatedSize: total.allocatedSize,
-                itemCount: total.itemCount
-            ))
+
+        categories = try summaries(from: categoryTotals)
+
+        var capacityCategoryTotals = categoryTotals
+        if applicationBytes > 0 {
+            capacityCategoryTotals[.application, default: .init()].allocatedSize += applicationBytes
+            capacityCategoryTotals[.application, default: .init()].itemCount += snapshot.applications.count
         }
-        categories = try ProjectionCancellationAwareOrdering.sorted(
-            categoryValues,
-            by: { $0.allocatedSize > $1.allocatedSize },
-            checkCancellation: checkCancellation
-        )
+        capacityCategories = try summaries(from: capacityCategoryTotals)
         // Both heaps are strictly bounded by itemDisplayLimit (100).
         largestItems = largestSelection.sortedItems
         oldItems = oldestSelection.sortedItems

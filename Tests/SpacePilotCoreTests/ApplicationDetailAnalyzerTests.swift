@@ -409,6 +409,91 @@ final class ApplicationDetailAnalyzerTests: XCTestCase {
         XCTAssertEqual(association.confidence, .high)
         XCTAssertEqual(association.ownership, .owned)
     }
+
+    func testCombinesChromeProductDataAndUserTemporaryArtifacts()
+        async throws
+    {
+        let home = try TemporaryTree(files: [
+            "Library/Application Support/Google/Chrome/Default/History": 31,
+            "Library/Caches/Google/Chrome/cache.bin": 32,
+            "UserTemporary/X/com.google.Chrome.code_sign_clone/Chrome.app/file": 33
+        ])
+        let built = try TestAppBuilder.make(
+            name: "Google Chrome",
+            bundleID: "com.google.Chrome",
+            version: "1.0",
+            executableBytes: 16
+        )
+        let application = ApplicationRecord(
+            name: "Google Chrome",
+            bundleIdentifier: "com.google.Chrome",
+            version: "1.0",
+            url: built.appURL,
+            executableURL: nil,
+            allocatedSize: 16
+        )
+        let identity = ApplicationIdentity(
+            applicationID: application.id,
+            mainBundleIdentifier: "com.google.Chrome",
+            componentBundleIdentifiers: [],
+            teamIdentifier: "EQHXZ8M8AV",
+            applicationGroups: []
+        )
+        let analyzer = ApplicationDetailAnalyzer(
+            identityReader: FixedApplicationIdentityReader(identity: identity),
+            spotlightFinder: SpotlightApplicationCandidateFinder(
+                query: FixedSpotlightCandidateQuery(urls: [])
+            ),
+            volatileFinder: ApplicationVolatileArtifactFinder(
+                temporaryDirectory: home.url.appending(
+                    path: "UserTemporary/T",
+                    directoryHint: .isDirectory
+                )
+            )
+        )
+
+        let result = try await analyzer.analyze(
+            application: application,
+            homeDirectory: home.url
+        )
+        let paths = Set(result.items.map { $0.url.standardizedFileURL.path })
+        let support = home.url.appending(
+            path: "Library/Application Support/Google/Chrome"
+        ).standardizedFileURL.path
+        let cache = home.url.appending(
+            path: "Library/Caches/Google/Chrome"
+        ).standardizedFileURL.path
+        let temporary = home.url.appending(
+            path: "UserTemporary/X/com.google.Chrome.code_sign_clone"
+        ).standardizedFileURL.path
+
+        XCTAssertTrue(paths.contains(support))
+        XCTAssertTrue(paths.contains(cache))
+        XCTAssertTrue(paths.contains(temporary))
+        XCTAssertFalse(paths.contains {
+            $0.hasSuffix("Library/Application Support/Google")
+        })
+        let itemsByID = Dictionary(
+            uniqueKeysWithValues: result.items.map { ($0.id, $0) }
+        )
+        let temporaryAssociation = try XCTUnwrap(
+            result.associations.first {
+                itemsByID[$0.itemID]?.url.standardizedFileURL.path
+                    == temporary
+            }
+        )
+        XCTAssertEqual(temporaryAssociation.confidence, .high)
+        XCTAssertEqual(temporaryAssociation.ownership, .owned)
+        XCTAssertEqual(temporaryAssociation.risk, .rebuildable)
+    }
+}
+
+private struct FixedApplicationIdentityReader: ApplicationIdentityReading {
+    let identity: ApplicationIdentity
+
+    func read(application: ApplicationRecord) throws -> ApplicationIdentity {
+        identity
+    }
 }
 
 private struct FixedSpotlightCandidateQuery:

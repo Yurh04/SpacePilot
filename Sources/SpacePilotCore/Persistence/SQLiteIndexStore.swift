@@ -414,6 +414,371 @@ public actor SQLiteIndexStore: SnapshotStoring {
         }
     }
 
+    @discardableResult
+    public func establishStorageChangeBaselineIfNeeded(
+        snapshot: ScanSnapshot,
+        eventID: Int64 = 0
+    ) throws -> Bool {
+        guard try metadataValue(for: "storage_change_baseline_at") == nil else {
+            return false
+        }
+        let observedAt = snapshot.completedAt
+        let states = storageChangeStates(from: snapshot, eventID: eventID)
+        try connection.execute("BEGIN IMMEDIATE;")
+        do {
+            try upsertStorageChangeStates(states)
+            try connection.statement(
+                "INSERT OR REPLACE INTO metadata(key, value) VALUES ('storage_change_baseline_at', ?);"
+            ) { statement in
+                try connection.bind(observedAt.timeIntervalSince1970.description, to: 1, in: statement)
+                try connection.stepDone(statement)
+            }
+            if let volume = snapshot.volume {
+                try insertDiskSpaceObservation(.init(
+                    observedAt: observedAt,
+                    totalCapacity: volume.totalCapacity,
+                    availableCapacity: volume.availableCapacity
+                ))
+            }
+            try connection.execute("COMMIT;")
+        } catch {
+            try? connection.execute("ROLLBACK;")
+            throw error
+        }
+        return true
+    }
+
+    public func calibrateStorageChangeBaseline(
+        snapshot: ScanSnapshot,
+        eventID: Int64 = 0
+    ) throws {
+        try upsertStorageChangeStates(
+            storageChangeStates(from: snapshot, eventID: eventID)
+        )
+    }
+
+    public func resolveOpenStorageChangeGaps(at date: Date) throws {
+        let gaps: [StorageChangeCoverageGap] = try connection.statement(
+            "SELECT payload FROM storage_change_gaps WHERE ended_at IS NULL;"
+        ) { statement in
+            var values: [StorageChangeCoverageGap] = []
+            while try connection.step(statement) == SQLITE_ROW {
+                values.append(try decoder.decode(
+                    StorageChangeCoverageGap.self,
+                    from: connection.blob(at: 0, in: statement)
+                ))
+            }
+            return values
+        }
+        guard !gaps.isEmpty else { return }
+        try connection.statement(
+            "UPDATE storage_change_gaps SET ended_at = ?, payload = ? WHERE id = ?;"
+        ) { statement in
+            for gap in gaps {
+                let resolved = StorageChangeCoverageGap(
+                    id: gap.id,
+                    startedAt: gap.startedAt,
+                    endedAt: date,
+                    reason: gap.reason
+                )
+                try connection.bind(date.timeIntervalSince1970, to: 1, in: statement)
+                try connection.bind(try encoder.encode(resolved), to: 2, in: statement)
+                try connection.bind(gap.id.uuidString, to: 3, in: statement)
+                try connection.stepDone(statement)
+                try connection.reset(statement)
+            }
+        }
+    }
+
+    public func storageChangeStates() throws -> [String: StorageChangeFileState] {
+        try connection.statement(
+            "SELECT path, payload FROM storage_change_states;"
+        ) { statement in
+            var values: [String: StorageChangeFileState] = [:]
+            while try connection.step(statement) == SQLITE_ROW {
+                let path = Self.text(at: 0, in: statement)
+                values[path] = try decoder.decode(
+                    StorageChangeFileState.self,
+                    from: connection.blob(at: 1, in: statement)
+                )
+            }
+            return values
+        }
+    }
+
+    public func recordStorageChangeUpdate(
+        entries: [StorageChangeEntry],
+        states: [StorageChangeFileState],
+        removedPaths: [String],
+        observation: DiskSpaceObservation? = nil,
+        gap: StorageChangeCoverageGap? = nil,
+        cursor: FileSystemEventCursor? = nil
+    ) throws {
+        let persistedEntries = try coalescedStorageChangeEntries(entries)
+        try connection.execute("BEGIN IMMEDIATE;")
+        do {
+            try upsertStorageChangeStates(states)
+            if !removedPaths.isEmpty {
+                try connection.statement(
+                    "DELETE FROM storage_change_states WHERE path = ?;"
+                ) { statement in
+                    for path in removedPaths {
+                        try connection.bind(path, to: 1, in: statement)
+                        try connection.stepDone(statement)
+                        try connection.reset(statement)
+                    }
+                }
+            }
+            try connection.statement(
+                """
+                INSERT OR REPLACE INTO storage_change_events(
+                    id, path, kind, magnitude, observed_at, payload
+                ) VALUES (?, ?, ?, ?, ?, ?);
+                """
+            ) { statement in
+                for entry in persistedEntries {
+                    try connection.bind(entry.id.uuidString, to: 1, in: statement)
+                    try connection.bind(entry.url.path, to: 2, in: statement)
+                    try connection.bind(entry.kind.rawValue, to: 3, in: statement)
+                    try connection.bind(entry.magnitudeBytes, to: 4, in: statement)
+                    try connection.bind(entry.observedAt.timeIntervalSince1970, to: 5, in: statement)
+                    try connection.bind(try encoder.encode(entry), to: 6, in: statement)
+                    try connection.stepDone(statement)
+                    try connection.reset(statement)
+                }
+            }
+            if let observation {
+                try insertDiskSpaceObservation(observation)
+            }
+            if let gap {
+                try connection.statement(
+                    "INSERT OR REPLACE INTO storage_change_gaps(id, started_at, ended_at, payload) VALUES (?, ?, ?, ?);"
+                ) { statement in
+                    try connection.bind(gap.id.uuidString, to: 1, in: statement)
+                    try connection.bind(gap.startedAt.timeIntervalSince1970, to: 2, in: statement)
+                    if let endedAt = gap.endedAt {
+                        try connection.bind(endedAt.timeIntervalSince1970, to: 3, in: statement)
+                    } else {
+                        try connection.bindNull(to: 3, in: statement)
+                    }
+                    try connection.bind(try encoder.encode(gap), to: 4, in: statement)
+                    try connection.stepDone(statement)
+                }
+            }
+            if let cursor {
+                try save(fileSystemEventCursor: cursor)
+            }
+            let cutoff = Date.now.addingTimeInterval(-31 * 24 * 60 * 60).timeIntervalSince1970
+            try connection.statement(
+                "DELETE FROM storage_change_events WHERE observed_at < ?;"
+            ) { statement in
+                try connection.bind(cutoff, to: 1, in: statement)
+                try connection.stepDone(statement)
+            }
+            try connection.statement(
+                "DELETE FROM disk_space_observations WHERE observed_at < ?;"
+            ) { statement in
+                try connection.bind(cutoff, to: 1, in: statement)
+                try connection.stepDone(statement)
+            }
+            try connection.statement(
+                "DELETE FROM storage_change_states WHERE updated_at < ?;"
+            ) { statement in
+                try connection.bind(cutoff, to: 1, in: statement)
+                try connection.stepDone(statement)
+            }
+            try connection.execute("COMMIT;")
+        } catch {
+            try? connection.execute("ROLLBACK;")
+            throw error
+        }
+    }
+
+    public func recordDiskSpaceObservation(_ observation: DiskSpaceObservation) throws {
+        try insertDiskSpaceObservation(observation)
+    }
+
+    public func storageChangeHistory(
+        since cutoff: Date = Date.now.addingTimeInterval(-31 * 24 * 60 * 60)
+    ) throws -> StorageChangeHistory {
+        let entries: [StorageChangeEntry] = try decodedPayloads(
+            sql: "SELECT payload FROM storage_change_events WHERE observed_at >= ? ORDER BY observed_at DESC;",
+            cutoff: cutoff
+        )
+        let observations: [DiskSpaceObservation] = try decodedPayloads(
+            sql: "SELECT payload FROM disk_space_observations WHERE observed_at >= ? ORDER BY observed_at ASC;",
+            cutoff: cutoff
+        )
+        let gaps: [StorageChangeCoverageGap] = try connection.statement(
+            "SELECT payload FROM storage_change_gaps WHERE ended_at IS NULL OR ended_at >= ? ORDER BY started_at DESC;"
+        ) { statement in
+            try connection.bind(cutoff.timeIntervalSince1970, to: 1, in: statement)
+            var values: [StorageChangeCoverageGap] = []
+            while try connection.step(statement) == SQLITE_ROW {
+                values.append(try decoder.decode(
+                    StorageChangeCoverageGap.self,
+                    from: connection.blob(at: 0, in: statement)
+                ))
+            }
+            return values
+        }
+        let baseline = try metadataValue(for: "storage_change_baseline_at")
+            .flatMap(Double.init)
+            .map(Date.init(timeIntervalSince1970:))
+        return StorageChangeHistory(
+            entries: entries,
+            observations: observations,
+            coverageGaps: gaps,
+            baselineEstablishedAt: baseline
+        )
+    }
+
+    private func upsertStorageChangeStates(_ states: [StorageChangeFileState]) throws {
+        guard !states.isEmpty else { return }
+        try connection.statement(
+            """
+            INSERT INTO storage_change_states(path, updated_at, payload)
+            VALUES (?, ?, ?)
+            ON CONFLICT(path) DO UPDATE SET
+                updated_at = excluded.updated_at,
+                payload = excluded.payload;
+            """
+        ) { statement in
+            for state in states {
+                try connection.bind(state.url.path, to: 1, in: statement)
+                try connection.bind(state.observedAt.timeIntervalSince1970, to: 2, in: statement)
+                try connection.bind(try encoder.encode(state), to: 3, in: statement)
+                try connection.stepDone(statement)
+                try connection.reset(statement)
+            }
+        }
+    }
+
+    private func storageChangeStates(
+        from snapshot: ScanSnapshot,
+        eventID: Int64
+    ) -> [StorageChangeFileState] {
+        let applicationNames = Dictionary(uniqueKeysWithValues: snapshot.applications.map {
+            ($0.id, $0.name)
+        })
+        var ownersByItemID: [UUID: String] = [:]
+        for application in snapshot.applications {
+            for association in application.associations where ownersByItemID[association.itemID] == nil {
+                ownersByItemID[association.itemID] = applicationNames[association.applicationID]
+            }
+        }
+        return snapshot.items.map { item in
+            StorageChangeFileState(
+                url: item.url,
+                allocatedSize: item.allocatedSize,
+                resourceIdentifier: item.resourceIdentifier,
+                category: item.category,
+                ownerName: ownersByItemID[item.id],
+                risk: item.risk,
+                observedAt: snapshot.completedAt,
+                lastEventID: eventID
+            )
+        }
+    }
+
+    private func coalescedStorageChangeEntries(
+        _ entries: [StorageChangeEntry]
+    ) throws -> [StorageChangeEntry] {
+        try entries.map { entry in
+            let cutoff = entry.observedAt.addingTimeInterval(-10 * 60)
+            let previous: StorageChangeEntry? = try connection.statement(
+                """
+                SELECT payload
+                FROM storage_change_events
+                WHERE path = ? AND kind = ? AND observed_at >= ?
+                ORDER BY observed_at DESC
+                LIMIT 1;
+                """
+            ) { statement in
+                try connection.bind(entry.url.path, to: 1, in: statement)
+                try connection.bind(entry.kind.rawValue, to: 2, in: statement)
+                try connection.bind(cutoff.timeIntervalSince1970, to: 3, in: statement)
+                guard try connection.step(statement) == SQLITE_ROW else { return nil }
+                return try decoder.decode(
+                    StorageChangeEntry.self,
+                    from: connection.blob(at: 0, in: statement)
+                )
+            }
+            guard let previous else { return entry }
+
+            let isAggregate = previous.isAggregated || entry.isAggregated
+            let before: Int64
+            let after: Int64
+            if isAggregate {
+                before = previous.beforeBytes + entry.beforeBytes
+                after = previous.afterBytes + entry.afterBytes
+            } else {
+                before = previous.beforeBytes
+                after = entry.afterBytes
+            }
+            return StorageChangeEntry(
+                id: previous.id,
+                url: entry.url,
+                kind: entry.kind,
+                beforeBytes: before,
+                afterBytes: after,
+                startedAt: previous.startedAt,
+                observedAt: entry.observedAt,
+                category: entry.category ?? previous.category,
+                ownerName: entry.ownerName ?? previous.ownerName,
+                risk: mergedStorageChangeRisk(previous.risk, entry.risk),
+                isAggregated: isAggregate,
+                confidence: previous.confidence == .estimated || entry.confidence == .estimated
+                    ? .estimated
+                    : .high
+            )
+        }
+    }
+
+    private func mergedStorageChangeRisk(
+        _ previous: RiskLevel?,
+        _ current: RiskLevel?
+    ) -> RiskLevel? {
+        guard let previous, let current else { return nil }
+        return max(previous, current)
+    }
+
+    private func insertDiskSpaceObservation(_ observation: DiskSpaceObservation) throws {
+        let latestTimestamp: Double? = try connection.statement(
+            "SELECT MAX(observed_at) FROM disk_space_observations;"
+        ) { statement in
+            guard try connection.step(statement) == SQLITE_ROW,
+                  sqlite3_column_type(statement, 0) != SQLITE_NULL else { return nil }
+            return sqlite3_column_double(statement, 0)
+        }
+        if let latestTimestamp,
+           observation.observedAt.timeIntervalSince1970 - latestTimestamp < 15 * 60 {
+            return
+        }
+        try connection.statement(
+            "INSERT OR REPLACE INTO disk_space_observations(id, observed_at, payload) VALUES (?, ?, ?);"
+        ) { statement in
+            try connection.bind(observation.id.uuidString, to: 1, in: statement)
+            try connection.bind(observation.observedAt.timeIntervalSince1970, to: 2, in: statement)
+            try connection.bind(try encoder.encode(observation), to: 3, in: statement)
+            try connection.stepDone(statement)
+        }
+    }
+
+    private func decodedPayloads<Value: Decodable>(
+        sql: String,
+        cutoff: Date
+    ) throws -> [Value] {
+        try connection.statement(sql) { statement in
+            try connection.bind(cutoff.timeIntervalSince1970, to: 1, in: statement)
+            var values: [Value] = []
+            while try connection.step(statement) == SQLITE_ROW {
+                values.append(try decoder.decode(Value.self, from: connection.blob(at: 0, in: statement)))
+            }
+            return values
+        }
+    }
+
     public func cachedApplicationIdentity(
         for application: ApplicationRecord
     ) throws -> ApplicationIdentity? {

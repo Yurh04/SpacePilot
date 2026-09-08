@@ -2049,6 +2049,8 @@
         }
       }
     },
+    "app.analysis-completed": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Last analyzed"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"上次分析"}}}},
+    "app.analysis-in-progress": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Analyzing related files…"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"正在分析关联文件…"}}}},
     "app.application": {
       "localizations": {
         "en": {
@@ -3873,6 +3875,7 @@
         }
       }
     },
+    "overview.inaccessible-folder-count": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"%lld inaccessible folders"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"%lld 个文件夹无法访问"}}}},
     "overview.analyze-mac": {
       "localizations": {
         "en": {
@@ -4113,6 +4116,11 @@
         }
       }
     },
+    "overview.recent-added": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Added"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"新增"}}}},
+    "overview.recent-changes-summary": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Changes in the last 7 days"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"最近 7 天变化"}}}},
+    "overview.recent-grown": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Grown"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"变大"}}}},
+    "overview.recent-released": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Released"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已释放"}}}},
+    "overview.recent-safe-to-clean": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"%@ from recent changes is safe to clean"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"最近变化中有 %@ 可安全清理"}}}},
     "overview.recent-cleanup": {
       "localizations": {
         "en": {
@@ -4385,6 +4393,7 @@
         }
       }
     },
+    "overview.view-recent-changes": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"View recent changes"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"查看最近变化"}}}},
     "overview.works-locally": {
       "localizations": {
         "en": {
@@ -4977,6 +4986,22 @@
         }
       }
     },
+    "storage.analyzed-categories": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analyzed Categories"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已分析分类"
+          }
+        }
+      }
+    },
     "storage.available": {
       "localizations": {
         "en": {
@@ -5121,6 +5146,22 @@
         }
       }
     },
+    "storage.other-analyzed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Other Analyzed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "其他已分析"
+          }
+        }
+      }
+    },
     "storage.review-safe-cleanup": {
       "localizations": {
         "en": {
@@ -5149,6 +5190,38 @@
           "stringUnit": {
             "state": "translated",
             "value": "总容量"
+          }
+        }
+      }
+    },
+    "storage.unattributed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unanalyzed / System"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未分析/系统占用"
+          }
+        }
+      }
+    },
+    "storage.unattributed-description": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Used space that is not mapped to readable indexed paths. It can include macOS data, snapshots, purgeable storage, and inaccessible folders."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚未映射到可读取索引路径的已用空间，可能包含 macOS 数据、快照、可清除空间和无权限访问的文件夹。"
           }
         }
       }
@@ -5185,6 +5258,27 @@
         }
       }
     },
+    "storage.changes.24-hours": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"24 Hours"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"24 小时"}}}},
+    "storage.changes.30-days": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"30 Days"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"30 天"}}}},
+    "storage.changes.7-days": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"7 Days"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"7 天"}}}},
+    "storage.changes.added": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Added"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"新增"}}}},
+    "storage.changes.all": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"All"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"全部"}}}},
+    "storage.changes.coverage-gap": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Some file-system events were unavailable. Totals for this period may be incomplete."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"部分文件系统事件不可用，这段时间的统计可能不完整。"}}}},
+    "storage.changes.deleted": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Deleted"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已删除"}}}},
+    "storage.changes.disk-delta": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Available Space Change"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"可用空间变化"}}}},
+    "storage.changes.empty": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"No Matching Changes"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"没有符合条件的变化"}}}},
+    "storage.changes.empty-description": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Changes of 100 MB or more will appear here; smaller changes are grouped by folder."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"单项变化达到 100 MB 后会显示；较小变化会按文件夹合并。"}}}},
+    "storage.changes.grown": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Grown"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"变大"}}}},
+    "storage.changes.item": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Changed Item"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"变化项目"}}}},
+    "storage.changes.range": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Time Range"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"时间范围"}}}},
+    "storage.changes.recent": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Recent Changes"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"最近变化"}}}},
+    "storage.changes.released": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Released"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已释放"}}}},
+    "storage.changes.safe-only": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Safe only"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"仅可安全清理"}}}},
+    "storage.changes.safety": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Cleanability"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"可清理性"}}}},
+    "storage.changes.size": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Change"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"变化量"}}}},
+    "storage.changes.time": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Observed"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"发现时间"}}}},
+    "storage.changes.type": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Type"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"类型"}}}},
+    "storage.changes.waiting-baseline": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Change Tracking Is Ready"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"变化追踪已就绪"}}}},
     "storage.visible-items": {
       "localizations": {
         "en": {

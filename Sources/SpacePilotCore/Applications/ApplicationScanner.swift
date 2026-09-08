@@ -3,9 +3,14 @@ import Foundation
 
 public struct ApplicationScanner: Sendable {
     private let cache: (any ScanResultCaching)?
+    private let supplementaryApplicationURLs: @Sendable () -> [URL]
 
-    public init(cache: (any ScanResultCaching)? = nil) {
+    public init(
+        cache: (any ScanResultCaching)? = nil,
+        supplementaryApplicationURLs: @escaping @Sendable () -> [URL] = { [] }
+    ) {
         self.cache = cache
+        self.supplementaryApplicationURLs = supplementaryApplicationURLs
     }
 
     public func scan(locations: [URL]) async throws -> [ApplicationRecord] {
@@ -41,18 +46,29 @@ public struct ApplicationScanner: Sendable {
             }
         }
 
+        var primaryBundleIdentifiers = Set(
+            records.compactMap(\.bundleIdentifier).map { $0.lowercased() }
+        )
+        for candidate in supplementaryApplicationURLs() {
+            try Task.checkCancellation()
+            let canonical = candidate.standardizedFileURL.resolvingSymlinksInPath()
+            guard seen.insert(canonical.path).inserted,
+                  let record = try makeRecord(at: canonical)
+            else { continue }
+            if let bundleIdentifier = record.bundleIdentifier?.lowercased(),
+               !primaryBundleIdentifiers.insert(bundleIdentifier).inserted {
+                continue
+            }
+            records.append(record)
+        }
+
         return records.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     private func scan(location: URL) throws -> [ApplicationRecord] {
-        let candidates = try FileManager.default.contentsOfDirectory(
-            at: location,
-            includingPropertiesForKeys: [.isApplicationKey, .isDirectoryKey],
-            options: [.skipsHiddenFiles]
-        )
+        let candidates = try ApplicationBundleLocator.applicationURLs(in: location)
         var records: [ApplicationRecord] = []
-        for candidate in candidates
-            where candidate.pathExtension.lowercased() == "app" {
+        for candidate in candidates {
             try Task.checkCancellation()
             let canonical = candidate.standardizedFileURL
                 .resolvingSymlinksInPath()
@@ -69,8 +85,12 @@ public struct ApplicationScanner: Sendable {
               let info = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
         else { return nil }
 
-        let name = (info["CFBundleDisplayName"] as? String)
-            ?? (info["CFBundleName"] as? String)
+        let name = [
+            info["CFBundleDisplayName"] as? String,
+            info["CFBundleName"] as? String
+        ]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first(where: { !$0.isEmpty })
             ?? appURL.deletingPathExtension().lastPathComponent
         let executableName = info["CFBundleExecutable"] as? String
         let executableURL = executableName.map { appURL.appending(path: "Contents/MacOS/\($0)") }

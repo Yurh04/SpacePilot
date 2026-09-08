@@ -47,7 +47,15 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                 URL(fileURLWithPath: "/Applications", isDirectory: true),
                 homeDirectory.appending(path: "Applications", directoryHint: .isDirectory)
             ].filter { FileManager.default.fileExists(atPath: $0.path) }
-            let applicationScanner = ApplicationScanner(cache: scanCache)
+            let registeredApplicationDiscovery = RegisteredApplicationDiscovery(
+                homeDirectory: homeDirectory
+            )
+            let applicationScanner = ApplicationScanner(
+                cache: scanCache,
+                supplementaryApplicationURLs: {
+                    registeredApplicationDiscovery.applicationURLs()
+                }
+            )
             let baseApplications = try await applicationScanner.scan(locations: appLocations)
             let quickSnapshot = previousSnapshot ?? ScanSnapshot(
                     completedAt: .now,

@@ -81,6 +81,21 @@ final class ApplicationCleanupArchitectureTests: XCTestCase {
         ))
     }
 
+    func testApplicationAnalysisShowsProgressAndFreshnessWithoutReplacingContent() throws {
+        let applications = try source(
+            at: "Sources/SpacePilot/Views/Applications/ApplicationsView.swift"
+        )
+        let model = try source(at: "Sources/SpacePilot/App/AppModel.swift")
+        let root = try source(at: "Sources/SpacePilot/Views/AppRootView.swift")
+
+        XCTAssertTrue(applications.contains("private var analysisStatus"))
+        XCTAssertTrue(applications.contains("applicationAnalysisDates[application.id]"))
+        XCTAssertFalse(applications.contains("if isAnalyzing {\n                    ProgressView()"))
+        XCTAssertTrue(model.contains("var applicationAnalysisDates: [UUID: Date] = [:]"))
+        XCTAssertTrue(model.contains("applicationAnalysisDates[application.id] = .now"))
+        XCTAssertTrue(root.contains("applicationAnalysisDates: model.applicationAnalysisDates"))
+    }
+
     func testApplicationScreenUsesHorizontalListAndDetailLayout() throws {
         let source = try source(
             at: "Sources/SpacePilot/Views/Applications/ApplicationsView.swift"

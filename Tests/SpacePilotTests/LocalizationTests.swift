@@ -237,12 +237,26 @@ final class LocalizationTests: XCTestCase {
             "overview.quick-actions": ("Quick actions", "快捷操作"),
             "overview.review-safe-cleanup": ("Review safe cleanup", "检查安全清理"),
             "overview.view-largest-items": ("View largest items", "查看最大项目"),
+            "overview.view-recent-changes": ("View recent changes", "查看最近变化"),
             "overview.view-applications": ("View application storage", "查看应用占用"),
             "overview.rescan": ("Rescan", "重新扫描"),
             "overview.top-opportunities": ("Top cleanup opportunities", "优先清理建议"),
             "overview.space-details": ("Space details", "空间详情"),
             "overview.recent-cleanup": ("Recent cleanup", "最近清理"),
-            "overview.view-history": ("View history", "查看历史")
+            "overview.recent-changes-summary": ("Changes in the last 7 days", "最近 7 天变化"),
+            "overview.recent-safe-to-clean": (
+                "%@ from recent changes is safe to clean",
+                "最近变化中有 %@ 可安全清理"
+            ),
+            "overview.inaccessible-folder-count": (
+                "%lld inaccessible folders",
+                "%lld 个文件夹无法访问"
+            ),
+            "overview.view-history": ("View history", "查看历史"),
+            "storage.changes.safe-only": ("Safe only", "仅可安全清理"),
+            "storage.changes.safety": ("Cleanability", "可清理性"),
+            "app.analysis-in-progress": ("Analyzing related files…", "正在分析关联文件…"),
+            "app.analysis-completed": ("Last analyzed", "上次分析")
         ]
 
         for (key, values) in expected {
@@ -310,7 +324,7 @@ final class LocalizationTests: XCTestCase {
         let english = try stringsTable(at: resources.appending(path: "en.lproj/Localizable.strings"))
         let chinese = try stringsTable(at: resources.appending(path: "zh-Hans.lproj/Localizable.strings"))
 
-        XCTAssertEqual(L10n.allKeys.count, 325)
+        XCTAssertEqual(L10n.allKeys.count, 359)
         XCTAssertEqual(Set(catalogStrings.keys), L10n.allKeys)
         XCTAssertEqual(Set(english.keys), L10n.allKeys)
         XCTAssertEqual(Set(chinese.keys), L10n.allKeys)

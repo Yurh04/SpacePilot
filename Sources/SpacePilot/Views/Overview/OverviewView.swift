@@ -5,11 +5,14 @@ struct OverviewView: View {
     let projection: OverviewProjection?
     let hasSnapshot: Bool
     let latestCleanup: CleanupTransaction?
+    let changeHistory: StorageChangeHistory
     let startScan: () -> Void
     let reviewCleanup: ([ScannedItem]) -> Void
     let openStorage: () -> Void
+    let openRecentChanges: () -> Void
     let openApplications: () -> Void
     let openHistory: () -> Void
+    let openDiskAccessSettings: () -> Void
 
     var body: some View {
         Group {
@@ -35,27 +38,28 @@ struct OverviewView: View {
     private func dashboard(_ projection: OverviewProjection) -> some View {
         let state = OverviewDashboardState(
             projection: projection,
-            latestCleanup: latestCleanup
+            latestCleanup: latestCleanup,
+            changeHistory: changeHistory
         )
 
         return ScrollView {
-            LazyVStack(alignment: .leading, spacing: 20) {
+            LazyVStack(alignment: .leading, spacing: 12) {
                 storageStatus(projection, status: state.capacityStatus)
-                quickActions(projection)
-                cleanupOpportunities(projection)
-
-                if let recentCleanup = state.recentCleanup {
-                    recentCleanupCard(recentCleanup)
-                }
-
-                spaceDetails(projection)
 
                 if !projection.coverage.isComplete {
-                    coverageWarning
+                    coverageWarning(projection)
                 }
+
+                quickActions(projection)
+                primaryWorkspace(
+                    projection,
+                    recentCleanup: state.recentCleanup,
+                    recentStorageChanges: state.recentStorageChanges
+                )
             }
             .frame(maxWidth: 1_200, alignment: .leading)
-            .padding(20)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 14)
         }
     }
 
@@ -63,40 +67,59 @@ struct OverviewView: View {
         _ projection: OverviewProjection,
         status: OverviewDashboardState.CapacityStatus
     ) -> some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(spacing: 12) {
-                    Image(systemName: status.icon)
-                        .font(.title2)
-                        .foregroundStyle(status.tint)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Image(systemName: status.icon)
+                    .font(.title3)
+                    .foregroundStyle(status.tint)
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(verbatim: L10n.text(.overviewStorageStatus))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text(verbatim: status.title)
-                            .font(.title3.weight(.semibold))
-                    }
-
-                    Spacer()
-
-                    if projection.hasWholeDiskCapacity {
-                        Text(ByteCount.string(projection.availableBytes))
-                            .font(.title3.weight(.semibold))
-                            .monospacedDigit()
-                    }
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(verbatim: L10n.text(.overviewStorageStatus))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(verbatim: status.title)
+                        .font(.headline)
                 }
+
+                Spacer()
 
                 if projection.hasWholeDiskCapacity {
-                    ProgressView(value: usedFraction(projection))
-                        .tint(status.tint)
-                        .accessibilityLabel(L10n.text(.overviewInternalDiskUsed))
+                    Text(ByteCount.string(projection.availableBytes))
+                        .font(.title3.weight(.semibold))
+                        .monospacedDigit()
+                        .contentTransition(.numericText())
+                }
+            }
+
+            if projection.hasWholeDiskCapacity {
+                ProgressView(value: usedFraction(projection))
+                    .tint(status.tint)
+                    .accessibilityLabel(L10n.text(.overviewInternalDiskUsed))
+                    .animation(.snappy(duration: 0.25), value: usedFraction(projection))
+            }
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 0) {
+                    metric(
+                        L10n.text(.overviewDiskAvailable),
+                        value: projection.hasWholeDiskCapacity
+                            ? ByteCount.string(projection.availableBytes)
+                            : "—",
+                        icon: "internaldrive"
+                    )
+                    metric(
+                        L10n.text(.overviewSafeRecommendations),
+                        value: ByteCount.string(projection.reclaimableBytes),
+                        icon: "sparkles"
+                    )
+                    metric(
+                        L10n.text(.overviewAnalyzedLocally),
+                        value: ByteCount.string(projection.analyzedBytes),
+                        icon: "chart.bar.xaxis"
+                    )
                 }
 
-                LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: 160), spacing: 12)],
-                    spacing: 12
-                ) {
+                VStack(alignment: .leading, spacing: 8) {
                     metric(
                         L10n.text(.overviewDiskAvailable),
                         value: projection.hasWholeDiskCapacity
@@ -116,8 +139,8 @@ struct OverviewView: View {
                     )
                 }
             }
-            .padding(4)
         }
+        .padding(.bottom, 2)
     }
 
     private func metric(_ title: String, value: String, icon: String) -> some View {
@@ -132,22 +155,20 @@ struct OverviewView: View {
                 Text(verbatim: value)
                     .font(.headline)
                     .monospacedDigit()
+                    .contentTransition(.numericText())
             }
             Spacer(minLength: 0)
         }
-        .padding(12)
-        .background(.quaternary.opacity(0.6), in: RoundedRectangle(cornerRadius: 10))
+        .frame(minWidth: 145, maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 4)
     }
 
     private func quickActions(_ projection: OverviewProjection) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(verbatim: L10n.text(.overviewQuickActions))
-                .font(.headline)
-
-            LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: 175), spacing: 10)],
-                spacing: 10
-            ) {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                Text(verbatim: L10n.text(.overviewQuickActions))
+                    .font(.headline)
+                    .padding(.trailing, 4)
                 actionButton(
                     L10n.text(.overviewReviewSafeCleanup),
                     icon: "sparkles",
@@ -162,6 +183,11 @@ struct OverviewView: View {
                     action: openStorage
                 )
                 actionButton(
+                    L10n.text(.overviewViewRecentChanges),
+                    icon: "clock.arrow.circlepath",
+                    action: openRecentChanges
+                )
+                actionButton(
                     L10n.text(.overviewViewApplications),
                     icon: "square.grid.2x2",
                     action: openApplications
@@ -171,6 +197,47 @@ struct OverviewView: View {
                     icon: "arrow.clockwise",
                     action: startScan
                 )
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text(verbatim: L10n.text(.overviewQuickActions))
+                    .font(.headline)
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible(), spacing: 8),
+                        GridItem(.flexible(), spacing: 8)
+                    ],
+                    spacing: 8
+                ) {
+                    actionButton(
+                        L10n.text(.overviewReviewSafeCleanup),
+                        icon: "sparkles",
+                        prominent: true,
+                        disabled: projection.preselectedRecommendations.isEmpty
+                    ) {
+                        reviewCleanup(projection.preselectedRecommendations)
+                    }
+                    actionButton(
+                        L10n.text(.overviewViewLargestItems),
+                        icon: "arrow.down.to.line",
+                        action: openStorage
+                    )
+                    actionButton(
+                        L10n.text(.overviewViewRecentChanges),
+                        icon: "clock.arrow.circlepath",
+                        action: openRecentChanges
+                    )
+                    actionButton(
+                        L10n.text(.overviewViewApplications),
+                        icon: "square.grid.2x2",
+                        action: openApplications
+                    )
+                    actionButton(
+                        L10n.text(.overviewRescan),
+                        icon: "arrow.clockwise",
+                        action: startScan
+                    )
+                }
             }
         }
     }
@@ -200,11 +267,44 @@ struct OverviewView: View {
 
     private func actionButtonLabel(_ title: String, icon: String) -> some View {
         Label(title, systemImage: icon)
-            .lineLimit(2)
-            .frame(maxWidth: .infinity, minHeight: 36, alignment: .leading)
+            .lineLimit(1)
+            .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
     }
 
-    private func cleanupOpportunities(_ projection: OverviewProjection) -> some View {
+    private func primaryWorkspace(
+        _ projection: OverviewProjection,
+        recentCleanup: OverviewDashboardState.RecentCleanup?,
+        recentStorageChanges: OverviewDashboardState.RecentStorageChanges?
+    ) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 12) {
+                cleanupWorkspace(
+                    projection,
+                    recentCleanup: recentCleanup,
+                    recentStorageChanges: recentStorageChanges
+                )
+                    .frame(minWidth: 375, maxWidth: .infinity, maxHeight: .infinity)
+                spaceDetails(projection)
+                    .frame(minWidth: 375, maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .frame(height: 430)
+
+            VStack(alignment: .leading, spacing: 12) {
+                cleanupWorkspace(
+                    projection,
+                    recentCleanup: recentCleanup,
+                    recentStorageChanges: recentStorageChanges
+                )
+                spaceDetails(projection)
+            }
+        }
+    }
+
+    private func cleanupWorkspace(
+        _ projection: OverviewProjection,
+        recentCleanup: OverviewDashboardState.RecentCleanup?,
+        recentStorageChanges: OverviewDashboardState.RecentStorageChanges?
+    ) -> some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 0) {
                 if projection.preselectedRecommendations.isEmpty {
@@ -215,12 +315,23 @@ struct OverviewView: View {
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 12)
                 } else {
-                    ForEach(Array(projection.preselectedRecommendations.prefix(5).enumerated()), id: \.element.id) { index, item in
+                    let previewLimit = recommendationPreviewLimit(
+                        recentCleanup: recentCleanup,
+                        recentStorageChanges: recentStorageChanges
+                    )
+                    ForEach(
+                        Array(
+                            projection.preselectedRecommendations
+                                .prefix(previewLimit)
+                                .enumerated()
+                        ),
+                        id: \.element.id
+                    ) { index, item in
                         if index > 0 {
                             Divider()
                         }
                         StorageItemRow(item: item)
-                            .padding(.vertical, 9)
+                            .padding(.vertical, 6)
                     }
 
                     Divider()
@@ -233,10 +344,25 @@ struct OverviewView: View {
                         }
                         .buttonStyle(.borderedProminent)
                     }
-                    .padding(.top, 12)
+                    .padding(.top, 8)
+                }
+
+                if let recentStorageChanges {
+                    Divider()
+                        .padding(.top, 10)
+                    recentChangesSummary(recentStorageChanges)
+                        .padding(.top, 8)
+                }
+
+                if let recentCleanup {
+                    Divider()
+                        .padding(.top, 10)
+                    recentCleanupSummary(recentCleanup)
+                        .padding(.top, 8)
                 }
             }
-            .padding(4)
+            .frame(maxHeight: .infinity, alignment: .top)
+            .padding(2)
         } label: {
             HStack {
                 Label(L10n.text(.overviewTopOpportunities), systemImage: "sparkles")
@@ -248,80 +374,157 @@ struct OverviewView: View {
         }
     }
 
-    private func recentCleanupCard(
+    private func recentChangesSummary(
+        _ changes: OverviewDashboardState.RecentStorageChanges
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label(
+                    L10n.text(.overviewRecentChangesSummary),
+                    systemImage: "clock.arrow.circlepath"
+                )
+                .font(.subheadline.weight(.semibold))
+                Spacer()
+                Button(L10n.text(.overviewViewRecentChanges), action: openRecentChanges)
+                    .buttonStyle(.borderless)
+            }
+
+            HStack(spacing: 0) {
+                recentChangeMetric(
+                    L10n.text(.overviewRecentAdded),
+                    value: changes.addedBytes,
+                    tint: .blue
+                )
+                recentChangeMetric(
+                    L10n.text(.overviewRecentGrown),
+                    value: changes.grownBytes,
+                    tint: .orange
+                )
+                recentChangeMetric(
+                    L10n.text(.overviewRecentReleased),
+                    value: changes.releasedBytes,
+                    tint: .green
+                )
+            }
+
+            HStack(spacing: 12) {
+                if changes.safeToCleanBytes > 0 {
+                    Label(
+                        L10n.recentSafeToClean(
+                            ByteCount.string(changes.safeToCleanBytes)
+                        ),
+                        systemImage: "shield.checkered"
+                    )
+                }
+                Spacer(minLength: 0)
+                if let delta = changes.availableCapacityDelta {
+                    Text(
+                        "\(L10n.text(.storageChangesDiskDelta)): "
+                            + signedByteString(delta)
+                    )
+                }
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private func recommendationPreviewLimit(
+        recentCleanup: OverviewDashboardState.RecentCleanup?,
+        recentStorageChanges: OverviewDashboardState.RecentStorageChanges?
+    ) -> Int {
+        if recentCleanup != nil && recentStorageChanges != nil { return 2 }
+        if recentCleanup != nil || recentStorageChanges != nil { return 3 }
+        return 4
+    }
+
+    private func recentChangeMetric(
+        _ title: String,
+        value: Int64,
+        tint: Color
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(verbatim: title)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text(ByteCount.string(value))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(tint)
+                .monospacedDigit()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func recentCleanupSummary(
         _ recentCleanup: OverviewDashboardState.RecentCleanup
     ) -> some View {
-        GroupBox {
-            HStack(spacing: 12) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.title2)
-                    .foregroundStyle(.green)
+        HStack(spacing: 12) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.title2)
+                .foregroundStyle(.green)
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(verbatim: L10n.text(.overviewRecentCleanup))
-                        .font(.headline)
-                    Text(recentCleanup.completedAt, style: .relative)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 3) {
-                    if let verified = recentCleanup.verifiedFreedBytes {
-                        Text(L10n.verifiedSpace(ByteCount.string(verified)))
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    Text(L10n.movedCount(recentCleanup.movedItemCount))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Button(L10n.text(.overviewViewHistory), action: openHistory)
-                    .buttonStyle(.bordered)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(verbatim: L10n.text(.overviewRecentCleanup))
+                    .font(.headline)
+                Text(recentCleanup.completedAt, style: .relative)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            .padding(4)
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 3) {
+                if let verified = recentCleanup.verifiedFreedBytes {
+                    Text(L10n.verifiedSpace(ByteCount.string(verified)))
+                        .font(.subheadline.weight(.semibold))
+                }
+                Text(L10n.movedCount(recentCleanup.movedItemCount))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Button(L10n.text(.overviewViewHistory), action: openHistory)
+                .buttonStyle(.bordered)
         }
     }
 
     private func spaceDetails(_ projection: OverviewProjection) -> some View {
         GroupBox {
-            LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: 300), spacing: 28, alignment: .top)],
-                alignment: .leading,
-                spacing: 24
-            ) {
+            VStack(alignment: .leading, spacing: 12) {
                 diskCapacitySummary(projection)
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                Divider()
                 AnalyzedCategoryChart(categories: projection.categories)
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
             }
-            .padding(4)
+            .padding(2)
         } label: {
             Label(L10n.text(.overviewSpaceDetails), systemImage: "chart.pie")
         }
     }
 
-    private var coverageWarning: some View {
-        HStack(alignment: .top, spacing: 12) {
+    private func coverageWarning(_ projection: OverviewProjection) -> some View {
+        HStack(alignment: .top, spacing: 9) {
             Image(systemName: "lock.trianglebadge.exclamationmark")
-                .font(.title3)
                 .foregroundStyle(.orange)
             VStack(alignment: .leading, spacing: 3) {
                 Text(verbatim: L10n.text(.overviewLimitedCoverage))
-                    .font(.headline)
+                    .font(.subheadline.weight(.semibold))
                 Text(verbatim: L10n.text(.overviewLimitedCoverageDescription))
-                    .font(.callout)
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            VStack(alignment: .trailing, spacing: 5) {
+                Text(L10n.inaccessibleFolderCount(projection.coverage.deniedPaths.count))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button(
+                    L10n.text(.settingsOpenDiskAccess),
+                    action: openDiskAccessSettings
+                )
+                .buttonStyle(.bordered)
+            }
         }
-        .padding(14)
-        .background(.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(.orange.opacity(0.3))
-        }
+        .padding(.vertical, 4)
     }
 
     @ViewBuilder
@@ -353,6 +556,11 @@ struct OverviewView: View {
             max(Double(projection.totalUsedBytes) / Double(projection.totalCapacityBytes), 0),
             1
         )
+    }
+
+    private func signedByteString(_ bytes: Int64) -> String {
+        if bytes == 0 { return ByteCount.string(0) }
+        return (bytes > 0 ? "+" : "−") + ByteCount.string(abs(bytes))
     }
 }
 

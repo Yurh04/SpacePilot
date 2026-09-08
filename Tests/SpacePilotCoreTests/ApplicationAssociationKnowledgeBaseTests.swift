@@ -11,8 +11,8 @@ final class ApplicationAssociationKnowledgeBaseTests: XCTestCase {
 
         XCTAssertEqual(decoded, original)
         XCTAssertEqual(decoded.schemaVersion, 1)
-        XCTAssertEqual(decoded.contentVersion, "1.4.0")
-        XCTAssertEqual(decoded.rules.count, 17)
+        XCTAssertEqual(decoded.contentVersion, "1.5.0")
+        XCTAssertEqual(decoded.rules.count, 18)
     }
 
     func testMatchesExactBundleAndTeamIdentifiers() throws {
@@ -537,6 +537,81 @@ final class ApplicationAssociationKnowledgeBaseTests: XCTestCase {
         XCTAssertFalse(wrongTeam.contains {
             $0.ruleID == "product.bytedance.doubao-data.v1"
         })
+    }
+
+    func testBuiltInChromeRuleCoversProductDataWithoutClaimingSharedUpdater()
+        throws
+    {
+        let fixture = try Fixture()
+        let chrome = try ApplicationAssociationKnowledgeBase.builtInV1
+            .candidates(
+                for: fixture.context(
+                    bundleIdentifier: "com.google.Chrome",
+                    teamIdentifier: "EQHXZ8M8AV"
+                ),
+                homeDirectory: fixture.home
+            )
+            .filter { $0.ruleID == "product.google.chrome-data.v1" }
+
+        XCTAssertEqual(
+            Set(chrome.map(\.url.path)),
+            [
+                fixture.home.appending(
+                    path: "Library/Application Support/Google/Chrome"
+                ).path,
+                fixture.home.appending(
+                    path: "Library/Caches/Google/Chrome"
+                ).path,
+                fixture.home.appending(
+                    path: "Library/Google/GoogleSoftwareUpdate/Actives/com.google.Chrome"
+                ).path,
+                fixture.home.appending(
+                    path: "Library/Google/Google Chrome Brand.plist"
+                ).path
+            ]
+        )
+        XCTAssertEqual(chrome.count, 4)
+        XCTAssertTrue(chrome.allSatisfy {
+            $0.confidence == .high
+                && $0.ownership == .owned
+                && $0.disposition == .inspectOnly
+        })
+        XCTAssertEqual(
+            chrome.first {
+                $0.url.path.hasSuffix(
+                    "Library/Application Support/Google/Chrome"
+                )
+            }?.risk,
+            .sensitive
+        )
+        XCTAssertEqual(
+            chrome.first {
+                $0.url.path.hasSuffix("Library/Caches/Google/Chrome")
+            }?.risk,
+            .rebuildable
+        )
+        XCTAssertFalse(chrome.contains {
+            $0.url.path.hasSuffix(
+                "Library/Application Support/Google/GoogleUpdater"
+            )
+        })
+
+        for context in [
+            fixture.context(
+                bundleIdentifier: "com.google.Chrome.canary",
+                teamIdentifier: "EQHXZ8M8AV"
+            ),
+            fixture.context(
+                bundleIdentifier: "com.google.Chrome",
+                teamIdentifier: "OTHERTEAM"
+            )
+        ] {
+            let candidates = try ApplicationAssociationKnowledgeBase.builtInV1
+                .candidates(for: context, homeDirectory: fixture.home)
+            XCTAssertFalse(candidates.contains {
+                $0.ruleID == "product.google.chrome-data.v1"
+            })
+        }
     }
 
     private func knowledgeBase(

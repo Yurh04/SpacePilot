@@ -20,21 +20,22 @@
 | 扫描范围和管线 | `Sources/SpacePilotCore/Scanning/ScanCoordinator.swift` | `ScanCoordinatorTests.swift`、`ScanScopeArchitectureTests.swift` |
 | 有数量限制的目录遍历 | `Sources/SpacePilotCore/Scanning/DirectoryScanner.swift` | `DirectoryScannerTests.swift` |
 | 磁盘和开发工具目录 | `VolumeScanner.swift`、`DeveloperStorageScanner.swift` | 同名扫描器测试 |
-| FSEvents 和变化合并 | `FileSystemChangeMonitor.swift`、`FileSystemChangeReconciler.swift` | `FileSystemChangeMonitorTests.swift` |
+| FSEvents、变化合并和最近空间变化 | `FileSystemChangeMonitor.swift`、`FileSystemChangeReconciler.swift`、`StorageChangeTracker.swift` | `FileSystemChangeMonitorTests.swift`、`StorageChangeTrackerTests.swift` |
 | SQLite 快照、索引和统计 | `Sources/SpacePilotCore/Persistence/SQLiteIndexStore.swift`、`IndexSchema.swift` | `SQLiteIndexStoreTests.swift` |
-| 快照和所有权核心模型 | `Models/ScanSnapshot.swift`、`ScannedItem.swift`、`StorageIntelligence.swift` | `ModelAggregationTests.swift` |
+| 快照、所有权和变化历史模型 | `Models/ScanSnapshot.swift`、`ScannedItem.swift`、`StorageIntelligence.swift`、`StorageChangeHistory.swift` | `ModelAggregationTests.swift`、`StorageChangeHistoryTests.swift` |
 | 界面投影和数量限制 | `Models/AppSnapshotProjection.swift`、`ViewProjections.swift` | `ViewProjectionTests.swift` |
-| 概览和储存界面 | `Views/Overview/`、`Views/Storage/StorageView.swift` | `OverviewDashboardStateTests.swift`、`OverviewChartArchitectureTests.swift`、储存界面架构测试 |
+| 概览和储存界面 | `Views/Overview/`、`Views/Storage/StorageView.swift`、`StorageCapacityOverview.swift` | `OverviewDashboardStateTests.swift`、`OverviewChartArchitectureTests.swift`、`StorageWorkbenchArchitectureTests.swift` |
 
 ## 应用程序
 
 | 用途 | 主要文件 | 对应测试 |
 | --- | --- | --- |
-| 已安装应用清单 | `Applications/ApplicationScanner.swift` | `ApplicationScannerTests.swift` |
+| 已安装应用清单 | `Applications/ApplicationScanner.swift`、`ApplicationBundleLocator.swift`、`RegisteredApplicationDiscovery.swift` | `ApplicationScannerTests.swift`、`RegisteredApplicationDiscoveryTests.swift` |
 | Bundle、签名和组件身份 | `ApplicationIdentity.swift`、`ApplicationIdentityReader.swift` | `ApplicationIdentityReaderTests.swift` |
 | 候选路径和关联证据 | `ApplicationArtifactResolver.swift`、`ApplicationRule.swift` | `ApplicationArtifactResolverTests.swift` |
 | 版本化特殊规则 | `ApplicationAssociationKnowledgeBase.swift` | `ApplicationAssociationKnowledgeBaseTests.swift` |
 | Spotlight 加速 | `SpotlightApplicationCandidateDiscovery.swift` | `SpotlightApplicationCandidateDiscoveryTests.swift` |
+| 当前用户临时区关联 | `ApplicationVolatileArtifactFinder.swift` | `ApplicationVolatileArtifactFinderTests.swift` |
 | 按需计算大小和详情 | `ApplicationDetailAnalyzer.swift`、`ApplicationArtifactSizeResolver.swift` | 对应分析器测试 |
 | 重置和卸载选择 | `ApplicationUninstallPlanner.swift` | `ApplicationUninstallPlannerTests.swift` |
 | 应用界面和分组行 | `Sources/SpacePilot/Views/Applications/ApplicationsView.swift` | `ApplicationAssociationGroupingTests.swift`、`FinderRevealTests.swift` |

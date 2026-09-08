@@ -448,7 +448,7 @@ public extension ApplicationAssociationKnowledgeBase {
     /// Built-in version 1 examples. All results are deliberately inspect-only.
     static let builtInV1 = ApplicationAssociationKnowledgeBase(
         schemaVersion: 1,
-        contentVersion: "1.4.0",
+        contentVersion: "1.5.0",
         rules: [
             ApplicationAssociationKnowledgeRule(
                 id: "product.openai.chatgpt-codex.v1",
@@ -493,6 +493,47 @@ public extension ApplicationAssociationKnowledgeBase {
                         scope: .homeDirectory,
                         template: "Library/Caches/Doubao",
                         category: .cache,
+                        risk: .rebuildable,
+                        confidence: .high,
+                        ownership: .owned
+                    )
+                ]
+            ),
+            ApplicationAssociationKnowledgeRule(
+                id: "product.google.chrome-data.v1",
+                match: ApplicationAssociationKnowledgeMatch(
+                    bundleIdentifiers: ["com.google.Chrome"],
+                    teamIdentifiers: ["EQHXZ8M8AV"]
+                ),
+                paths: [
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: "Library/Application Support/Google/Chrome",
+                        category: .application,
+                        risk: .sensitive,
+                        confidence: .high,
+                        ownership: .owned
+                    ),
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: "Library/Caches/Google/Chrome",
+                        category: .cache,
+                        risk: .rebuildable,
+                        confidence: .high,
+                        ownership: .owned
+                    ),
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: "Library/Google/GoogleSoftwareUpdate/Actives/com.google.Chrome",
+                        category: .application,
+                        risk: .rebuildable,
+                        confidence: .high,
+                        ownership: .owned
+                    ),
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: "Library/Google/Google Chrome Brand.plist",
+                        category: .application,
                         risk: .rebuildable,
                         confidence: .high,
                         ownership: .owned

@@ -21,6 +21,8 @@ final class AppModel {
     var selectedAIApplicationTab: AIApplicationTab = .overview
     var latestSnapshot: ScanSnapshot?
     var projection: AppSnapshotProjection?
+    var storageChangeHistory = StorageChangeHistory()
+    var storageItemMode: StorageItemMode = .largest
     var aiQueryProjection: AIApplicationQueryProjection?
     var scanStage: ScanStage?
     var scanProgress = 0.0
@@ -34,6 +36,7 @@ final class AppModel {
     var latestCleanupTransaction: CleanupTransaction?
     var cleanupHistory: [CleanupTransaction] = []
     var analyzingApplicationID: UUID?
+    var applicationAnalysisDates: [UUID: Date] = [:]
     /// Read-only projection of discovered AI tools/assets for the future
     /// management UI. Never mutated by discovery directly; only replaced whole.
     var aiManagementProjection = AIManagementProjection.empty
@@ -114,6 +117,7 @@ final class AppModel {
     private var aiQueryPublicationTask: Task<Void, Never>?
     private var fileSystemMonitor: FileSystemChangeMonitor?
     private var fileSystemChangeReconciler: FileSystemChangeReconciler?
+    private var storageChangeTracker: StorageChangeTracker?
     private var pendingAutomaticRefreshScope: ScanScope?
     private let runtime: SpacePilotRuntime?
     private let approvedProjectRootStore: any ApprovedProjectRootStoring
@@ -288,6 +292,13 @@ final class AppModel {
                         applicationAnalysisTask = nil
                         analyzingApplicationID = nil
                         analyzedApplicationIDs.removeAll(keepingCapacity: true)
+                        applicationAnalysisDates.removeAll(keepingCapacity: true)
+                    }
+                    if event.stage == .completed, let snapshot = event.snapshot {
+                        await updateStorageChangeHistory(
+                            for: snapshot,
+                            resolvesCoverageGaps: scope == .full
+                        )
                     }
                     if background {
                         if event.stage == .completed,
@@ -419,6 +430,7 @@ final class AppModel {
                 }
                 try await runtime.store.save(snapshot: updated)
                 analyzedApplicationIDs.insert(application.id)
+                applicationAnalysisDates[application.id] = .now
                 apply(snapshot: updated)
             } catch is CancellationError {
                 Self.logger.info("Application detail analysis cancelled")
@@ -523,8 +535,12 @@ final class AppModel {
             if let snapshot = try await runtime.store.latestSnapshot() {
                 apply(snapshot: snapshot)
                 try await runtime.store.ensureStorageIndex(snapshot: snapshot)
+                _ = try await runtime.store.establishStorageChangeBaselineIfNeeded(
+                    snapshot: snapshot
+                )
             }
             cleanupHistory = try await runtime.store.cleanupHistory()
+            storageChangeHistory = try await runtime.store.storageChangeHistory()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -612,6 +628,10 @@ final class AppModel {
             ignoredRoots: [indexDirectory]
         )
         let store = runtime.store
+        let tracker = StorageChangeTracker(
+            root: runtime.homeDirectory,
+            store: store
+        )
         let logger = Self.logger
         let homeDirectory = runtime.homeDirectory
         let reconciler = FileSystemChangeReconciler(
@@ -625,19 +645,14 @@ final class AppModel {
                         changedPaths: batch.changedPaths
                     )
                 }
-                if batch.lastEventID > 0 {
-                    try await store.save(fileSystemEventCursor: .init(
-                        volumeID: volumeID,
-                        lastEventID: batch.lastEventID,
-                        lastReconciledAt: .now
-                    ))
-                }
+                let history = try await tracker.track(batch)
                 if let scope = IncrementalRefreshPlanner.scope(
                     for: batch,
                     homeDirectory: homeDirectory
                 ) {
                     await self?.requestAutomaticRefresh(scope: scope)
                 }
+                await self?.publishStorageChangeHistory(history)
             } catch {
                 logger.error(
                     "FSEvents reconciliation failed: \(error.localizedDescription, privacy: .public)"
@@ -653,12 +668,67 @@ final class AppModel {
         }
         fileSystemMonitor = monitor
         fileSystemChangeReconciler = reconciler
+        storageChangeTracker = tracker
         if cursor == nil {
-            try await store.save(fileSystemEventCursor: .init(
+            let now = Date.now
+            let initialCursor = FileSystemEventCursor(
                 volumeID: volumeID,
                 lastEventID: startingEventID,
-                lastReconciledAt: .now
-            ))
+                lastReconciledAt: now
+            )
+            if let snapshot = latestSnapshot,
+               now.timeIntervalSince(snapshot.completedAt) > 60 {
+                try await store.recordStorageChangeUpdate(
+                    entries: [],
+                    states: [],
+                    removedPaths: [],
+                    gap: .init(
+                        startedAt: snapshot.completedAt,
+                        endedAt: now,
+                        reason: "Change tracking began after the saved snapshot"
+                    ),
+                    cursor: initialCursor
+                )
+                storageChangeHistory = try await store.storageChangeHistory()
+            } else {
+                try await store.save(fileSystemEventCursor: initialCursor)
+            }
+        }
+    }
+
+    private func publishStorageChangeHistory(_ history: StorageChangeHistory) {
+        storageChangeHistory = history
+    }
+
+    private func updateStorageChangeHistory(
+        for snapshot: ScanSnapshot,
+        resolvesCoverageGaps: Bool
+    ) async {
+        guard let runtime else { return }
+        do {
+            let established = try await runtime.store.establishStorageChangeBaselineIfNeeded(
+                snapshot: snapshot
+            )
+            if !established, resolvesCoverageGaps {
+                try await runtime.store.calibrateStorageChangeBaseline(
+                    snapshot: snapshot
+                )
+                try await runtime.store.resolveOpenStorageChangeGaps(
+                    at: snapshot.completedAt
+                )
+            }
+            if !established, let volume = snapshot.volume {
+                try await runtime.store.recordDiskSpaceObservation(.init(
+                    observedAt: snapshot.completedAt,
+                    totalCapacity: volume.totalCapacity,
+                    availableCapacity: volume.availableCapacity
+                ))
+            }
+            storageChangeHistory = try await runtime.store.storageChangeHistory()
+        } catch {
+            Self.logger.error(
+                "Could not update storage change history: \(error.localizedDescription, privacy: .public)"
+            )
         }
     }
 

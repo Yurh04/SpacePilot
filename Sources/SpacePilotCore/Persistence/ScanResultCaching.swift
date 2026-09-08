@@ -64,18 +64,12 @@ enum ScanCacheValidation {
     }
 
     static func applicationInventoryToken(at location: URL) -> String {
-        guard let candidates = try? FileManager.default.contentsOfDirectory(
-            at: location,
-            includingPropertiesForKeys: [
-                .contentModificationDateKey,
-                .fileResourceIdentifierKey
-            ],
-            options: [.skipsHiddenFiles]
+        guard let candidates = try? ApplicationBundleLocator.applicationURLs(
+            in: location
         ) else {
             return "missing"
         }
         return candidates
-            .filter { $0.pathExtension.lowercased() == "app" }
             .map { application in
                 let values = try? application.resourceValues(forKeys: [
                     .contentModificationDateKey,

@@ -15,12 +15,24 @@ struct OverviewDashboardState: Equatable {
         let verifiedFreedBytes: Int64?
     }
 
+    struct RecentStorageChanges: Equatable {
+        let addedBytes: Int64
+        let grownBytes: Int64
+        let releasedBytes: Int64
+        let safeToCleanBytes: Int64
+        let availableCapacityDelta: Int64?
+        let hasCoverageGap: Bool
+    }
+
     let capacityStatus: CapacityStatus
     let recentCleanup: RecentCleanup?
+    let recentStorageChanges: RecentStorageChanges?
 
     init(
         projection: OverviewProjection,
-        latestCleanup: CleanupTransaction?
+        latestCleanup: CleanupTransaction?,
+        changeHistory: StorageChangeHistory = StorageChangeHistory(),
+        now: Date = .now
     ) {
         if projection.hasWholeDiskCapacity,
            projection.totalCapacityBytes > 0 {
@@ -45,6 +57,29 @@ struct OverviewDashboardState: Equatable {
                 }.count,
                 verifiedFreedBytes: transaction.verifiedFreedBytes
             )
+        }
+
+        if changeHistory.baselineEstablishedAt != nil || !changeHistory.entries.isEmpty {
+            let allChanges = StorageChangeProjection(
+                history: changeHistory,
+                timeRange: .week,
+                kindFilter: .all,
+                now: now
+            )
+            let cutoff = StorageChangeTimeRange.week.cutoff(relativeTo: now)
+            let safeToCleanBytes = changeHistory.entries.lazy
+                .filter { $0.observedAt >= cutoff && $0.isSafeToClean }
+                .reduce(Int64(0)) { $0 + $1.afterBytes }
+            recentStorageChanges = RecentStorageChanges(
+                addedBytes: allChanges.addedBytes,
+                grownBytes: allChanges.grownBytes,
+                releasedBytes: allChanges.releasedBytes,
+                safeToCleanBytes: safeToCleanBytes,
+                availableCapacityDelta: allChanges.availableCapacityDelta,
+                hasCoverageGap: allChanges.hasCoverageGap
+            )
+        } else {
+            recentStorageChanges = nil
         }
     }
 }

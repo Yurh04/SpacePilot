@@ -48,17 +48,30 @@ struct AppRootView: View {
                 projection: model.projection?.overview,
                 hasSnapshot: model.latestSnapshot != nil,
                 latestCleanup: model.cleanupHistory.first,
+                changeHistory: model.storageChangeHistory,
                 startScan: { model.startScan(scope: .full) },
                 reviewCleanup: model.prepareCleanup,
-                openStorage: { model.selection = .storage },
+                openStorage: {
+                    model.storageItemMode = .largest
+                    model.selection = .storage
+                },
+                openRecentChanges: {
+                    model.storageItemMode = .recent
+                    model.selection = .storage
+                },
                 openApplications: { model.selection = .applications },
-                openHistory: { model.selection = .history }
+                openHistory: { model.selection = .history },
+                openDiskAccessSettings: {
+                    PermissionService().openFullDiskAccessSettings()
+                }
             )
         case .storage:
             StorageView(
                 projection: model.projection?.storage,
+                changeHistory: model.storageChangeHistory,
                 hasSnapshot: model.latestSnapshot != nil,
                 searchText: model.searchText,
+                mode: $model.storageItemMode,
                 reviewCleanup: model.prepareCleanup
             )
         case .applications:
@@ -67,6 +80,7 @@ struct AppRootView: View {
                 hasSnapshot: model.latestSnapshot != nil,
                 relatedFileSearchText: model.searchText,
                 analyzingApplicationID: model.analyzingApplicationID,
+                applicationAnalysisDates: model.applicationAnalysisDates,
                 analyze: model.analyzeApplication,
                 uninstall: model.prepareUninstall,
                 reset: model.prepareReset

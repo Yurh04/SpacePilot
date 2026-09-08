@@ -53,6 +53,7 @@ struct ApplicationsView: View {
     let hasSnapshot: Bool
     let relatedFileSearchText: String
     let analyzingApplicationID: UUID?
+    let applicationAnalysisDates: [UUID: Date]
     let analyze: (ApplicationProjection) -> Void
     let uninstall: (ApplicationProjection) -> Void
     let reset: (ApplicationProjection) -> Void
@@ -82,6 +83,7 @@ struct ApplicationsView: View {
                     ApplicationDetail(
                         projection: application,
                         isAnalyzing: analyzingApplicationID == application.id,
+                        analysisCompletedAt: applicationAnalysisDates[application.id],
                         searchText: relatedFileSearchText,
                         uninstall: { uninstall(application) },
                         reset: { reset(application) }
@@ -271,6 +273,7 @@ private struct ApplicationListRow: View {
 private struct ApplicationDetail: View {
     let projection: ApplicationProjection
     let isAnalyzing: Bool
+    let analysisCompletedAt: Date?
     let searchText: String
     let uninstall: () -> Void
     let reset: () -> Void
@@ -347,6 +350,7 @@ private struct ApplicationDetail: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
+                analysisStatus
                 if !searchText.isEmpty {
                     Text(visibleAssociations.count.formatted())
                         .font(.caption)
@@ -390,17 +394,41 @@ private struct ApplicationDetail: View {
             }
             .listStyle(.inset)
             .overlay {
-                if isAnalyzing {
-                    ProgressView()
-                } else if !searchText.isEmpty && visibleAssociations.isEmpty {
+                if !isAnalyzing && !searchText.isEmpty && visibleAssociations.isEmpty {
                     ContentUnavailableView.search(text: searchText)
-                } else if projection.associations.isEmpty {
+                } else if !isAnalyzing && projection.associations.isEmpty {
                     ContentUnavailableView(
                         L10n.text(.applicationOnlyHighConfidence),
                         systemImage: "externaldrive.badge.magnifyingglass"
                     )
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private var analysisStatus: some View {
+        if isAnalyzing {
+            HStack(spacing: 6) {
+                ProgressView()
+                    .controlSize(.small)
+                Text(verbatim: L10n.text(.applicationAnalysisInProgress))
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .accessibilityElement(children: .combine)
+        } else if let analysisCompletedAt {
+            Label {
+                HStack(spacing: 4) {
+                    Text(verbatim: L10n.text(.applicationAnalysisCompleted))
+                    Text(analysisCompletedAt, style: .relative)
+                }
+            } icon: {
+                Image(systemName: "checkmark.circle")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .accessibilityElement(children: .combine)
         }
     }
 
