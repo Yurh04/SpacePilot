@@ -33,17 +33,39 @@ public struct PluginRoot: Sendable {
         definitions: [AIToolDefinition] = KnownAIToolDefinitions.all
     ) -> [Self] {
         var byRoot: [String: Self] = [:]
+        // The declared plugin roots, each paired with the owner/scope it confers.
+        // A discovered plugin lives *under* one of these (for example
+        // `~/.codex/plugins/cache/<src>/<plugin>/installation` sits under the
+        // declared `~/.codex/plugins`), so it is attributed by path-prefix rather
+        // than by an exact canonical-path match — the deep install directory never
+        // equals the declared root. Deepest declared root wins when several nest.
+        var declaredRoots: [(url: URL, owner: AIAssetOwner, scope: AIAssetLocationScope)] = []
         for definition in definitions {
             for descriptor in definition.pluginRoots {
-                merge(Self(
-                    url: homeDirectory.appending(path: descriptor.relativePath, directoryHint: .isDirectory),
-                    owner: descriptor.ownership == .shared ? .shared : .tool(definitionID: definition.id),
-                    locationScope: .userGlobal
-                ), into: &byRoot)
+                let url = homeDirectory.appending(path: descriptor.relativePath, directoryHint: .isDirectory)
+                let owner: AIAssetOwner = descriptor.ownership == .shared
+                    ? .shared
+                    : .tool(definitionID: definition.id)
+                merge(Self(url: url, owner: owner, locationScope: .userGlobal), into: &byRoot)
+                declaredRoots.append((url.canonicalizedForDiscovery, owner, .userGlobal))
             }
         }
+        // Longest (deepest) declared root first so a nested declaration wins over
+        // a shallower one that also contains the discovered path.
+        declaredRoots.sort { $0.url.pathComponents.count > $1.url.pathComponents.count }
         for root in discoveredRoots {
-            merge(Self(url: root), into: &byRoot)
+            let canonical = root.canonicalizedForDiscovery
+            let matches = declaredRoots.filter { canonical.hasPluginPathPrefix($0.url) }
+            // Among the containing roots, only the deepest ones attribute the
+            // plugin; if several equally-deep roots disagree on owner (two tools
+            // sharing a root), fold to an ambiguous `.unknown` rather than guess.
+            let deepest = matches.first.map { $0.url.pathComponents.count }
+            let winners = matches.filter { $0.url.pathComponents.count == deepest }
+            let owner = winners.map(\.owner).reduce(AIAssetOwner?.none) { acc, next in
+                acc.map { SkillRoot.resolveOwner($0, next) } ?? next
+            } ?? .unknown
+            let scope = winners.first?.scope ?? .userGlobal
+            merge(Self(url: root, owner: owner, locationScope: scope), into: &byRoot)
         }
         return byRoot.values.sorted { $0.url.path < $1.url.path }
     }
@@ -198,5 +220,18 @@ public struct PluginScanner<Scanner: SkillScanning>: PluginScanning {
 
     private func allocatedSize(of root: URL) -> Int64 {
         ManagedAssetDirectoryMetadata.scan(root: root).allocatedSize
+    }
+}
+
+private extension URL {
+    /// Whole-path-component prefix test on already-canonical URLs. A descendant
+    /// path (`~/.codex/plugins/cache/x/install`) is under `~/.codex/plugins`, but
+    /// a sibling that merely shares a string prefix (`~/.codex/plugins-backup`) is
+    /// not — comparison is component-by-component, never substring.
+    func hasPluginPathPrefix(_ prefix: URL) -> Bool {
+        let components = pathComponents
+        let prefixComponents = prefix.pathComponents
+        guard prefixComponents.count <= components.count else { return false }
+        return Array(components.prefix(prefixComponents.count)) == prefixComponents
     }
 }

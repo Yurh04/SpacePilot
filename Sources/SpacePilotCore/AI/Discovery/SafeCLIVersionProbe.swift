@@ -42,6 +42,23 @@ public protocol CLIProcessRunning: Sendable {
 /// deterministic tests.
 public protocol ExecutableLocating: Sendable {
     func isExecutableFile(at url: URL) -> Bool
+    /// Resolves a candidate to its canonical executable (following symlinks).
+    /// Used to prove that a generic bin candidate belongs to an expected npm
+    /// package. Defaults to real filesystem resolution.
+    func canonicalExecutable(at url: URL) -> URL
+    /// Whether a directory exists at `url`. Used to confirm a
+    /// `node_modules/<packageID>` install. Defaults to a real filesystem check.
+    func directoryExists(at url: URL) -> Bool
+}
+
+public extension ExecutableLocating {
+    func canonicalExecutable(at url: URL) -> URL { url.canonicalizedForDiscovery }
+
+    func directoryExists(at url: URL) -> Bool {
+        var isDirectory: ObjCBool = false
+        return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
+            && isDirectory.boolValue
+    }
 }
 
 public struct LocalExecutableLocator: ExecutableLocating {
@@ -482,6 +499,29 @@ public struct SafeCLIVersionProbe: Sendable {
                 executableURL: homeDirectory.appending(path: "Library/pnpm/bin/\(spec.basename)", directoryHint: .notDirectory),
                 environment: Self.fixedEnvironment
             ))
+        } else {
+            // A node-package tool installed via Homebrew or `npm -g` is exposed as
+            // a symlink in `/usr/local/bin`, `/opt/homebrew/bin`, `~/.local/bin`,
+            // or the pnpm bin. Those generic locations carry no package identity on
+            // their own, so a candidate is admitted only when its symlink resolves
+            // into a `node_modules/<packageID>` install for one of the fixed
+            // identifiers — the same "prove the package is installed" invariant the
+            // FNM/NVM branch enforces, just for a symlinked global install. An
+            // unrelated binary that merely shares the basename is never accepted.
+            var identityGated: [URL] = spec.absoluteCandidatePaths.map { URL(filePath: $0) }
+            identityGated.append(contentsOf: spec.homeRelativeCandidatePaths.map {
+                homeDirectory.appending(path: $0, directoryHint: .notDirectory)
+            })
+            identityGated.append(
+                homeDirectory.appending(path: "Library/pnpm/bin/\(spec.basename)", directoryHint: .notDirectory)
+            )
+            for candidateURL in identityGated {
+                guard let verified = nodePackageCandidate(
+                    at: candidateURL,
+                    requiredPackageIdentifiers: spec.nodePackageIdentifiers
+                ) else { continue }
+                candidates.append(verified)
+            }
         }
         // FNM/NVM candidates are only offered for tools distributed as a known
         // npm package. Each candidate is accepted only when its own version root
@@ -630,6 +670,49 @@ public struct SafeCLIVersionProbe: Sendable {
         var environment = fixedEnvironment
         environment["PATH"] = bin.path + ":" + (fixedEnvironment["PATH"] ?? "")
         return environment
+    }
+
+    /// Verifies a generic bin candidate (Homebrew / npm-global / pnpm) for a
+    /// node-package tool by resolving its symlink and confirming the resolved
+    /// executable lives inside a `node_modules/<packageID>` install for one of the
+    /// fixed identifiers. This gives the generic location the same package
+    /// identity the FNM/NVM branch requires, so an unrelated same-named binary is
+    /// never executed or attributed. All filesystem access goes through the
+    /// injected `locator`, keeping the check deterministic under test. Returns
+    /// `nil` when the candidate is missing, not executable, or cannot be tied to
+    /// an expected package.
+    private func nodePackageCandidate(
+        at candidateURL: URL,
+        requiredPackageIdentifiers: [String]
+    ) -> ProbeCandidate? {
+        guard locator.isExecutableFile(at: candidateURL) else { return nil }
+        let canonicalExecutable = locator.canonicalExecutable(at: candidateURL)
+        // Walk up from the resolved executable looking for a `node_modules`
+        // directory that contains one of the expected package directories. A
+        // typical layout is `.../node_modules/<packageID>/{bin,dist}/cli.js` with
+        // the bin symlinked into a generic location.
+        var directory = canonicalExecutable.deletingLastPathComponent()
+        var depth = 0
+        while depth < 12, directory.path != "/" {
+            if directory.lastPathComponent == "node_modules" {
+                for identifier in requiredPackageIdentifiers {
+                    var packageURL = directory
+                    for component in identifier.split(separator: "/", omittingEmptySubsequences: true) {
+                        packageURL = packageURL.appending(path: String(component), directoryHint: .isDirectory)
+                    }
+                    guard packageURL.hasPathComponentPrefix(directory),
+                          canonicalExecutable.hasPathComponentPrefix(directory),
+                          locator.directoryExists(at: packageURL) else { continue }
+                    return ProbeCandidate(
+                        executableURL: canonicalExecutable,
+                        environment: Self.fixedEnvironment
+                    )
+                }
+            }
+            directory = directory.deletingLastPathComponent()
+            depth += 1
+        }
+        return nil
     }
 
     /// Extracts a plausible version string from captured output. To reject

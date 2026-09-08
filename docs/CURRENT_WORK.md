@@ -5,11 +5,16 @@
 ## 仓库检查点
 
 - 当前分支为 `main`，跟踪 `origin/main`。
-- 当前 `main` 已包含概览/储存界面改进提交 `58c116c`，并合入 `origin/feat/double-click` 至 `41371e1` 的后续 AI 管理工作。
+- 当前 `main` 已包含概览/储存界面改进提交 `58c116c`，并合入 `origin/feat/double-click` 至 `255eebe` 的后续 AI 管理工作。
 - 当前预览版本：0.1.3。
 - 开始工作前仍必须运行 `git status --short --branch` 检查实时状态，不能只依赖本文档。
 
 ## 本轮完成
+
+- 开发与 AI 工作区改为单一稳定侧边栏，统一容纳 Agent、MCP、全局 Skill、Plugin、CLI 和其他 AI 工具；Agent 详情补充 MCP、Hook、全局指令、模型与凭据存在性等只读配置能力。
+- 新增 AI 健康诊断和确定性分类：识别重复 Skill、异常/失效软链接、大体积占用、外部 Hook 接管和未引用 Skill，并区分普通 CLI、MCP Server、配置管理器、Hook Provider 等辅助工具及安装来源。
+- AI 配置扫描与目录发现改为同一后台任务原子发布，取消或过期结果不会覆盖新快照；本地化目录合并为 402 个中英文键。
+- 2026-09-09 验证：完整 `swift test` 556 项通过、0 项失败；`./script/test_release.sh` 的 556 项测试、Release 构建、临时启动、应用包、签名结构和 ZIP 检查通过。Gatekeeper 仍按预期拒绝 ad-hoc 签名。
 
 - 扩大已安装应用发现范围：`/Applications` 与当前用户 `Applications` 目录改为有界递归，能够识别 `TeX`、`Python 3.12` 等套件文件夹中的独立 `.app`，但不会进入已有应用包的 `Contents` 把 helper 重复列为应用。
 - 新增 Spotlight 注册应用补充来源，覆盖 Application Support 中真实注册的更新器、Agent 和工具链应用；排除构建产物、Script Editor 模板、卸载器和嵌套 helper，并按 Bundle ID 优先保留正式安装位置。

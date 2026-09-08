@@ -59,6 +59,51 @@ final class SafeCLIVersionProbeTests: XCTestCase {
         func isExecutableFile(at url: URL) -> Bool { false }
     }
 
+    /// A fully in-memory locator for the node-package identity gate: it treats a
+    /// fixed set of paths as executable, resolves symlinks via a fixed map, and
+    /// answers directory existence from a fixed set. This keeps the gate's
+    /// behaviour deterministic and independent of whatever is really installed on
+    /// the machine running the tests.
+    private struct FakeNodeLocator: ExecutableLocating {
+        var executablePaths: Set<String> = []
+        var symlinks: [String: String] = [:]
+        var directories: Set<String> = []
+
+        func isExecutableFile(at url: URL) -> Bool { executablePaths.contains(url.path) }
+
+        func canonicalExecutable(at url: URL) -> URL {
+            URL(filePath: symlinks[url.path] ?? url.path)
+        }
+
+        func directoryExists(at url: URL) -> Bool {
+            directories.contains(url.path.hasSuffix("/") ? String(url.path.dropLast()) : url.path)
+        }
+    }
+
+    /// Wraps `LocalExecutableLocator` but only trusts paths inside a given root
+    /// (a test's temporary tree). Any path outside the root — for example the
+    /// real `/usr/local/bin/one` or `/opt/homebrew/bin/one` — is treated as
+    /// absent, so a probe that walks fixed absolute candidates stays hermetic
+    /// regardless of what is actually installed on the machine.
+    private struct SandboxedLocalLocator: ExecutableLocating {
+        let root: URL
+        private let local = LocalExecutableLocator()
+
+        private func isInsideRoot(_ url: URL) -> Bool {
+            url.standardizedFileURL.path.hasPrefix(root.standardizedFileURL.path)
+        }
+
+        func isExecutableFile(at url: URL) -> Bool {
+            isInsideRoot(url) && local.isExecutableFile(at: url)
+        }
+
+        func canonicalExecutable(at url: URL) -> URL { local.canonicalExecutable(at: url) }
+
+        func directoryExists(at url: URL) -> Bool {
+            isInsideRoot(url) && local.directoryExists(at: url)
+        }
+    }
+
     private func output(
         stdout: String = "",
         stderr: String = "",
@@ -352,15 +397,69 @@ final class SafeCLIVersionProbeTests: XCTestCase {
     }
 
     func testNodePackageToolRejectsUnverifiedGenericBasenameCandidates() async throws {
-        // `one` is distributed as the npm package @dp/one-cli. The generic
-        // basename candidates (/usr/local/bin/one, /opt/homebrew/bin/one,
-        // ~/.local/bin/one, ~/Library/pnpm/bin/one) carry no package identity and
-        // must NOT be offered for a node-package tool. AlwaysExecutableLocator
-        // claims every path is executable, so if any generic candidate were
-        // still offered it would run; instead only the package-ID gated
-        // FNM/NVM templates apply, none exist here, so nothing runs.
+        // `one` is distributed as the npm package @dp/one-cli. A generic bin
+        // candidate (/usr/local/bin/one, /opt/homebrew/bin/one, ~/.local/bin/one,
+        // ~/Library/pnpm/bin/one) is admitted only when it resolves into a
+        // `node_modules/@dp/one-cli` install. Here every path is "executable" but
+        // no such install exists, so the identity gate rejects them all and only
+        // the package-ID gated FNM/NVM templates could apply — none do, so nothing
+        // runs and no unrelated same-named binary is attributed.
+        let locator = FakeNodeLocator(
+            executablePaths: [
+                "/usr/local/bin/one", "/opt/homebrew/bin/one",
+                "/Users/test/.local/bin/one", "/Users/test/Library/pnpm/bin/one"
+            ]
+            // No symlink resolution and no node_modules directories configured.
+        )
         let runner = RecordingRunner(output: output(stdout: "one 9.9.9\n"))
-        let probe = SafeCLIVersionProbe(runner: runner, locator: AlwaysExecutableLocator())
+        let probe = SafeCLIVersionProbe(runner: runner, locator: locator)
+
+        let result = try await probe.probeVersion(probeID: "one", homeDirectory: home)
+
+        XCTAssertNil(result.executableURL)
+        XCTAssertEqual(result.coverageFailure, .unavailable)
+        XCTAssertTrue(runner.invocations.isEmpty)
+    }
+
+    func testNodePackageToolAcceptsGenericBinResolvingIntoInstalledPackage() async throws {
+        // The real Homebrew / npm-global layout: /opt/homebrew/bin/one is a
+        // symlink into a `node_modules/@dp/one-cli` install. The identity gate
+        // resolves the symlink, confirms the package directory exists, and admits
+        // the candidate — so a tool installed outside FNM/NVM is now detected
+        // instead of being silently missed.
+        let installRoot = "/opt/homebrew/lib/node_modules/@dp/one-cli"
+        let resolved = "\(installRoot)/dist/one.js"
+        let locator = FakeNodeLocator(
+            executablePaths: ["/opt/homebrew/bin/one", resolved],
+            symlinks: ["/opt/homebrew/bin/one": resolved],
+            directories: [installRoot, "/opt/homebrew/lib/node_modules"]
+        )
+        let runner = RecordingRunner(output: output(stdout: "one 3.2.1\n"))
+        let probe = SafeCLIVersionProbe(runner: runner, locator: locator)
+
+        let result = try await probe.probeVersion(probeID: "one", homeDirectory: home)
+
+        XCTAssertEqual(result.executableURL, URL(filePath: resolved))
+        XCTAssertEqual(result.version, "one 3.2.1")
+        XCTAssertNil(result.coverageFailure)
+        XCTAssertEqual(runner.invocations.first?.executableURL, URL(filePath: resolved))
+    }
+
+    func testNodePackageToolRejectsGenericBinResolvingIntoWrongPackage() async throws {
+        // A same-named binary that resolves into some *other* package's
+        // node_modules must not be attributed to the AI tool: the required
+        // identifier @dp/one-cli is absent, so the gate rejects it.
+        let resolved = "/opt/homebrew/lib/node_modules/unrelated/dist/one.js"
+        let locator = FakeNodeLocator(
+            executablePaths: ["/opt/homebrew/bin/one", resolved],
+            symlinks: ["/opt/homebrew/bin/one": resolved],
+            directories: [
+                "/opt/homebrew/lib/node_modules/unrelated",
+                "/opt/homebrew/lib/node_modules"
+            ]
+        )
+        let runner = RecordingRunner(output: output(stdout: "one 9.9.9\n"))
+        let probe = SafeCLIVersionProbe(runner: runner, locator: locator)
 
         let result = try await probe.probeVersion(probeID: "one", homeDirectory: home)
 
@@ -413,7 +512,10 @@ final class SafeCLIVersionProbeTests: XCTestCase {
         try makeExecutable(at: executable)
         // Intentionally do NOT create installation/lib/node_modules/@dp/one-cli.
         let runner = RecordingRunner(output: output(stdout: "one 9.9.9\n"))
-        let probe = SafeCLIVersionProbe(runner: runner, locator: LocalExecutableLocator())
+        // Sandbox to the temp tree so the fixed absolute candidates
+        // (/usr/local/bin/one, /opt/homebrew/bin/one) can't pick up a real
+        // install on the host machine.
+        let probe = SafeCLIVersionProbe(runner: runner, locator: SandboxedLocalLocator(root: tree.url))
 
         let result = try await probe.probeVersion(probeID: "one", homeDirectory: tree.url)
 

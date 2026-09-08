@@ -65,7 +65,7 @@ public struct AIToolPackageInventory: Sendable {
                     let parsed = Self.parseMetadata(data)
                     let packageName = parsed.packageName ?? descriptor.packageName
                     guard packageName == descriptor.packageName else { continue }
-                    let canonical = metadataURL.standardizedFileURL.resolvingSymlinksInPath().path
+                    let canonical = metadataURL.canonicalizedDiscoveryPath
                     let key = "\(definition.id)|\(descriptor.manager.rawValue)|\(packageName)|\(canonical)"
                     guard seen.insert(key).inserted else { continue }
                     facts.append(AIToolPackageInstallFact(

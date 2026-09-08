@@ -246,19 +246,30 @@ final class AIUpdateExecutionTests: XCTestCase {
 
     func testParseVersionHandlesNpmPnpmAndPipxLayouts() {
         XCTAssertEqual(
-            LocalInstalledVersionProbe.parseVersion(from: "@openai/codex@1.2.3", packageIdentifier: "@openai/codex"),
+            LocalInstalledVersionProbe.parseVersion(
+                from: "@openai/codex@1.2.3", packageIdentifier: "@openai/codex", comparator: .semver),
             "1.2.3"
         )
         XCTAssertEqual(
-            LocalInstalledVersionProbe.parseVersion(from: "  @aiden-cli/core@2.0.1  ", packageIdentifier: "@aiden-cli/core"),
+            LocalInstalledVersionProbe.parseVersion(
+                from: "  @aiden-cli/core@2.0.1  ", packageIdentifier: "@aiden-cli/core", comparator: .semver),
             "2.0.1"
         )
         XCTAssertEqual(
-            LocalInstalledVersionProbe.parseVersion(from: "aider-chat 3.1.0", packageIdentifier: "aider-chat"),
+            LocalInstalledVersionProbe.parseVersion(
+                from: "aider-chat 3.1.0", packageIdentifier: "aider-chat", comparator: .pep440),
             "3.1.0"
         )
+        // A PyPI version that strict SemVer would reject must still be parsed
+        // under the pipx (PEP 440) comparator.
+        XCTAssertEqual(
+            LocalInstalledVersionProbe.parseVersion(
+                from: "aider-chat 0.72.1.post1", packageIdentifier: "aider-chat", comparator: .pep440),
+            "0.72.1.post1"
+        )
         XCTAssertNil(
-            LocalInstalledVersionProbe.parseVersion(from: "some-other-pkg@1.0.0", packageIdentifier: "@openai/codex")
+            LocalInstalledVersionProbe.parseVersion(
+                from: "some-other-pkg@1.0.0", packageIdentifier: "@openai/codex", comparator: .semver)
         )
     }
 

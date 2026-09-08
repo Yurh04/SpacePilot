@@ -25,8 +25,16 @@ struct GlobalSkillsView: View {
     @Binding var selectedGroupID: String?
     @Binding var selection: Set<UUID>
 
+    /// Grouped view of the discovered skills.
+    ///
+    /// Read many times per render (once per row for the scope label), so it is
+    /// memoised against its inputs instead of rebuilt on each access.
     private var projection: GroupedSkillsProjection {
-        GroupedSkillsProjection(skills: skills, plugins: plugins, discoveredToolIDs: discoveredToolIDs)
+        AIAgentCache.shared.groupedSkills(
+            skills: skills,
+            plugins: plugins,
+            discoveredToolIDs: discoveredToolIDs
+        )
     }
 
     private var selectedRows: [AIUpdateSelectionPlan.SelectedRow] {

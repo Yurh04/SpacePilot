@@ -168,6 +168,7 @@ public enum UpdateProviderKind: String, Codable, Hashable, Sendable {
 
 public enum VersionComparatorKind: String, Codable, Hashable, Sendable {
     case semver
+    case pep440
 }
 
 public struct UpdateCapability: Hashable, Sendable {
@@ -181,14 +182,26 @@ public struct UpdateCapability: Hashable, Sendable {
         providerID: String,
         providerKind: UpdateProviderKind,
         packageIdentifier: String,
-        comparator: VersionComparatorKind = .semver,
+        comparator: VersionComparatorKind? = nil,
         allowsPrerelease: Bool = false
     ) {
         self.providerID = providerID
         self.providerKind = providerKind
         self.packageIdentifier = packageIdentifier
-        self.comparator = comparator
+        // A pypi provider publishes PEP 440 versions (`1.2`, `2024.1`,
+        // `1.0.0rc1`, `1.2.post1`), which strict SemVer cannot parse. Default the
+        // comparator from the provider kind so a caller cannot forget to pair a
+        // pypi provider with the right comparator, while still allowing an
+        // explicit override.
+        self.comparator = comparator ?? Self.defaultComparator(for: providerKind)
         self.allowsPrerelease = allowsPrerelease
+    }
+
+    private static func defaultComparator(for providerKind: UpdateProviderKind) -> VersionComparatorKind {
+        switch providerKind {
+        case .npmRegistry: return .semver
+        case .pypi: return .pep440
+        }
     }
 }
 
@@ -456,7 +469,11 @@ public struct AIUpdateChecker: Sendable {
         capability: UpdateCapability
     ) -> UpdateCheckResult {
         let status: UpdateStatus
-        switch SemVerComparator.compare(current, latest, allowsPrerelease: capability.allowsPrerelease) {
+        switch VersionComparator.compare(
+            current, latest,
+            kind: capability.comparator,
+            allowsPrerelease: capability.allowsPrerelease
+        ) {
         case .orderedAscending:
             status = .updateAvailable
         case .orderedSame, .orderedDescending:
@@ -485,6 +502,32 @@ public struct AIUpdateChecker: Sendable {
             checkedAt: .now,
             failure: failure
         )
+    }
+}
+
+/// Compares two version strings under a named version scheme. This is the single
+/// entry point the update pipeline uses so that a pypi package is never compared
+/// with strict SemVer (which rejects `1.2`, `2024.1`, `1.0.0rc1`, ...). Returns
+/// `nil` when either side is unparseable under the chosen scheme.
+public enum VersionComparator {
+    public static func compare(
+        _ lhs: String,
+        _ rhs: String,
+        kind: VersionComparatorKind,
+        allowsPrerelease: Bool = false
+    ) -> ComparisonResult? {
+        switch kind {
+        case .semver:
+            return SemVerComparator.compare(lhs, rhs, allowsPrerelease: allowsPrerelease)
+        case .pep440:
+            return PEP440Comparator.compare(lhs, rhs, allowsPrerelease: allowsPrerelease)
+        }
+    }
+
+    /// Whether a single version string parses under the chosen scheme. Used to
+    /// validate a probed/latest version before it is trusted as a target.
+    public static func isValid(_ version: String, kind: VersionComparatorKind) -> Bool {
+        compare(version, version, kind: kind) != nil
     }
 }
 
@@ -566,6 +609,172 @@ public enum SemVerComparator {
                 }
             }
             return .orderedSame
+        }
+    }
+}
+
+/// A pragmatic PEP 440 comparator covering the release forms real PyPI packages
+/// publish: an arbitrary-length release segment (`1`, `1.2`, `2024.1.0`), an
+/// optional epoch (`1!2.0`), and the pre/post/dev suffixes (`1.0rc1`,
+/// `1.2.post1`, `1.0.dev3`), with or without separators. It intentionally does
+/// not implement local versions (`+local`) for ordering — the build metadata is
+/// ignored, matching SemVer's behaviour here — but such versions still parse.
+public enum PEP440Comparator {
+    public static func compare(
+        _ lhs: String,
+        _ rhs: String,
+        allowsPrerelease: Bool = false
+    ) -> ComparisonResult? {
+        guard let left = PEP440(lhs), let right = PEP440(rhs) else { return nil }
+        // A pre-release (`rcN`/`aN`/`bN`) or dev release is "less than" the
+        // corresponding final release. Mirror SemVer's policy: unless the caller
+        // opts in, treat "newer only as a pre-release" as not an upgrade.
+        if right.isPreOrDev, !left.isPreOrDev, !allowsPrerelease {
+            return .orderedDescending
+        }
+        if left == right { return .orderedSame }
+        return left < right ? .orderedAscending : .orderedDescending
+    }
+
+    struct PEP440: Comparable, Equatable {
+        let epoch: Int
+        let release: [Int]
+        /// Ordering rank of the pre-release phase: dev(-3) < alpha(-2) <
+        /// beta(-1) < rc(0) < final(1) < post(2). Combined with `phaseNumber`.
+        let phase: Int
+        let phaseNumber: Int
+        let devNumber: Int?
+
+        var isPreOrDev: Bool { phase < 1 || devNumber != nil }
+
+        init?(_ raw: String) {
+            guard raw.count <= 128 else { return nil }
+            var text = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard !text.isEmpty else { return nil }
+            if text.hasPrefix("v") { text.removeFirst() }
+
+            // Epoch: "N!rest".
+            var epoch = 0
+            if let bang = text.firstIndex(of: "!") {
+                guard let value = Int(text[text.startIndex..<bang]), value >= 0 else { return nil }
+                epoch = value
+                text = String(text[text.index(after: bang)...])
+            }
+
+            // Local version segment ("+local") is ignored for ordering.
+            if let plus = text.firstIndex(of: "+") {
+                text = String(text[text.startIndex..<plus])
+            }
+
+            // Split the release from any pre/post/dev suffix. The release is the
+            // leading run of dot-separated integers; the remainder is the suffix.
+            var releasePart = text
+            var suffix = ""
+            if let boundary = text.firstIndex(where: { !($0.isNumber || $0 == ".") }) {
+                releasePart = String(text[text.startIndex..<boundary])
+                suffix = String(text[boundary...])
+            }
+            releasePart = releasePart.trimmingCharacters(in: CharacterSet(charactersIn: "."))
+            let releaseTokens = releasePart.split(separator: ".", omittingEmptySubsequences: false)
+            guard !releaseTokens.isEmpty else { return nil }
+            var release: [Int] = []
+            for token in releaseTokens {
+                guard let value = Int(token), value >= 0 else { return nil }
+                release.append(value)
+            }
+
+            self.epoch = epoch
+            self.release = release
+
+            guard let parsed = Self.parseSuffix(suffix) else { return nil }
+            self.phase = parsed.phase
+            self.phaseNumber = parsed.phaseNumber
+            self.devNumber = parsed.devNumber
+        }
+
+        /// Parses the pre/post/dev suffix. Accepts optional separators
+        /// (`.`, `-`, `_`) and the usual spellings: a/alpha, b/beta, c/rc/pre/preview,
+        /// post/rev/r, dev. Returns `nil` on anything unrecognised so a malformed
+        /// version does not masquerade as a valid one.
+        private static func parseSuffix(_ raw: String) -> (phase: Int, phaseNumber: Int, devNumber: Int?)? {
+            var remainder = raw
+            var devNumber: Int?
+
+            // Extract a trailing ".devN" (or "devN") first; it can follow any phase.
+            if let devRange = remainder.range(of: "dev") {
+                let before = String(remainder[remainder.startIndex..<devRange.lowerBound])
+                let after = String(remainder[devRange.upperBound...])
+                let trimmedNumber = after.trimmingCharacters(in: CharacterSet(charactersIn: "._-"))
+                if trimmedNumber.isEmpty {
+                    devNumber = 0
+                } else if let value = Int(trimmedNumber), value >= 0 {
+                    devNumber = value
+                } else {
+                    return nil
+                }
+                remainder = before.trimmingCharacters(in: CharacterSet(charactersIn: "._-"))
+            }
+
+            if remainder.isEmpty {
+                // Pure release, optionally with a dev segment. A ".devN" with no
+                // pre/post phase ranks below the final release.
+                return (devNumber == nil ? 1 : -3, 0, devNumber)
+            }
+
+            let normalized = remainder.trimmingCharacters(in: CharacterSet(charactersIn: "._-"))
+            for (tokens, phase) in Self.phaseSpellings {
+                for token in tokens where normalized.hasPrefix(token) {
+                    let numberText = String(normalized.dropFirst(token.count))
+                        .trimmingCharacters(in: CharacterSet(charactersIn: "._-"))
+                    let number = numberText.isEmpty ? 0 : Int(numberText)
+                    guard numberText.isEmpty || number != nil, (number ?? 0) >= 0 else { return nil }
+                    return (phase, number ?? 0, devNumber)
+                }
+            }
+            return nil
+        }
+
+        /// Longest spellings first so `alpha` is matched before `a`, etc.
+        private static let phaseSpellings: [(tokens: [String], phase: Int)] = [
+            (["alpha", "a"], -2),
+            (["beta", "b"], -1),
+            (["preview", "pre", "rc", "c"], 0),
+            (["post", "rev", "r"], 2)
+        ]
+
+        static func < (lhs: Self, rhs: Self) -> Bool {
+            if lhs.epoch != rhs.epoch { return lhs.epoch < rhs.epoch }
+            // Compare release components, treating a missing component as 0 so
+            // `1.2` == `1.2.0`.
+            let count = max(lhs.release.count, rhs.release.count)
+            for index in 0..<count {
+                let left = index < lhs.release.count ? lhs.release[index] : 0
+                let right = index < rhs.release.count ? rhs.release[index] : 0
+                if left != right { return left < right }
+            }
+            if lhs.phase != rhs.phase { return lhs.phase < rhs.phase }
+            if lhs.phaseNumber != rhs.phaseNumber { return lhs.phaseNumber < rhs.phaseNumber }
+            // A dev release precedes the same phase without one.
+            switch (lhs.devNumber, rhs.devNumber) {
+            case (nil, nil): return false
+            case (_?, nil): return true
+            case (nil, _?): return false
+            case let (l?, r?): return l < r
+            }
+        }
+
+        static func == (lhs: Self, rhs: Self) -> Bool {
+            guard lhs.epoch == rhs.epoch, lhs.phase == rhs.phase,
+                  lhs.phaseNumber == rhs.phaseNumber, lhs.devNumber == rhs.devNumber else {
+                return false
+            }
+            let count = max(lhs.release.count, rhs.release.count)
+            for index in 0..<count {
+                let left = index < lhs.release.count ? lhs.release[index] : 0
+                let right = index < rhs.release.count ? rhs.release[index] : 0
+                if left != right { return false }
+            }
+            return true
         }
     }
 }

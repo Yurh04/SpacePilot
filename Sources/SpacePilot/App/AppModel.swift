@@ -40,6 +40,11 @@ final class AppModel {
     /// Read-only projection of discovered AI tools/assets for the future
     /// management UI. Never mutated by discovery directly; only replaced whole.
     var aiManagementProjection = AIManagementProjection.empty
+    /// Capabilities that live in Agent *config files* rather than on disk as
+    /// directories: MCP servers, hooks and global instruction files. Kept
+    /// separate from `aiManagementProjection` (which describes directory-backed
+    /// records) and, like it, only ever replaced whole.
+    var aiCapabilities = AICapabilityScanner.Result()
     var isDiscoveringAITools = false
     /// A read-only error surface for AI discovery. Deliberately separate from
     /// `errorMessage` so a discovery failure never clobbers the main scan error.
@@ -138,7 +143,10 @@ final class AppModel {
     /// The off-MainActor worker computing records, and the MainActor task that
     /// awaits it and publishes. Both are cancelled on a new snapshot or explicit
     /// cancellation, mirroring `projectionWorker`/`projectionPublicationTask`.
-    private var aiDiscoveryWorker: Task<[AIToolRecord], Error>?
+    /// Carries both halves of one discovery pass — directory-backed records and
+    /// config-file capabilities — so they are cancelled together and published
+    /// atomically.
+    private var aiDiscoveryWorker: Task<([AIToolRecord], AICapabilityScanner.Result), Error>?
     private var aiDiscoveryPublicationTask: Task<Void, Never>?
     /// Monotonically increasing token; only the newest discovery may publish.
     private var aiDiscoveryGeneration = 0
@@ -1137,17 +1145,23 @@ final class AppModel {
 
         let discover = discoverAITools
         let worker = Task.detached(priority: .utility) { [snapshot, homeDirectory, discover] in
-            try await discover(snapshot, homeDirectory)
+            // Config-file capabilities are scanned on the same background pass as
+            // directory discovery so both land in one atomic publication; a
+            // partially-updated pane would otherwise be visible between passes.
+            async let records = try await discover(snapshot, homeDirectory)
+            let capabilities = AICapabilityScanner().scan(homeDirectory: homeDirectory)
+            return (try await records, capabilities)
         }
         aiDiscoveryWorker = worker
         aiDiscoveryPublicationTask = Task { [weak self] in
             do {
-                let records = try await worker.value
+                let (records, capabilities) = try await worker.value
                 guard let self,
                       !Task.isCancelled,
                       self.aiDiscoveryGeneration == generation,
                       self.latestSnapshot?.id == snapshotID else { return }
                 self.aiManagementProjection = AIManagementProjection(records: records)
+                self.aiCapabilities = capabilities
                 // Record success only now, so a failed/cancelled pass never marks
                 // these inputs as covered and a retry stays possible.
                 self.lastSuccessfulAIDiscoveryFingerprint = fingerprint

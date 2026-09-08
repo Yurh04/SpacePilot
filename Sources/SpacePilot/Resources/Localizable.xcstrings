@@ -65,6 +65,54 @@
         }
       }
     },
+    "ai.agent.hooks": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hooks"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hook"
+          }
+        }
+      }
+    },
+    "ai.agent.instructions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Instructions"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全局指令"
+          }
+        }
+      }
+    },
+    "ai.agent.mcp": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MCP"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MCP"
+          }
+        }
+      }
+    },
     "ai.agent.module-empty": {
       "localizations": {
         "en": {
@@ -289,6 +337,38 @@
         }
       }
     },
+    "ai.cli.install-local": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local install"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本地安装"
+          }
+        }
+      }
+    },
+    "ai.cli.install-source": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Install source"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安装来源"
+          }
+        }
+      }
+    },
     "ai.cli.owner": {
       "localizations": {
         "en": {
@@ -317,6 +397,102 @@
           "stringUnit": {
             "state": "translated",
             "value": "状态"
+          }
+        }
+      }
+    },
+    "ai.config.credential": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Credential"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "凭据"
+          }
+        }
+      }
+    },
+    "ai.config.credential-configured": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configured"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已配置"
+          }
+        }
+      }
+    },
+    "ai.config.credential-none": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not detected"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未检测到"
+          }
+        }
+      }
+    },
+    "ai.config.model": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Model"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模型"
+          }
+        }
+      }
+    },
+    "ai.config.reasoning-effort": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reasoning effort"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "推理强度"
+          }
+        }
+      }
+    },
+    "ai.config.section": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Model & configuration"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模型与配置"
           }
         }
       }
@@ -449,6 +625,54 @@
         }
       }
     },
+    "ai.duplicate.copies": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "stored %@ times"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重复存储 %@ 份"
+          }
+        }
+      }
+    },
+    "ai.duplicate.storage": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duplicate storage"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重复存储"
+          }
+        }
+      }
+    },
+    "ai.duplicate.summary": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ items · %@ reclaimable"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 项 · 可释放 %@"
+          }
+        }
+      }
+    },
     "ai.group.bundled": {
       "localizations": {
         "en": {
@@ -461,6 +685,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "内置"
+          }
+        }
+      }
+    },
+    "ai.group.capabilities": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Capabilities"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "能力"
           }
         }
       }
@@ -625,6 +865,118 @@
         }
       }
     },
+    "ai.health.duplicate": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duplicated skills"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "技能重复存储"
+          }
+        }
+      }
+    },
+    "ai.health.hook-takeover": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hooks driven externally"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "钩子被外部接管"
+          }
+        }
+      }
+    },
+    "ai.health.large-footprint": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Large footprint"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "占用偏大"
+          }
+        }
+      }
+    },
+    "ai.health.section": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Health findings"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "体检发现"
+          }
+        }
+      }
+    },
+    "ai.health.symlink": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Symlinked skills"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "软链接技能"
+          }
+        }
+      }
+    },
+    "ai.health.unreferenced": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unreferenced skills"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无引用技能"
+          }
+        }
+      }
+    },
+    "ai.list.and-more": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " +%@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " +%@"
+          }
+        }
+      }
+    },
     "ai.local-footprint": {
       "localizations": {
         "en": {
@@ -657,6 +1009,102 @@
         }
       }
     },
+    "ai.mcp.disabled": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disabled"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已禁用"
+          }
+        }
+      }
+    },
+    "ai.mcp.empty": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No MCP servers found"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未发现 MCP 服务"
+          }
+        }
+      }
+    },
+    "ai.mcp.enabled": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enabled"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已启用"
+          }
+        }
+      }
+    },
+    "ai.mcp.state": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "State"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "状态"
+          }
+        }
+      }
+    },
+    "ai.mcp.transport": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transport"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "传输方式"
+          }
+        }
+      }
+    },
+    "ai.mcp.used-by": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Used by"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "被谁使用"
+          }
+        }
+      }
+    },
     "ai.no-content-indexed": {
       "localizations": {
         "en": {
@@ -669,6 +1117,166 @@
           "stringUnit": {
             "state": "translated",
             "value": "不会索引对话和日志内容。"
+          }
+        }
+      }
+    },
+    "ai.other.empty": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No other AI tools found"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未发现其他 AI 工具"
+          }
+        }
+      }
+    },
+    "ai.other.install": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installed via"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安装方式"
+          }
+        }
+      }
+    },
+    "ai.other.install.app": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Application"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "桌面应用"
+          }
+        }
+      }
+    },
+    "ai.other.install.mcp": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MCP registration"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MCP 注册"
+          }
+        }
+      }
+    },
+    "ai.other.kind": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Role"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "作用"
+          }
+        }
+      }
+    },
+    "ai.other.kind.config-manager": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Config manager"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "配置管理器"
+          }
+        }
+      }
+    },
+    "ai.other.kind.hook-provider": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hook provider"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hook 提供方"
+          }
+        }
+      }
+    },
+    "ai.other.kind.mcp-server": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MCP server"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MCP 服务"
+          }
+        }
+      }
+    },
+    "ai.other.kind.package": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Package"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安装包"
+          }
+        }
+      }
+    },
+    "ai.other.kind.plugin-source": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plugin source"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "插件来源"
           }
         }
       }
@@ -1153,6 +1761,38 @@
         }
       }
     },
+    "ai.section.mcp": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MCP"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "MCP"
+          }
+        }
+      }
+    },
+    "ai.section.other-tools": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Other AI Tools"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "其他 AI 工具"
+          }
+        }
+      }
+    },
     "ai.select-application": {
       "localizations": {
         "en": {
@@ -1197,6 +1837,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "未索引技能"
+          }
+        }
+      }
+    },
+    "ai.skills.global-note": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Global skills are shared with other AI agents."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全局技能与其他 AI Agent 共享。"
+          }
+        }
+      }
+    },
+    "ai.skills.scope-agent": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This Agent (%@)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本 Agent (%@)"
+          }
+        }
+      }
+    },
+    "ai.skills.scope-global": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Global (%@)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全局 (%@)"
           }
         }
       }
@@ -2049,8 +2737,38 @@
         }
       }
     },
-    "app.analysis-completed": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Last analyzed"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"上次分析"}}}},
-    "app.analysis-in-progress": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Analyzing related files…"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"正在分析关联文件…"}}}},
+    "app.analysis-completed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last analyzed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上次分析"
+          }
+        }
+      }
+    },
+    "app.analysis-in-progress": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Analyzing related files…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在分析关联文件…"
+          }
+        }
+      }
+    },
     "app.application": {
       "localizations": {
         "en": {
@@ -3875,7 +4593,6 @@
         }
       }
     },
-    "overview.inaccessible-folder-count": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"%lld inaccessible folders"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"%lld 个文件夹无法访问"}}}},
     "overview.analyze-mac": {
       "localizations": {
         "en": {
@@ -4036,6 +4753,22 @@
         }
       }
     },
+    "overview.inaccessible-folder-count": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld inaccessible folders"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个文件夹无法访问"
+          }
+        }
+      }
+    },
     "overview.internal-disk-used": {
       "localizations": {
         "en": {
@@ -4116,11 +4849,38 @@
         }
       }
     },
-    "overview.recent-added": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Added"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"新增"}}}},
-    "overview.recent-changes-summary": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Changes in the last 7 days"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"最近 7 天变化"}}}},
-    "overview.recent-grown": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Grown"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"变大"}}}},
-    "overview.recent-released": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Released"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已释放"}}}},
-    "overview.recent-safe-to-clean": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"%@ from recent changes is safe to clean"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"最近变化中有 %@ 可安全清理"}}}},
+    "overview.recent-added": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Added"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新增"
+          }
+        }
+      }
+    },
+    "overview.recent-changes-summary": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changes in the last 7 days"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近 7 天变化"
+          }
+        }
+      }
+    },
     "overview.recent-cleanup": {
       "localizations": {
         "en": {
@@ -4133,6 +4893,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "最近清理"
+          }
+        }
+      }
+    },
+    "overview.recent-grown": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grown"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "变大"
+          }
+        }
+      }
+    },
+    "overview.recent-released": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Released"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已释放"
+          }
+        }
+      }
+    },
+    "overview.recent-safe-to-clean": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ from recent changes is safe to clean"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近变化中有 %@ 可安全清理"
           }
         }
       }
@@ -4393,7 +5201,22 @@
         }
       }
     },
-    "overview.view-recent-changes": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"View recent changes"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"查看最近变化"}}}},
+    "overview.view-recent-changes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View recent changes"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查看最近变化"
+          }
+        }
+      }
+    },
     "overview.works-locally": {
       "localizations": {
         "en": {
@@ -5034,6 +5857,342 @@
         }
       }
     },
+    "storage.changes.24-hours": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "24 Hours"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "24 小时"
+          }
+        }
+      }
+    },
+    "storage.changes.30-days": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 Days"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 天"
+          }
+        }
+      }
+    },
+    "storage.changes.7-days": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "7 Days"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "7 天"
+          }
+        }
+      }
+    },
+    "storage.changes.added": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Added"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新增"
+          }
+        }
+      }
+    },
+    "storage.changes.all": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全部"
+          }
+        }
+      }
+    },
+    "storage.changes.coverage-gap": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Some file-system events were unavailable. Totals for this period may be incomplete."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "部分文件系统事件不可用，这段时间的统计可能不完整。"
+          }
+        }
+      }
+    },
+    "storage.changes.deleted": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deleted"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已删除"
+          }
+        }
+      }
+    },
+    "storage.changes.disk-delta": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Available Space Change"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可用空间变化"
+          }
+        }
+      }
+    },
+    "storage.changes.empty": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Matching Changes"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有符合条件的变化"
+          }
+        }
+      }
+    },
+    "storage.changes.empty-description": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changes of 100 MB or more will appear here; smaller changes are grouped by folder."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "单项变化达到 100 MB 后会显示；较小变化会按文件夹合并。"
+          }
+        }
+      }
+    },
+    "storage.changes.grown": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grown"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "变大"
+          }
+        }
+      }
+    },
+    "storage.changes.item": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changed Item"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "变化项目"
+          }
+        }
+      }
+    },
+    "storage.changes.range": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Time Range"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "时间范围"
+          }
+        }
+      }
+    },
+    "storage.changes.recent": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recent Changes"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近变化"
+          }
+        }
+      }
+    },
+    "storage.changes.released": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Released"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已释放"
+          }
+        }
+      }
+    },
+    "storage.changes.safe-only": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Safe only"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅可安全清理"
+          }
+        }
+      }
+    },
+    "storage.changes.safety": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cleanability"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可清理性"
+          }
+        }
+      }
+    },
+    "storage.changes.size": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "变化量"
+          }
+        }
+      }
+    },
+    "storage.changes.time": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Observed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "发现时间"
+          }
+        }
+      }
+    },
+    "storage.changes.type": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "类型"
+          }
+        }
+      }
+    },
+    "storage.changes.waiting-baseline": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Change Tracking Is Ready"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "变化追踪已就绪"
+          }
+        }
+      }
+    },
     "storage.internal-disk": {
       "localizations": {
         "en": {
@@ -5258,27 +6417,6 @@
         }
       }
     },
-    "storage.changes.24-hours": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"24 Hours"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"24 小时"}}}},
-    "storage.changes.30-days": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"30 Days"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"30 天"}}}},
-    "storage.changes.7-days": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"7 Days"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"7 天"}}}},
-    "storage.changes.added": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Added"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"新增"}}}},
-    "storage.changes.all": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"All"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"全部"}}}},
-    "storage.changes.coverage-gap": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Some file-system events were unavailable. Totals for this period may be incomplete."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"部分文件系统事件不可用，这段时间的统计可能不完整。"}}}},
-    "storage.changes.deleted": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Deleted"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已删除"}}}},
-    "storage.changes.disk-delta": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Available Space Change"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"可用空间变化"}}}},
-    "storage.changes.empty": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"No Matching Changes"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"没有符合条件的变化"}}}},
-    "storage.changes.empty-description": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Changes of 100 MB or more will appear here; smaller changes are grouped by folder."}},"zh-Hans":{"stringUnit":{"state":"translated","value":"单项变化达到 100 MB 后会显示；较小变化会按文件夹合并。"}}}},
-    "storage.changes.grown": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Grown"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"变大"}}}},
-    "storage.changes.item": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Changed Item"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"变化项目"}}}},
-    "storage.changes.range": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Time Range"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"时间范围"}}}},
-    "storage.changes.recent": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Recent Changes"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"最近变化"}}}},
-    "storage.changes.released": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Released"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"已释放"}}}},
-    "storage.changes.safe-only": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Safe only"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"仅可安全清理"}}}},
-    "storage.changes.safety": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Cleanability"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"可清理性"}}}},
-    "storage.changes.size": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Change"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"变化量"}}}},
-    "storage.changes.time": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Observed"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"发现时间"}}}},
-    "storage.changes.type": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Type"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"类型"}}}},
-    "storage.changes.waiting-baseline": {"localizations":{"en":{"stringUnit":{"state":"translated","value":"Change Tracking Is Ready"}},"zh-Hans":{"stringUnit":{"state":"translated","value":"变化追踪已就绪"}}}},
     "storage.visible-items": {
       "localizations": {
         "en": {

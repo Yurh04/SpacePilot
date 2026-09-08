@@ -17,7 +17,34 @@ enum L10n {
         static let aiSearching = Self(key: "ai.searching", english: "Searching…")
         static let aiSection = Self(key: "ai.section", english: "Section")
         static let aiSectionApps = Self(key: "ai.section.apps", english: "AI Agents")
+        static let aiSkillsGlobalNote = Self(
+            key: "ai.skills.global-note",
+            english: "Global skills are shared with other AI agents."
+        )
         static let aiSectionCLI = Self(key: "ai.section.cli", english: "CLI Tools")
+        static let aiSectionMCP = Self(key: "ai.section.mcp", english: "MCP")
+        static let aiGroupCapabilities = Self(key: "ai.group.capabilities", english: "Capabilities")
+        static let aiMCPEmpty = Self(key: "ai.mcp.empty", english: "No MCP servers found")
+        static let aiMCPUsedBy = Self(key: "ai.mcp.used-by", english: "Used by")
+        static let aiMCPTransport = Self(key: "ai.mcp.transport", english: "Transport")
+        static let aiMCPState = Self(key: "ai.mcp.state", english: "State")
+        static let aiMCPEnabled = Self(key: "ai.mcp.enabled", english: "Enabled")
+        static let aiMCPDisabled = Self(key: "ai.mcp.disabled", english: "Disabled")
+        static let aiOtherToolsEmpty = Self(key: "ai.other.empty", english: "No other AI tools found")
+        static let aiOtherKind = Self(key: "ai.other.kind", english: "Role")
+        static let aiOtherInstall = Self(key: "ai.other.install", english: "Installed via")
+        static let aiOtherKindConfigManager = Self(key: "ai.other.kind.config-manager", english: "Config manager")
+        static let aiOtherKindHookProvider = Self(key: "ai.other.kind.hook-provider", english: "Hook provider")
+        static let aiOtherKindMCPServer = Self(key: "ai.other.kind.mcp-server", english: "MCP server")
+        static let aiOtherKindPluginSource = Self(key: "ai.other.kind.plugin-source", english: "Plugin source")
+        static let aiOtherKindPackage = Self(key: "ai.other.kind.package", english: "Package")
+        static let aiOtherInstallApp = Self(key: "ai.other.install.app", english: "Application")
+        static let aiOtherInstallMCP = Self(key: "ai.other.install.mcp", english: "MCP registration")
+        static let aiAgentHooks = Self(key: "ai.agent.hooks", english: "Hooks")
+        static let aiAgentInstructions = Self(key: "ai.agent.instructions", english: "Instructions")
+        static let aiAgentMCP = Self(key: "ai.agent.mcp", english: "MCP")
+        static let aiDuplicateStorage = Self(key: "ai.duplicate.storage", english: "Duplicate storage")
+        static let aiSectionOtherTools = Self(key: "ai.section.other-tools", english: "Other AI Tools")
         static let aiOverviewApps = Self(key: "ai.overview.apps", english: "AI Agents")
         static let aiAgentsLocal = Self(key: "ai.agents.local", english: "Local Agents")
         static let aiAgentsRemote = Self(key: "ai.agents.remote", english: "Remote Agents")
@@ -35,7 +62,21 @@ enum L10n {
         static let aiOverviewPartialCoverage = Self(key: "ai.overview.partial-coverage", english: "Partial coverage")
         static let aiOverviewDiscovering = Self(key: "ai.overview.discovering", english: "Discovering AI tools…")
         static let aiOverviewDiscoveryIssue = Self(key: "ai.overview.discovery-issue", english: "Discovery issue")
+        static let aiHealthSection = Self(key: "ai.health.section", english: "Health findings")
+        static let aiHealthDuplicate = Self(key: "ai.health.duplicate", english: "Duplicated skills")
+        static let aiHealthLargeFootprint = Self(key: "ai.health.large-footprint", english: "Large footprint")
+        static let aiHealthHookTakeover = Self(key: "ai.health.hook-takeover", english: "Hooks driven externally")
+        static let aiHealthSymlink = Self(key: "ai.health.symlink", english: "Symlinked skills")
+        static let aiHealthUnreferenced = Self(key: "ai.health.unreferenced", english: "Unreferenced skills")
+        static let aiConfigSection = Self(key: "ai.config.section", english: "Model & configuration")
+        static let aiConfigModel = Self(key: "ai.config.model", english: "Model")
+        static let aiConfigReasoningEffort = Self(key: "ai.config.reasoning-effort", english: "Reasoning effort")
+        static let aiConfigCredential = Self(key: "ai.config.credential", english: "Credential")
+        static let aiConfigCredentialConfigured = Self(key: "ai.config.credential-configured", english: "Configured")
+        static let aiConfigCredentialNone = Self(key: "ai.config.credential-none", english: "Not detected")
         static let aiCLIExecutable = Self(key: "ai.cli.executable", english: "Executable")
+        static let aiCLIInstallSource = Self(key: "ai.cli.install-source", english: "Install source")
+        static let aiCLIInstallLocal = Self(key: "ai.cli.install-local", english: "Local install")
         static let aiCLIOwner = Self(key: "ai.cli.owner", english: "Owner")
         static let aiCLIStatus = Self(key: "ai.cli.status", english: "Status")
         static let aiCLIAvailable = Self(key: "ai.cli.available", english: "Available")
@@ -247,13 +288,23 @@ enum L10n {
         "ai.basic-footprint", "ai.data-items", "ai.deep-analysis", "ai.developer-storage",
         "ai.local-footprint", "ai.manage-in", "ai.no-content-indexed", "ai.plugins-managed",
         "ai.privacy", "ai.searching", "ai.section", "ai.select-application",
-        "ai.skills-visible", "ai.storage-breakdown", "ai.total-indexed-space",
-        "ai.section.apps", "ai.section.cli", "ai.overview.apps", "ai.overview.clis",
+        "ai.skills-visible", "ai.skills.global-note", "ai.skills.scope-agent",
+        "ai.skills.scope-global", "ai.storage-breakdown", "ai.total-indexed-space",
+        "ai.duplicate.copies", "ai.duplicate.summary",
+        "ai.list.and-more", "ai.section.apps", "ai.section.cli", "ai.section.mcp",
+        "ai.group.capabilities", "ai.mcp.empty", "ai.mcp.used-by", "ai.mcp.transport", "ai.mcp.state", "ai.mcp.enabled", "ai.mcp.disabled", "ai.other.empty", "ai.other.kind", "ai.other.install", "ai.other.kind.config-manager", "ai.other.kind.hook-provider", "ai.other.kind.mcp-server", "ai.other.kind.plugin-source", "ai.other.kind.package", "ai.other.install.app", "ai.other.install.mcp", "ai.agent.hooks", "ai.agent.instructions", "ai.agent.mcp", "ai.duplicate.storage",
+        "ai.section.other-tools", "ai.overview.apps", "ai.overview.clis",
         "ai.agents.local", "ai.agents.remote", "ai.agents.local-empty", "ai.agents.remote-empty",
         "ai.agents.select", "ai.agent.storage", "ai.agent.not-applicable", "ai.agent.module-empty",
         "ai.agent.form.app", "ai.agent.form.cli", "ai.agent.form.cloud", "ai.agent.form-factors",
         "ai.overview.partial-coverage", "ai.overview.discovering", "ai.overview.discovery-issue",
+        "ai.health.section", "ai.health.duplicate", "ai.health.large-footprint", "ai.health.hook-takeover",
+        "ai.health.symlink",
+        "ai.health.unreferenced",
+        "ai.config.section", "ai.config.model", "ai.config.reasoning-effort",
+        "ai.config.credential", "ai.config.credential-configured", "ai.config.credential-none",
         "ai.cli.executable", "ai.cli.owner", "ai.cli.status", "ai.cli.available",
+        "ai.cli.install-source", "ai.cli.install-local",
         "ai.cli.aliases",
         "ai.cli.empty", "ai.group.bundled", "ai.group.empty", "ai.group.global",
         "ai.group.no-items", "ai.group.project", "ai.group.scope", "ai.group.select", "ai.group.system",
@@ -696,16 +747,6 @@ enum L10n {
         }
     }
 
-    static func aiSectionTitle(for section: AIManagementSection, locale: Locale? = nil) -> String {
-        switch section {
-        case .overview: overview(locale: locale)
-        case .apps: value("ai.section.apps", default: "AI Agents", locale: locale)
-        case .skills: skills(locale: locale)
-        case .plugins: plugins(locale: locale)
-        case .cli: value("ai.section.cli", default: "CLI Tools", locale: locale)
-        }
-    }
-
     static func name(for evidence: AssociationEvidence, locale: Locale? = nil) -> String {
         switch evidence {
         case .exactBundleIdentifier: value("app.evidence.bundle-id", default: "Bundle identifier", locale: locale)
@@ -769,8 +810,36 @@ enum L10n {
         format("ai.manage-in", default: "Manage in %@", locale: locale, application)
     }
 
+    /// Summarises duplicate storage: how many Skills are stored more than once,
+    /// and how much would be freed by keeping one copy of each.
+    static func duplicateSummary(entities: Int, reclaimable: String, locale: Locale? = nil) -> String {
+        format("ai.duplicate.summary", default: "%@ items · %@ reclaimable",
+               locale: locale, entities.formatted(), reclaimable)
+    }
+
+    /// How many physical copies of one Skill exist.
+    static func duplicateCopies(_ count: Int, locale: Locale? = nil) -> String {
+        format("ai.duplicate.copies", default: "stored %@ times", locale: locale, count.formatted())
+    }
+
+    /// Suffix for a truncated list, e.g. "A · B · C +2".
+    static func andMore(_ count: Int, locale: Locale? = nil) -> String {
+        format("ai.list.and-more", default: " +%@", locale: locale, count.formatted())
+    }
+
     static func skillsVisible(to application: String, locale: Locale? = nil) -> String {
         format("ai.skills-visible", default: "Skills visible to %@", locale: locale, application)
+    }
+
+    /// Segment title for the skills this Agent owns by itself.
+    static func aiSkillsScopeAgent(_ count: Int, locale: Locale? = nil) -> String {
+        format("ai.skills.scope-agent", default: "This Agent (%@)", locale: locale, count.formatted())
+    }
+
+    /// Segment title for shared skills that are visible to this Agent but owned
+    /// by no single tool.
+    static func aiSkillsScopeGlobal(_ count: Int, locale: Locale? = nil) -> String {
+        format("ai.skills.scope-global", default: "Global (%@)", locale: locale, count.formatted())
     }
 
     static func reviewCleanup(_ space: String, locale: Locale? = nil) -> String {

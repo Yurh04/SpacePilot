@@ -139,6 +139,6 @@ public enum AIApplicationJoin {
 
     private static func normalizedPath(_ url: URL?) -> String? {
         guard let url else { return nil }
-        return url.standardizedFileURL.resolvingSymlinksInPath().path
+        return url.canonicalizedDiscoveryPath
     }
 }

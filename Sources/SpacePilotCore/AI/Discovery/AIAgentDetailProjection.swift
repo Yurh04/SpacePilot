@@ -47,7 +47,7 @@ public struct AIAgentStorageItem: Identifiable, Hashable, Sendable {
         case config
     }
 
-    public var id: String { url.standardizedFileURL.path }
+    public var id: String { url.canonicalizedDiscoveryPath }
     public let kind: Kind
     public let url: URL
     public let allocatedSize: Int64
@@ -55,6 +55,22 @@ public struct AIAgentStorageItem: Identifiable, Hashable, Sendable {
     public init(kind: Kind, url: URL, allocatedSize: Int64 = 0) {
         self.kind = kind
         self.url = url
+        self.allocatedSize = allocatedSize
+    }
+}
+
+/// One row of an Agent's storage "space breakdown": how much of its indexed
+/// footprint falls into a semantic category (conversations, logs, cache, model
+/// data, plugins, skills, …). Categories come from `ScannedItem.category`, which
+/// the adapters already tag, so this is a pure aggregation with no file access.
+public struct AIAgentStorageCategory: Identifiable, Hashable, Sendable {
+    public let category: ItemCategory
+    public let allocatedSize: Int64
+
+    public var id: String { category.rawValue }
+
+    public init(category: ItemCategory, allocatedSize: Int64) {
+        self.category = category
         self.allocatedSize = allocatedSize
     }
 }
@@ -78,8 +94,18 @@ public struct AIAgentDetailProjection: Sendable, Equatable {
     public let storageAvailability: AIAgentModuleAvailability
     public let skills: [SkillRecord]
     public let skillsAvailability: AIAgentModuleAvailability
+    /// Shared skills that are visible to this Agent but owned by no single tool.
+    /// Kept separate from `skills` so the UI can offer an explicit
+    /// "this Agent" / "Global" switch without ever conflating the two: deleting a
+    /// shared skill affects every Agent, an owned one does not.
+    public let globalSkills: [SkillRecord]
+    public let globalSkillsAvailability: AIAgentModuleAvailability
     public let plugins: [PluginRecord]
     public let pluginsAvailability: AIAgentModuleAvailability
+    /// Indexed footprint split by semantic category (conversations/logs/cache/…),
+    /// largest first. Empty when no per-category sizes were supplied (for example
+    /// a remote Agent, or a caller that did not pass a breakdown).
+    public let storageBreakdown: [AIAgentStorageCategory]
 
     public var totalStorageSize: Int64 {
         storageItems.reduce(0) { $0 + $1.allocatedSize }
@@ -89,7 +115,8 @@ public struct AIAgentDetailProjection: Sendable, Equatable {
         agent: AIAgentEntry,
         skills: [SkillRecord],
         plugins: [PluginRecord],
-        storageSizesByPath: [String: Int64] = [:]
+        storageSizesByPath: [String: Int64] = [:],
+        storageSizesByCategory: [ItemCategory: Int64] = [:]
     ) {
         self.overview = AIAgentOverviewDetail(
             id: agent.id,
@@ -111,12 +138,12 @@ public struct AIAgentDetailProjection: Sendable, Equatable {
         var seenStorage = Set<String>()
         var items: [AIAgentStorageItem] = []
         for url in agent.dataRoots {
-            let key = url.standardizedFileURL.resolvingSymlinksInPath().path
+            let key = url.canonicalizedDiscoveryPath
             guard seenStorage.insert(key).inserted else { continue }
             items.append(AIAgentStorageItem(kind: .data, url: url, allocatedSize: storageSizesByPath[key] ?? 0))
         }
         for url in agent.configDirectories {
-            let key = url.standardizedFileURL.resolvingSymlinksInPath().path
+            let key = url.canonicalizedDiscoveryPath
             guard seenStorage.insert(key).inserted else { continue }
             items.append(AIAgentStorageItem(kind: .config, url: url, allocatedSize: storageSizesByPath[key] ?? 0))
         }
@@ -125,19 +152,46 @@ public struct AIAgentDetailProjection: Sendable, Equatable {
             ? .notApplicable
             : (items.isEmpty ? .empty : .available)
 
+        // Space breakdown by semantic category. Remote Agents manage no local
+        // storage, so they report none. Zero-size categories are dropped and the
+        // rest are ordered largest-first for a stable, meaningful bar chart.
+        self.storageBreakdown = isRemote
+            ? []
+            : storageSizesByCategory
+                .filter { $0.value > 0 }
+                .map { AIAgentStorageCategory(category: $0.key, allocatedSize: $0.value) }
+                .sorted(by: Self.categoryOrder)
+
         // Skills / plugins owned by this Agent's definition. Shared assets are
-        // never mixed into a per-Agent module (they belong to Global).
+        // reported separately in `globalSkills` (they are visible to this Agent
+        // but owned by no single tool), so per-Agent counts stay honest. A
+        // plugin-provided skill is attributed to whichever tool owns its parent
+        // plugin, mirroring AIAssetGroupingProjection so the detail pane's skill
+        // count matches the sidebar grouping.
+        let pluginOwnerByID = Dictionary(
+            plugins.map { ($0.id, $0.owner) },
+            uniquingKeysWith: { first, _ in first }
+        )
         let ownedSkills = skills
-            .filter { Self.isOwned(by: agent.id, owner: $0.owner) }
+            .filter { Self.isOwned(by: agent.id, skill: $0, pluginOwnerByID: pluginOwnerByID) }
             .sorted(by: Self.skillOrder)
         let ownedPlugins = plugins
             .filter { Self.isOwned(by: agent.id, owner: $0.owner) }
             .sorted(by: Self.pluginOrder)
+        let sharedSkills = isRemote
+            ? []
+            : skills
+                .filter { $0.owner == .shared }
+                .sorted(by: Self.skillOrder)
         self.skills = ownedSkills
         self.plugins = ownedPlugins
+        self.globalSkills = sharedSkills
         self.skillsAvailability = isRemote
             ? .notApplicable
             : (ownedSkills.isEmpty ? .empty : .available)
+        self.globalSkillsAvailability = isRemote
+            ? .notApplicable
+            : (sharedSkills.isEmpty ? .empty : .available)
         self.pluginsAvailability = isRemote
             ? .notApplicable
             : (ownedPlugins.isEmpty ? .empty : .available)
@@ -146,6 +200,24 @@ public struct AIAgentDetailProjection: Sendable, Equatable {
     private static func isOwned(by definitionID: String, owner: AIAssetOwner) -> Bool {
         if case .tool(let id) = owner { return id == definitionID }
         return false
+    }
+
+    /// A skill is owned by an Agent when it is directly owned by that tool, or
+    /// when it is provided by a plugin whose owner is that tool. Resolving the
+    /// parent-plugin chain here keeps the detail pane consistent with
+    /// `AIAssetGroupingProjection`, which folds plugin-provided skills into their
+    /// parent plugin's tool owner.
+    private static func isOwned(
+        by definitionID: String,
+        skill: SkillRecord,
+        pluginOwnerByID: [UUID: AIAssetOwner]
+    ) -> Bool {
+        if case .plugin = skill.owner {
+            guard let pluginID = skill.parentPluginID,
+                  let pluginOwner = pluginOwnerByID[pluginID] else { return false }
+            return isOwned(by: definitionID, owner: pluginOwner)
+        }
+        return isOwned(by: definitionID, owner: skill.owner)
     }
 
     /// Buckets already-scanned items under an Agent's fixed data/config roots,
@@ -158,20 +230,45 @@ public struct AIAgentDetailProjection: Sendable, Equatable {
         items: [ScannedItem],
         forAgent agent: AIAgentEntry
     ) -> [String: Int64] {
-        let roots = (agent.dataRoots + agent.configDirectories)
-            .map { $0.standardizedFileURL.resolvingSymlinksInPath().path }
-        guard !roots.isEmpty else { return [:] }
-        // Deepest-first so the first containing root wins for nested layouts.
-        let orderedRoots = Array(Set(roots)).sorted { $0.count > $1.count }
-        var sizes: [String: Int64] = [:]
+        storageSizes(items: items, forAgents: [agent])[agent.id] ?? [:]
+    }
+
+    /// Buckets scanned items for many Agents in a single pass, keyed by Agent id.
+    ///
+    /// Canonicalising a path is a file-system syscall (measured ~3 µs), so the
+    /// per-Agent overload multiplies that cost by the number of Agents. This
+    /// overload canonicalises each item exactly once and reuses the result for
+    /// every Agent, which is what keeps the detail pane cheap to re-render.
+    public static func storageSizes(
+        items: [ScannedItem],
+        forAgents agents: [AIAgentEntry]
+    ) -> [String: [String: Int64]] {
+        // Canonical roots per Agent, deepest-first so the first containing root
+        // wins for nested layouts.
+        var rootsByAgent: [(agentID: String, roots: [String])] = []
+        var allRoots: Set<String> = []
+        for agent in agents {
+            let roots = (agent.dataRoots + agent.configDirectories)
+                .map { $0.canonicalizedDiscoveryPath }
+            guard !roots.isEmpty else { continue }
+            let ordered = Array(Set(roots)).sorted { $0.count > $1.count }
+            rootsByAgent.append((agent.id, ordered))
+            allRoots.formUnion(ordered)
+        }
+        guard !rootsByAgent.isEmpty else { return [:] }
+
+        var result: [String: [String: Int64]] = [:]
         for item in items {
-            let itemPath = item.url.standardizedFileURL.resolvingSymlinksInPath().path
-            for root in orderedRoots where Self.path(itemPath, isUnder: root) {
-                sizes[root, default: 0] += item.allocatedSize
-                break
+            // One canonicalisation per item, shared across all Agents.
+            let itemPath = item.url.canonicalizedDiscoveryPath
+            for (agentID, roots) in rootsByAgent {
+                for root in roots where Self.path(itemPath, isUnder: root) {
+                    result[agentID, default: [:]][root, default: 0] += item.allocatedSize
+                    break
+                }
             }
         }
-        return sizes
+        return result
     }
 
     private static func path(_ path: String, isUnder root: String) -> Bool {
@@ -180,9 +277,46 @@ public struct AIAgentDetailProjection: Sendable, Equatable {
         return path.hasPrefix(prefix)
     }
 
+    /// Buckets scanned items for many Agents by semantic `ItemCategory`, keyed by
+    /// Agent id. Same containment rule as `storageSizes(items:forAgents:)` (an
+    /// item counts once, under the deepest containing root), but the inner tally
+    /// is per category rather than per root. Pure aggregation, one canonicalise
+    /// per item, no file access — safe to call from a cached MainActor path.
+    public static func storageSizesByCategory(
+        items: [ScannedItem],
+        forAgents agents: [AIAgentEntry]
+    ) -> [String: [ItemCategory: Int64]] {
+        var rootsByAgent: [(agentID: String, roots: [String])] = []
+        for agent in agents {
+            let roots = (agent.dataRoots + agent.configDirectories)
+                .map { $0.canonicalizedDiscoveryPath }
+            guard !roots.isEmpty else { continue }
+            let ordered = Array(Set(roots)).sorted { $0.count > $1.count }
+            rootsByAgent.append((agent.id, ordered))
+        }
+        guard !rootsByAgent.isEmpty else { return [:] }
+
+        var result: [String: [ItemCategory: Int64]] = [:]
+        for item in items {
+            let itemPath = item.url.canonicalizedDiscoveryPath
+            for (agentID, roots) in rootsByAgent {
+                for root in roots where Self.path(itemPath, isUnder: root) {
+                    result[agentID, default: [:]][item.category, default: 0] += item.allocatedSize
+                    break
+                }
+            }
+        }
+        return result
+    }
+
+    private static func categoryOrder(_ lhs: AIAgentStorageCategory, _ rhs: AIAgentStorageCategory) -> Bool {
+        if lhs.allocatedSize != rhs.allocatedSize { return lhs.allocatedSize > rhs.allocatedSize }
+        return lhs.category.rawValue < rhs.category.rawValue
+    }
+
     private static func storageOrder(_ lhs: AIAgentStorageItem, _ rhs: AIAgentStorageItem) -> Bool {
         if lhs.kind != rhs.kind { return lhs.kind == .data }
-        return lhs.url.standardizedFileURL.path < rhs.url.standardizedFileURL.path
+        return lhs.url.canonicalizedDiscoveryPath < rhs.url.canonicalizedDiscoveryPath
     }
 
     private static func skillOrder(_ lhs: SkillRecord, _ rhs: SkillRecord) -> Bool {

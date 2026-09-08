@@ -165,7 +165,11 @@ final class AIAgentProjectionTests: XCTestCase {
         XCTAssertEqual(detail.storageItems.count, 1)
     }
 
-    func testDetailProjectionFiltersSkillsByOwnerAndExcludesShared() {
+    /// Owned skills and shared skills are reported through separate channels: a
+    /// per-Agent module must never silently mix them, because deleting a shared
+    /// skill affects every Agent while deleting an owned one does not. The UI
+    /// offers an explicit "this Agent" / "Global" switch over these two lists.
+    func testDetailProjectionSeparatesOwnedSkillsFromSharedSkills() {
         let entry = AIAgentEntry(
             id: "codex", displayName: "Codex", locality: .local,
             formFactors: [.cli], icon: .systemSymbol(name: "terminal")
@@ -189,8 +193,134 @@ final class AIAgentProjectionTests: XCTestCase {
             owner: .tool(definitionID: "claude"), locationScope: .userGlobal
         )
         let detail = AIAgentDetailProjection(agent: entry, skills: [mine, shared, other], plugins: [])
+        // "This Agent" holds only what this Agent owns — never shared, never
+        // another Agent's.
         XCTAssertEqual(detail.skills.map(\.name), ["Mine"])
         XCTAssertEqual(detail.skillsAvailability, .available)
+        // "Global" surfaces the shared skill, so it is reachable from the Agent
+        // without being counted as the Agent's own.
+        XCTAssertEqual(detail.globalSkills.map(\.name), ["Shared"])
+        XCTAssertEqual(detail.globalSkillsAvailability, .available)
+        // Another Agent's owned skill appears in neither list.
+        XCTAssertFalse(detail.skills.contains { $0.name == "Other" })
+        XCTAssertFalse(detail.globalSkills.contains { $0.name == "Other" })
+    }
+
+    /// Remote Agents manage no local assets, so both skill channels report
+    /// `.notApplicable` rather than a misleading empty list.
+    func testRemoteAgentReportsGlobalSkillsNotApplicable() {
+        let entry = AIAgentEntry(
+            id: "traex", displayName: "Traex", locality: .remote,
+            formFactors: [.cloud], icon: .systemSymbol(name: "cloud")
+        )
+        let shared = SkillRecord(
+            name: "Shared", summary: "", url: URL(fileURLWithPath: "/Users/x/.agents/skills/shared"),
+            allocatedSize: 0, scope: .sharedAgents, visibleAgents: ["Codex"],
+            parentPluginID: nil, fingerprint: "b", conflict: nil, managementStatus: .standalone,
+            owner: .shared, locationScope: .userGlobal
+        )
+        let detail = AIAgentDetailProjection(agent: entry, skills: [shared], plugins: [])
+        XCTAssertTrue(detail.globalSkills.isEmpty)
+        XCTAssertEqual(detail.globalSkillsAvailability, .notApplicable)
+    }
+
+    /// The batch overload must agree with the per-Agent one for every Agent, so
+    /// the faster path cannot silently change reported sizes.
+    func testBatchStorageSizesMatchPerAgentResults() {
+        let home = URL(fileURLWithPath: NSHomeDirectory())
+        let codex = AIAgentEntry(
+            id: "codex", displayName: "Codex", locality: .local,
+            formFactors: [.cli], icon: .systemSymbol(name: "terminal"),
+            dataRoots: [home.appending(path: ".codex")],
+            configDirectories: [home.appending(path: ".config/codex")]
+        )
+        let claude = AIAgentEntry(
+            id: "claude", displayName: "Claude", locality: .local,
+            formFactors: [.cli], icon: .systemSymbol(name: "terminal"),
+            dataRoots: [home.appending(path: ".claude")]
+        )
+        let items = [
+            ScannedItem(
+                url: home.appending(path: ".codex/sessions/a.jsonl"),
+                logicalSize: 10, allocatedSize: 10,
+                category: .conversation, risk: .safe, explanation: ""
+            ),
+            ScannedItem(
+                url: home.appending(path: ".claude/projects/b.bin"),
+                logicalSize: 20, allocatedSize: 20,
+                category: .conversation, risk: .safe, explanation: ""
+            ),
+            ScannedItem(
+                url: home.appending(path: "Documents/unrelated.pdf"),
+                logicalSize: 40, allocatedSize: 40,
+                category: .developer, risk: .safe, explanation: ""
+            )
+        ]
+        let batch = AIAgentDetailProjection.storageSizes(items: items, forAgents: [codex, claude])
+        for agent in [codex, claude] {
+            let single = AIAgentDetailProjection.storageSizes(items: items, forAgent: agent)
+            XCTAssertEqual(batch[agent.id] ?? [:], single, "batch must match per-agent for \(agent.id)")
+        }
+        // And unrelated items are attributed to nobody.
+        let total = batch.values.flatMap(\.values).reduce(0, +)
+        XCTAssertEqual(total, 30)
+    }
+
+    func testStorageSizesByCategoryAndBreakdownOrdering() {
+        let home = URL(fileURLWithPath: "/Users/test")
+        let codex = AIAgentEntry(
+            id: "codex", displayName: "Codex", locality: .local,
+            formFactors: [.cli], icon: .systemSymbol(name: "terminal"),
+            dataRoots: [home.appending(path: ".codex")]
+        )
+        let items = [
+            ScannedItem(
+                url: home.appending(path: ".codex/sessions/a.jsonl"),
+                logicalSize: 10, allocatedSize: 10,
+                category: .conversation, risk: .safe, explanation: ""
+            ),
+            ScannedItem(
+                url: home.appending(path: ".codex/logs/x.sqlite"),
+                logicalSize: 50, allocatedSize: 50,
+                category: .log, risk: .safe, explanation: ""
+            ),
+            ScannedItem(
+                url: home.appending(path: ".codex/sessions/b.jsonl"),
+                logicalSize: 5, allocatedSize: 5,
+                category: .conversation, risk: .safe, explanation: ""
+            ),
+            // Outside every root — must not be attributed.
+            ScannedItem(
+                url: home.appending(path: "Documents/z.pdf"),
+                logicalSize: 99, allocatedSize: 99,
+                category: .developer, risk: .safe, explanation: ""
+            )
+        ]
+
+        let byCategory = AIAgentDetailProjection.storageSizesByCategory(items: items, forAgents: [codex])
+        XCTAssertEqual(byCategory["codex"]?[.conversation], 15)
+        XCTAssertEqual(byCategory["codex"]?[.log], 50)
+        XCTAssertNil(byCategory["codex"]?[.developer])
+
+        // Breakdown is ordered largest-first and drops zero categories.
+        let detail = AIAgentDetailProjection(
+            agent: codex, skills: [], plugins: [],
+            storageSizesByCategory: byCategory["codex"] ?? [:]
+        )
+        XCTAssertEqual(detail.storageBreakdown.map(\.category), [.log, .conversation])
+        XCTAssertEqual(detail.storageBreakdown.map(\.allocatedSize), [50, 15])
+    }
+
+    func testRemoteAgentHasNoStorageBreakdown() {
+        let remote = AIAgentEntry(
+            id: "traex", displayName: "Traex", locality: .remote,
+            formFactors: [.cloud], icon: .systemSymbol(name: "cloud")
+        )
+        let detail = AIAgentDetailProjection(
+            agent: remote, skills: [], plugins: [],
+            storageSizesByCategory: [.conversation: 100]
+        )
+        XCTAssertTrue(detail.storageBreakdown.isEmpty)
     }
 
     // MARK: - Temp-home fixtures (real filesystem, bounded)

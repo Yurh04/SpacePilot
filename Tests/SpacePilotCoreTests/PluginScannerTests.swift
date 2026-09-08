@@ -95,7 +95,25 @@ final class PluginScannerTests: XCTestCase {
 
         XCTAssertTrue(roots.contains { $0.url.path == "/Users/test/.codex/plugins" && $0.owner == .tool(definitionID: "codex") })
         XCTAssertTrue(roots.contains { $0.url.path == "/Users/test/.claude/plugins" && $0.owner == .tool(definitionID: "claude") })
-        XCTAssertTrue(roots.contains { $0.url.path.contains(".codex/plugins/cache") && $0.owner == .unknown })
+        // A plugin discovered *under* a declared plugin root inherits that tool's
+        // ownership by path prefix — the deep cache install never equals the
+        // declared root, so exact matching alone would leave it Unknown.
+        XCTAssertTrue(roots.contains { $0.url.path.contains(".codex/plugins/cache") && $0.owner == .tool(definitionID: "codex") })
+    }
+
+    func testDiscoveredPluginOutsideAnyDeclaredRootStaysUnknown() throws {
+        let home = URL(fileURLWithPath: "/Users/test")
+
+        let roots = PluginRoot.production(
+            homeDirectory: home,
+            discoveredRoots: [home.appending(path: ".some-unknown-tool/plugins/cache/x/1.0.0")]
+        )
+
+        // No declared plugin root contains this path, so it must not be attributed
+        // to any tool.
+        XCTAssertTrue(roots.contains {
+            $0.url.path.contains(".some-unknown-tool/plugins") && $0.owner == .unknown
+        })
     }
 
     func testPluginProductionRootConflictsBecomeUnknown() throws {

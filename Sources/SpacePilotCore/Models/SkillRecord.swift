@@ -33,6 +33,14 @@ public struct SkillRecord: Identifiable, Codable, Hashable, Sendable {
     public let managementStatus: SkillManagementStatus
     public let owner: AIAssetOwner
     public let locationScope: AIAssetLocationScope
+    /// When the skill folder is itself a symbolic link, the resolved target it
+    /// points at; nil for a real directory. A skill exposed only through a
+    /// symlink disappears if the link target is removed (for example, uninstalling
+    /// the external manager that owns the target).
+    public let symlinkTarget: URL?
+    /// True when this skill is a symlink whose target no longer exists — the skill
+    /// is effectively broken and will not load.
+    public let isSymlinkBroken: Bool
 
     public init(
         id: UUID = UUID(),
@@ -47,7 +55,9 @@ public struct SkillRecord: Identifiable, Codable, Hashable, Sendable {
         conflict: SkillConflict?,
         managementStatus: SkillManagementStatus,
         owner: AIAssetOwner? = nil,
-        locationScope: AIAssetLocationScope? = nil
+        locationScope: AIAssetLocationScope? = nil,
+        symlinkTarget: URL? = nil,
+        isSymlinkBroken: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -62,6 +72,8 @@ public struct SkillRecord: Identifiable, Codable, Hashable, Sendable {
         self.managementStatus = managementStatus
         self.owner = owner ?? AIAssetOwner.migrated(from: scope)
         self.locationScope = locationScope ?? AIAssetLocationScope.migrated(from: scope)
+        self.symlinkTarget = symlinkTarget
+        self.isSymlinkBroken = isSymlinkBroken
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -78,6 +90,8 @@ public struct SkillRecord: Identifiable, Codable, Hashable, Sendable {
         case managementStatus
         case owner
         case locationScope
+        case symlinkTarget
+        case isSymlinkBroken
     }
 
     public init(from decoder: Decoder) throws {
@@ -98,6 +112,9 @@ public struct SkillRecord: Identifiable, Codable, Hashable, Sendable {
             ?? AIAssetOwner.migrated(from: scope)
         locationScope = try container.decodeIfPresent(AIAssetLocationScope.self, forKey: .locationScope)
             ?? AIAssetLocationScope.migrated(from: scope)
+        // Older snapshots predate symlink fields; default so history never breaks.
+        symlinkTarget = try container.decodeIfPresent(URL.self, forKey: .symlinkTarget)
+        isSymlinkBroken = try container.decodeIfPresent(Bool.self, forKey: .isSymlinkBroken) ?? false
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -115,5 +132,7 @@ public struct SkillRecord: Identifiable, Codable, Hashable, Sendable {
         try container.encode(managementStatus, forKey: .managementStatus)
         try container.encode(owner, forKey: .owner)
         try container.encode(locationScope, forKey: .locationScope)
+        try container.encodeIfPresent(symlinkTarget, forKey: .symlinkTarget)
+        try container.encode(isSymlinkBroken, forKey: .isSymlinkBroken)
     }
 }

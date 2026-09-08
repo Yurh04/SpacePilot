@@ -103,7 +103,7 @@ public struct AIToolEvidence: Codable, Hashable, Sendable {
         var seen = Set<String>()
         var result: [URL] = []
         for url in lhs + rhs {
-            let key = url.standardizedFileURL.path
+            let key = url.canonicalizedDiscoveryPath
             if seen.insert(key).inserted {
                 result.append(url)
             }
@@ -154,7 +154,7 @@ public struct AIToolRecord: Identifiable, Codable, Hashable, Sendable {
 
     /// Builds a deterministic stable identifier from the definition ID, kind and
     /// a canonical location. Callers must pass an already-canonicalized location
-    /// (typically `URL.standardizedFileURL.path`) so that logically identical
+    /// (typically `URL.canonicalizedDiscoveryPath`) so that logically identical
     /// paths collapse to the same ID.
     public static func stableID(
         kind: AIToolKind,

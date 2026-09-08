@@ -8,6 +8,17 @@ public enum UpdateExecutionManager: String, Codable, Hashable, Sendable {
     case npm
     case pnpm
     case pipx
+
+    /// The version scheme a manager's packages are published under. `pipx`
+    /// installs PyPI packages (PEP 440); the node managers install npm packages
+    /// (SemVer). Used to validate a target version and to compare the re-probed
+    /// installed version after an install.
+    public var versionComparator: VersionComparatorKind {
+        switch self {
+        case .npm, .pnpm: return .semver
+        case .pipx: return .pep440
+        }
+    }
 }
 
 /// A fixed, code-owned authorization to *execute* an update for a tool. Unlike
@@ -155,7 +166,9 @@ public struct UpdateExecutionPlan: Equatable, Sendable {
                 skipped.append(SkippedItem(key: key, displayName: asset.displayName, reason: .noTargetVersion))
                 continue
             }
-            guard let latest = result.latestVersion, SemVerComparator.compare(latest, latest) != nil else {
+            let comparator = asset.capability?.comparator ?? execution.manager.versionComparator
+            guard let latest = result.latestVersion,
+                  VersionComparator.isValid(latest, kind: comparator) else {
                 skipped.append(SkippedItem(key: key, displayName: asset.displayName, reason: .invalidTargetVersion))
                 continue
             }

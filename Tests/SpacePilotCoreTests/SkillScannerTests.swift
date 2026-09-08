@@ -57,4 +57,44 @@ final class SkillScannerTests: XCTestCase {
         XCTAssertEqual(conflict?.owner, .unknown)
         XCTAssertEqual(conflict?.locationScope, .userGlobal)
     }
+
+    // MARK: - Symlink dependency detection
+
+    func testSymlinkedSkillRecordsTargetAndBrokenState() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: "SpacePilotSymlink-\(UUID().uuidString)", directoryHint: .isDirectory)
+        let store = root.appending(path: "store", directoryHint: .isDirectory)
+        let skillsDir = root.appending(path: ".codex/skills", directoryHint: .isDirectory)
+        let fm = FileManager.default
+        try fm.createDirectory(at: store, withIntermediateDirectories: true)
+        try fm.createDirectory(at: skillsDir, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+
+        // A real skill directory in the external store.
+        let realSkill = store.appending(path: "linked-skill", directoryHint: .isDirectory)
+        try fm.createDirectory(at: realSkill, withIntermediateDirectories: true)
+        try Data("---\nname: linked-skill\ndescription: via link\n---\n".utf8)
+            .write(to: realSkill.appending(path: "SKILL.md"))
+        // A live symlink into it.
+        try fm.createSymbolicLink(
+            at: skillsDir.appending(path: "linked-skill", directoryHint: .isDirectory),
+            withDestinationURL: realSkill
+        )
+
+        let records = try await SkillScanner().scan(
+            roots: [SkillRoot(url: skillsDir, scope: .agentSpecific(agent: "Codex"))]
+        )
+        let linked = try XCTUnwrap(records.first { $0.name == "linked-skill" })
+        XCTAssertNotNil(linked.symlinkTarget)
+        XCTAssertFalse(linked.isSymlinkBroken)
+        XCTAssertEqual(linked.symlinkTarget?.lastPathComponent, "linked-skill")
+    }
+
+    func testRealDirectorySkillHasNoSymlinkTarget() async throws {
+        let roots = try SkillFixtureRoots.make(codex: ["plain": "Plain skill"])
+        let records = try await SkillScanner().scan(roots: roots.skillRoots)
+        let plain = try XCTUnwrap(records.first(named: "plain"))
+        XCTAssertNil(plain.symlinkTarget)
+        XCTAssertFalse(plain.isSymlinkBroken)
+    }
 }
