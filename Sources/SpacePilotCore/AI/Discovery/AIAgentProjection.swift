@@ -171,8 +171,13 @@ public struct AIAgentProjection: Sendable, Equatable {
 
         // An Agent must have at least one qualifying surface (app or executable
         // evidence). Skills/plugins alone (or a bare config directory) never
-        // fabricate an Agent.
-        guard merged.applicationURL != nil || merged.executableURL != nil else {
+        // fabricate an Agent — UNLESS the definition explicitly opts into
+        // directory-backed presence (a tool installed from source with no
+        // discoverable command, for example DeepSeek Harness), in which case its
+        // managed data/config directory is the qualifying evidence.
+        let hasDirectoryPresence = definition.surfacesFromDirectoryPresence
+            && (!merged.dataRoots.isEmpty || !merged.configDirectories.isEmpty)
+        guard merged.applicationURL != nil || merged.executableURL != nil || hasDirectoryPresence else {
             return nil
         }
 
@@ -184,8 +189,13 @@ public struct AIAgentProjection: Sendable, Equatable {
         // intersection is empty the evidence does not match any declared form
         // factor, so reject the entry entirely rather than surface a formless
         // Agent (e.g. an application-only definition detected solely via a CLI
-        // executable must not produce an Agent at all).
-        let formFactors = detectedFormFactors.intersection(profile.formFactors)
+        // executable must not produce an Agent at all). A directory-presence
+        // Agent has no app/CLI/cloud record, so it adopts its declared form
+        // factors directly.
+        var formFactors = detectedFormFactors.intersection(profile.formFactors)
+        if formFactors.isEmpty, hasDirectoryPresence {
+            formFactors = profile.formFactors
+        }
         guard !formFactors.isEmpty else {
             return nil
         }

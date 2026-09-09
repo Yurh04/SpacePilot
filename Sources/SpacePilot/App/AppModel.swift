@@ -42,6 +42,12 @@ final class AppModel {
     /// separate from `aiManagementProjection` (which describes directory-backed
     /// records) and, like it, only ever replaced whole.
     var aiCapabilities = AICapabilityScanner.Result()
+    /// Standalone AI tools installed via pipx / `uv tool` (for example an
+    /// `openviking` memory tool). Surfaced under "Other AI tools".
+    var pipxAITools: [PipxToolScanner.Tool] = []
+    /// Configuration-manager tools (for example CC Switch), evidenced by their
+    /// config directory existing on disk. Surfaced under "Other AI tools".
+    var configManagerTools: [ConfigManagerScanner.Tool] = []
     var isDiscoveringAITools = false
     /// A read-only error surface for AI discovery. Deliberately separate from
     /// `errorMessage` so a discovery failure never clobbers the main scan error.
@@ -142,7 +148,7 @@ final class AppModel {
     /// Carries both halves of one discovery pass — directory-backed records and
     /// config-file capabilities — so they are cancelled together and published
     /// atomically.
-    private var aiDiscoveryWorker: Task<([AIToolRecord], AICapabilityScanner.Result), Error>?
+    private var aiDiscoveryWorker: Task<([AIToolRecord], AICapabilityScanner.Result, [PipxToolScanner.Tool], [ConfigManagerScanner.Tool]), Error>?
     private var aiDiscoveryPublicationTask: Task<Void, Never>?
     /// Monotonically increasing token; only the newest discovery may publish.
     private var aiDiscoveryGeneration = 0
@@ -1081,18 +1087,22 @@ final class AppModel {
             // partially-updated pane would otherwise be visible between passes.
             async let records = try await discover(snapshot, homeDirectory)
             let capabilities = AICapabilityScanner().scan(homeDirectory: homeDirectory)
-            return (try await records, capabilities)
+            let pipxTools = PipxToolScanner().scan(homeDirectory: homeDirectory)
+            let configManagers = ConfigManagerScanner().scan(homeDirectory: homeDirectory)
+            return (try await records, capabilities, pipxTools, configManagers)
         }
         aiDiscoveryWorker = worker
         aiDiscoveryPublicationTask = Task { [weak self] in
             do {
-                let (records, capabilities) = try await worker.value
+                let (records, capabilities, pipxTools, configManagers) = try await worker.value
                 guard let self,
                       !Task.isCancelled,
                       self.aiDiscoveryGeneration == generation,
                       self.latestSnapshot?.id == snapshotID else { return }
                 self.aiManagementProjection = AIManagementProjection(records: records)
                 self.aiCapabilities = capabilities
+                self.pipxAITools = pipxTools
+                self.configManagerTools = configManagers
                 // Record success only now, so a failed/cancelled pass never marks
                 // these inputs as covered and a retry stays possible.
                 self.lastSuccessfulAIDiscoveryFingerprint = fingerprint

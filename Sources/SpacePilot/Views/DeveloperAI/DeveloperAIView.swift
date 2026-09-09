@@ -285,7 +285,9 @@ struct DeveloperAIView: View {
         OtherAIToolProjection.tools(
             hooks: model.aiCapabilities.hooks,
             mcpServers: model.aiCapabilities.mcpServers,
-            reclassifiedCLIs: cliClassification.otherTools
+            reclassifiedCLIs: cliClassification.otherTools,
+            pipxTools: model.pipxAITools,
+            configManagers: model.configManagerTools
         )
     }
 

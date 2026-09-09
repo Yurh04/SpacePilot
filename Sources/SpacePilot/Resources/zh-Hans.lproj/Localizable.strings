@@ -99,7 +99,6 @@
 "ai.health.section" = "体检发现";
 "ai.health.duplicate" = "技能重复存储";
 "ai.health.large-footprint" = "占用偏大";
-"ai.health.hook-takeover" = "钩子被外部接管";
 "ai.health.symlink" = "软链接技能";
 "ai.health.unreferenced" = "无引用技能";
 "ai.config.section" = "模型与配置";

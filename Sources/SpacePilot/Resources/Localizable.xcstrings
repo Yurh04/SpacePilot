@@ -5489,22 +5489,6 @@
         }
       }
     },
-    "ai.health.hook-takeover": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hooks driven externally"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "钩子被外部接管"
-          }
-        }
-      }
-    },
     "ai.cli.install-source": {
       "localizations": {
         "en": {

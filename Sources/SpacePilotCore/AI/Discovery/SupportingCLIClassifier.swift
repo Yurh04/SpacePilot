@@ -39,6 +39,31 @@ public enum SupportingCLIClassifier {
         "memory", "mux", "viking", "recall", "knowledge"
     ]
 
+    /// Definition IDs known to be standalone AI-adjacent tools rather than
+    /// per-Agent tool providers, but whose names carry no capability keyword (for
+    /// example `devspace`, an MCP-server workspace bridge; `csj-proxy`, an
+    /// AI-request proxy). Kept here as a runtime signal — small, explicit and
+    /// testable — rather than as a role flag on the definition table, so the
+    /// catalog stays a plain data table. Matched on the owning definition ID.
+    static let standaloneToolDefinitionIDs: Set<String> = [
+        "devspace", "csj-proxy"
+    ]
+
+    /// Definition IDs whose tool *is* an MCP server by nature, independent of
+    /// whether any Agent currently registers it (for example `devspace`, which
+    /// exposes a local workspace through an MCP server). Used only to label the
+    /// "other AI tools" row; a subset of `standaloneToolDefinitionIDs`.
+    public static let mcpServerToolDefinitionIDs: Set<String> = [
+        "devspace"
+    ]
+
+    /// Whether a reclassified record represents a tool that is inherently an MCP
+    /// server, so callers can label it accurately without re-deriving the rule.
+    public static func isInherentMCPServer(_ record: AIToolRecord) -> Bool {
+        guard let id = definitionID(of: record) else { return false }
+        return mcpServerToolDefinitionIDs.contains(id)
+    }
+
     public static func classify(
         cliRecords: [AIToolRecord],
         mcpServers: [MCPServerRecord]
@@ -69,6 +94,13 @@ public enum SupportingCLIClassifier {
         // small, conservative vocabulary of standalone-tool capability words.
         let nameTokens = splitTokens(record.displayName).union(splitTokens(definitionID(of: record) ?? ""))
         if nameTokens.contains(where: { capabilityKeywords.contains($0) }) { return true }
+
+        // Signal 3 — explicit standalone list: a small, code-owned set of
+        // definition IDs known to be standalone AI-adjacent tools whose names
+        // carry no capability keyword (for example `devspace`, `csj-proxy`).
+        if let id = definitionID(of: record), standaloneToolDefinitionIDs.contains(id) {
+            return true
+        }
 
         return false
     }

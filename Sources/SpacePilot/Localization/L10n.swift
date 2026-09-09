@@ -65,7 +65,6 @@ enum L10n {
         static let aiHealthSection = Self(key: "ai.health.section", english: "Health findings")
         static let aiHealthDuplicate = Self(key: "ai.health.duplicate", english: "Duplicated skills")
         static let aiHealthLargeFootprint = Self(key: "ai.health.large-footprint", english: "Large footprint")
-        static let aiHealthHookTakeover = Self(key: "ai.health.hook-takeover", english: "Hooks driven externally")
         static let aiHealthSymlink = Self(key: "ai.health.symlink", english: "Symlinked skills")
         static let aiHealthUnreferenced = Self(key: "ai.health.unreferenced", english: "Unreferenced skills")
         static let aiConfigSection = Self(key: "ai.config.section", english: "Model & configuration")
@@ -252,7 +251,7 @@ enum L10n {
         "ai.agents.select", "ai.agent.storage", "ai.agent.not-applicable", "ai.agent.module-empty",
         "ai.agent.form.app", "ai.agent.form.cli", "ai.agent.form.cloud", "ai.agent.form-factors",
         "ai.overview.partial-coverage", "ai.overview.discovering", "ai.overview.discovery-issue",
-        "ai.health.section", "ai.health.duplicate", "ai.health.large-footprint", "ai.health.hook-takeover",
+        "ai.health.section", "ai.health.duplicate", "ai.health.large-footprint",
         "ai.health.symlink",
         "ai.health.unreferenced",
         "ai.config.section", "ai.config.model", "ai.config.reasoning-effort",

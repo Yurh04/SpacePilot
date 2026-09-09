@@ -49,6 +49,7 @@ struct OtherAIToolsView: View {
         case .applicationBundle: L10n.text(.aiOtherInstallApp)
         case .npm: "npm"
         case .homebrew: "Homebrew"
+        case .pipx: "pipx"
         case .mcpRegistration: L10n.text(.aiOtherInstallMCP)
         case .unknown: "—"
         }

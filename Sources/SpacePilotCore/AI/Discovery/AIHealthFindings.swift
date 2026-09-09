@@ -14,8 +14,6 @@ public struct AIHealthFinding: Identifiable, Hashable, Sendable {
         case duplicateStorage
         /// A single AI-owned directory whose footprint is unusually large.
         case largeFootprint
-        /// An Agent's hook event whose handlers all come from one external app.
-        case hookTakeover
         /// Skills exposed only through symlinks (fragile: break if the target's
         /// owner is removed), or symlinks whose target is already gone.
         case symlinkDependency
@@ -120,24 +118,7 @@ public enum AIHealthFindings {
             ))
         }
 
-        // 3. Hook takeover — an event whose handlers are all attributed to a
-        // single external provider. `providers` is only populated from an
-        // unambiguous /Applications/<App>.app path, so a non-empty single-provider
-        // set is strong evidence the event is driven by that external app.
-        for hook in hooks.sorted(by: { ($0.ownerDefinitionID, $0.event) < ($1.ownerDefinitionID, $1.event) }) {
-            let distinct = Set(hook.providers)
-            guard distinct.count == 1, let provider = distinct.first, hook.handlerCount > 0 else { continue }
-            findings.append(AIHealthFinding(
-                id: "hook:\(hook.ownerDefinitionID):\(hook.event)",
-                kind: .hookTakeover,
-                severity: .info,
-                subject: provider,
-                detail: "\(hook.ownerDefinitionID) · \(hook.event)",
-                byteCount: 0
-            ))
-        }
-
-        // 4. Symlink dependency — skills that exist only as symlinks. A broken
+        // 3. Symlink dependency — skills that exist only as symlinks. A broken
         // link (target gone) is a warning; a live symlinked skill is info-level
         // ("depends on an external target"). Summarised as one finding each, so a
         // machine with many linked skills does not flood the list.

@@ -29,7 +29,8 @@ public enum AIInstallSource: String, Sendable {
     public var otherToolInstallMethod: OtherAIToolInstallMethod {
         switch self {
         case .homebrew: return .homebrew
-        case .npm, .pipx: return .npm
+        case .npm: return .npm
+        case .pipx: return .pipx
         case .local, .unknown: return .unknown
         }
     }

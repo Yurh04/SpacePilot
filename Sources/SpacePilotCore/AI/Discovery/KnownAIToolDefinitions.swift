@@ -267,6 +267,38 @@ public enum KnownAIToolDefinitions {
             cliProbeID: "copilot",
             agentProfile: localAgent([.cli], symbol: "terminal")
         ),
+        // CLI Agents installed as npm globals (resolved through the FNM
+        // node-versions template with package-identity gating in the probe, so a
+        // random binary that merely shares the basename is never accepted). Each
+        // keeps its user-global data/config dot-directory as evidence.
+        AIToolDefinition(
+            id: "relay",
+            displayName: "Relay",
+            dataRootRelativePaths: [".relay"],
+            configRelativePaths: [".relay"],
+            cliProbeID: "relay",
+            agentProfile: localAgent([.cli], symbol: "arrow.triangle.2.circlepath")
+        ),
+        AIToolDefinition(
+            id: "pi",
+            displayName: "Pi",
+            dataRootRelativePaths: [".pi"],
+            configRelativePaths: [".pi"],
+            cliProbeID: "pi",
+            agentProfile: localAgent([.cli], symbol: "terminal")
+        ),
+        // DeepSeek Harness (DSH): a local Agent installed from source (checked out
+        // under ~/deepseek-harness, data under ~/.dsh). It exposes no command in
+        // the fixed probe locations and ships no app bundle, so it is surfaced
+        // from its managed data directory rather than a runnable executable.
+        AIToolDefinition(
+            id: "dsh",
+            displayName: "DeepSeek Harness",
+            dataRootRelativePaths: [".dsh"],
+            configRelativePaths: [".dsh"],
+            agentProfile: localAgent([.cli], symbol: "cpu"),
+            surfacesFromDirectoryPresence: true
+        ),
         // Continue / Cline / Roo are VS Code extensions, not standalone Agents:
         // they ship no independent application bundle and no controlled agent
         // executable. They surface only as VS Code host plugin/asset evidence
@@ -395,6 +427,47 @@ public enum KnownAIToolDefinitions {
             id: "lark-cli",
             displayName: "Lark CLI",
             cliProbeID: "lark-cli"
+        ),
+        AIToolDefinition(
+            id: "arkcli",
+            displayName: "ARK CLI",
+            cliProbeID: "arkcli"
+        ),
+        // AgentBuddy: a skill/plugin/mcp resource manager CLI (a "skill market"
+        // client), not an Agent. It only ever appears in CLI Tools.
+        AIToolDefinition(
+            id: "agentbuddy",
+            displayName: "AgentBuddy",
+            dataRootRelativePaths: [".agentbuddy"],
+            configRelativePaths: [".agentbuddy"],
+            cliProbeID: "agentbuddy"
+        ),
+        // cis-cli: a supporting CLI whose command is not in the fixed probe
+        // locations, but whose config directory (~/.cis-cli, holding its
+        // credential store and data service) proves it is set up. Surfaced from
+        // that directory as a CLI tool.
+        AIToolDefinition(
+            id: "cis-cli",
+            displayName: "CIS CLI",
+            dataRootRelativePaths: [".cis-cli"],
+            configRelativePaths: [".cis-cli"],
+            surfacesFromDirectoryPresence: true
+        ),
+        // Standalone AI-adjacent tools that are not Agents and not per-Agent tool
+        // providers. Discovered as CLIs, then moved to "Other AI tools" by the
+        // runtime classifier (their definition IDs are in its standalone list).
+        // devspace exposes a local workspace through an MCP server; csj-proxy is
+        // an AI-request proxy.
+        AIToolDefinition(
+            id: "devspace",
+            displayName: "devspace",
+            cliProbeID: "devspace"
+        ),
+        AIToolDefinition(
+            id: "csj-proxy",
+            displayName: "csjadk-proxy",
+            configRelativePaths: [".csj"],
+            cliProbeID: "csj-proxy"
         )
     ]
 }

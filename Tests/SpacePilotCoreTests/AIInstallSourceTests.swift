@@ -29,7 +29,7 @@ final class AIInstallSourceTests: XCTestCase {
     func testOtherToolInstallMethodMapping() {
         XCTAssertEqual(AIInstallSource.homebrew.otherToolInstallMethod, .homebrew)
         XCTAssertEqual(AIInstallSource.npm.otherToolInstallMethod, .npm)
-        XCTAssertEqual(AIInstallSource.pipx.otherToolInstallMethod, .npm)
+        XCTAssertEqual(AIInstallSource.pipx.otherToolInstallMethod, .pipx)
         XCTAssertEqual(AIInstallSource.local.otherToolInstallMethod, .unknown)
         XCTAssertEqual(AIInstallSource.unknown.otherToolInstallMethod, .unknown)
     }

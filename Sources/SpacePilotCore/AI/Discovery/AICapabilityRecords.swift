@@ -221,6 +221,7 @@ public enum OtherAIToolInstallMethod: String, Codable, Hashable, Sendable {
     case applicationBundle
     case npm
     case homebrew
+    case pipx
     case mcpRegistration
     case unknown
 }

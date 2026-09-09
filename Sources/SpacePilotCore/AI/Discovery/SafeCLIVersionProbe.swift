@@ -328,6 +328,51 @@ public struct SafeCLIVersionProbe: Sendable {
             homeRelativeCandidatePaths: [".local/bin/mira"],
             uvToolPackages: ["togo-cli"],
             versionArguments: ["--version"]
+        ),
+        // npm-global CLIs whose executable basename differs from the package
+        // name. The node-package identity gate accepts the FNM candidate only
+        // when the same version root also contains the published package.
+        "agentbuddy": ProbeSpec(
+            basename: "agentbuddy",
+            absoluteCandidatePaths: ["/usr/local/bin/agentbuddy", "/opt/homebrew/bin/agentbuddy"],
+            homeRelativeCandidatePaths: [".local/bin/agentbuddy"],
+            nodePackageIdentifiers: ["agentbuddy"],
+            versionArguments: ["--version"]
+        ),
+        "relay": ProbeSpec(
+            basename: "relay",
+            absoluteCandidatePaths: ["/usr/local/bin/relay", "/opt/homebrew/bin/relay"],
+            homeRelativeCandidatePaths: [".local/bin/relay"],
+            nodePackageIdentifiers: ["@bytedance-relay/claude-code"],
+            versionArguments: ["--version"]
+        ),
+        "pi": ProbeSpec(
+            basename: "pi",
+            absoluteCandidatePaths: ["/usr/local/bin/pi", "/opt/homebrew/bin/pi"],
+            homeRelativeCandidatePaths: [".local/bin/pi"],
+            nodePackageIdentifiers: ["@earendil-works/pi-coding-agent"],
+            versionArguments: ["--version"]
+        ),
+        "arkcli": ProbeSpec(
+            basename: "arkcli",
+            absoluteCandidatePaths: ["/usr/local/bin/arkcli", "/opt/homebrew/bin/arkcli"],
+            homeRelativeCandidatePaths: [".local/bin/arkcli"],
+            nodePackageIdentifiers: ["@byted-aml/ark-cli"],
+            versionArguments: ["--version"]
+        ),
+        "devspace": ProbeSpec(
+            basename: "devspace",
+            absoluteCandidatePaths: ["/usr/local/bin/devspace", "/opt/homebrew/bin/devspace"],
+            homeRelativeCandidatePaths: [".local/bin/devspace"],
+            nodePackageIdentifiers: ["@waishnav/devspace"],
+            versionArguments: ["--version"]
+        ),
+        "csj-proxy": ProbeSpec(
+            basename: "csj-proxy",
+            absoluteCandidatePaths: ["/usr/local/bin/csj-proxy", "/opt/homebrew/bin/csj-proxy"],
+            homeRelativeCandidatePaths: [".local/bin/csj-proxy"],
+            nodePackageIdentifiers: ["@csjstack/csjadk-proxy"],
+            versionArguments: ["--version"]
         )
     ]
 

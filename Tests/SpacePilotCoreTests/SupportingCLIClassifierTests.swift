@@ -84,6 +84,29 @@ final class SupportingCLIClassifierTests: XCTestCase {
         XCTAssertEqual(result.commandLineTools.count, 4)
     }
 
+    func testStandaloneListedToolsAreReclassifiedButPeersStay() {
+        let records = [
+            cli("devspace", name: "devspace"),
+            cli("csj-proxy", name: "csjadk-proxy"),
+            cli("lark-cli", name: "Lark CLI"),
+            cli("bytedcli", name: "Bytedcli")
+        ]
+
+        let result = SupportingCLIClassifier.classify(cliRecords: records, mcpServers: [])
+
+        // devspace and csj-proxy are on the code-owned standalone list even though
+        // their names carry no capability keyword; structurally-identical peer
+        // CLIs are not swept in.
+        XCTAssertEqual(
+            Set(result.otherTools.map(\.displayName)),
+            ["devspace", "csjadk-proxy"]
+        )
+        XCTAssertEqual(
+            Set(result.commandLineTools.map(\.displayName)),
+            ["Lark CLI", "Bytedcli"]
+        )
+    }
+
     func testReclassifiedToolsFeedOtherAIToolsProjection() throws {
         let records = [cli("botmux", name: "botmux", executable: "/opt/homebrew/bin/botmux")]
         let result = SupportingCLIClassifier.classify(cliRecords: records, mcpServers: [])
@@ -97,5 +120,20 @@ final class SupportingCLIClassifierTests: XCTestCase {
         let botmux = try XCTUnwrap(tools.first { $0.name == "botmux" })
         XCTAssertEqual(botmux.kind, .packageInstalled)
         XCTAssertEqual(botmux.installMethod, .homebrew)
+    }
+
+    func testInherentMCPServerToolSurfacesAsMCPServerKind() throws {
+        let records = [cli("devspace", name: "devspace", executable: "/Users/test/.local/bin/devspace")]
+        let result = SupportingCLIClassifier.classify(cliRecords: records, mcpServers: [])
+
+        // devspace reclassifies to an "other AI tool" and, being an MCP server by
+        // nature, is labelled `.mcpServer` even though no Agent registers it.
+        let tools = OtherAIToolProjection.tools(
+            hooks: [],
+            mcpServers: [],
+            reclassifiedCLIs: result.otherTools
+        )
+        let devspace = try XCTUnwrap(tools.first { $0.name == "devspace" })
+        XCTAssertEqual(devspace.kind, .mcpServer)
     }
 }

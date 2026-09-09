@@ -99,7 +99,6 @@
 "ai.health.section" = "Health findings";
 "ai.health.duplicate" = "Duplicated skills";
 "ai.health.large-footprint" = "Large footprint";
-"ai.health.hook-takeover" = "Hooks driven externally";
 "ai.health.symlink" = "Symlinked skills";
 "ai.health.unreferenced" = "Unreferenced skills";
 "ai.config.section" = "Model & configuration";

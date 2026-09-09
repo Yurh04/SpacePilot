@@ -160,6 +160,23 @@ public struct AIToolRegistry: Sendable {
                 records.append(cliRecord)
             }
 
+            // Directory-backed presence: for opted-in definitions with no app and
+            // no runnable CLI, the existence of the managed directory is itself
+            // the evidence the tool is installed (installed from source, or a
+            // command outside the fixed probe locations). Emitted as a `.cli`
+            // record with no executable so existing consumers treat it uniformly;
+            // gated so a leftover dot-directory never fabricates a tool.
+            if let presenceRecord = directoryPresenceRecord(
+                for: definition,
+                owner: owner,
+                dataRoots: dataRoots.present,
+                configRoots: configRoots.present,
+                alreadyHasAppOrCLI: records.contains { $0.owner == owner
+                    && ($0.kind == .application || $0.kind == .cli) }
+            ) {
+                records.append(presenceRecord)
+            }
+
             records.append(contentsOf: rootRecords(
                 kind: .skill,
                 descriptors: definition.skillRoots,
@@ -358,6 +375,46 @@ public struct AIToolRegistry: Sendable {
             owner: owner,
             evidence: evidence,
             coverageFailures: failures
+        )
+    }
+
+    /// Builds a directory-backed presence record for a definition that opted into
+    /// `surfacesFromDirectoryPresence` and produced no application or CLI record.
+    ///
+    /// The tool is proven present by its managed directory alone (data root
+    /// preferred, else config root). The record is a `.cli` with no executable —
+    /// so version/update/reveal code paths degrade gracefully — anchored to the
+    /// directory so its identifier stays stable across scans. Returns `nil` when
+    /// the definition did not opt in, when an app/CLI record already represents
+    /// it, or when no managed directory exists (so nothing is fabricated).
+    private func directoryPresenceRecord(
+        for definition: AIToolDefinition,
+        owner: AIToolOwner,
+        dataRoots: [URL],
+        configRoots: [URL],
+        alreadyHasAppOrCLI: Bool
+    ) -> AIToolRecord? {
+        guard definition.surfacesFromDirectoryPresence, !alreadyHasAppOrCLI else {
+            return nil
+        }
+        guard let anchor = dataRoots.first ?? configRoots.first else {
+            return nil
+        }
+
+        var evidence = AIToolEvidence()
+        evidence.dataRoots = dataRoots
+        evidence.configDirectories = configRoots
+
+        return AIToolRecord(
+            id: AIToolRecord.stableID(
+                kind: .cli,
+                owner: owner,
+                canonicalLocation: Self.canonicalKey(anchor)
+            ),
+            kind: .cli,
+            displayName: definition.displayName,
+            owner: owner,
+            evidence: evidence
         )
     }
 

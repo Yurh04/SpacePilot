@@ -14,7 +14,9 @@ public enum OtherAIToolProjection {
     public static func tools(
         hooks: [HookRecord],
         mcpServers: [MCPServerRecord],
-        reclassifiedCLIs: [AIToolRecord] = []
+        reclassifiedCLIs: [AIToolRecord] = [],
+        pipxTools: [PipxToolScanner.Tool] = [],
+        configManagers: [ConfigManagerScanner.Tool] = []
     ) -> [OtherAIToolRecord] {
         var tools: [OtherAIToolRecord] = []
 
@@ -64,18 +66,55 @@ public enum OtherAIToolProjection {
         // Supporting CLIs reclassified as standalone AI tools (for example a
         // `botmux`, or an `openviking` memory server). They arrive already
         // filtered by SupportingCLIClassifier; here they become rows with an
-        // install method inferred from where the executable lives. A name already
+        // install method inferred from where the executable lives. A tool that is
+        // an MCP server by nature (for example `devspace`) is labelled as such
+        // regardless of whether any Agent currently registers it. A name already
         // represented as a hook provider or MCP server above is not duplicated.
         let existingNames = Set(tools.map { $0.name.lowercased() })
         for record in reclassifiedCLIs.sorted(by: { $0.displayName.lowercased() < $1.displayName.lowercased() }) {
             guard !existingNames.contains(record.displayName.lowercased()) else { continue }
             let url = record.evidence.executableURL ?? URL(fileURLWithPath: "/")
+            let isMCP = SupportingCLIClassifier.isInherentMCPServer(record)
             tools.append(OtherAIToolRecord(
                 name: record.displayName,
-                kind: .packageInstalled,
+                kind: isMCP ? .mcpServer : .packageInstalled,
                 installMethod: installMethod(for: url),
                 affectedAgentIDs: [],
                 url: url,
+                allocatedSize: 0,
+                interceptedEventCount: 0
+            ))
+        }
+
+        // Python-managed AI tools (pipx / `uv tool`), for example an `openviking`
+        // memory tool. They are not on any Agent's CLI probe template and register
+        // no MCP server, so without this they would not appear anywhere. A name
+        // already represented above (hook provider, MCP server, or reclassified
+        // CLI) is not duplicated.
+        var namesSoFar = Set(tools.map { $0.name.lowercased() })
+        for tool in pipxTools where namesSoFar.insert(tool.name.lowercased()).inserted {
+            tools.append(OtherAIToolRecord(
+                name: tool.name,
+                kind: .packageInstalled,
+                installMethod: .pipx,
+                affectedAgentIDs: [],
+                url: tool.url,
+                allocatedSize: 0,
+                interceptedEventCount: 0
+            ))
+        }
+
+        // Configuration managers (for example CC Switch), evidenced by their
+        // config directory existing on disk. Reported as configuration managers
+        // installed as an application bundle. A name already represented above is
+        // not duplicated.
+        for tool in configManagers where namesSoFar.insert(tool.name.lowercased()).inserted {
+            tools.append(OtherAIToolRecord(
+                name: tool.name,
+                kind: .configurationManager,
+                installMethod: .applicationBundle,
+                affectedAgentIDs: [],
+                url: tool.url,
                 allocatedSize: 0,
                 interceptedEventCount: 0
             ))

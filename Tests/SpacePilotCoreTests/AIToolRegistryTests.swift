@@ -147,7 +147,11 @@ final class AIToolRegistryTests: XCTestCase {
             ("traex", "traex"),
             ("lark-cli", "lark-cli"),
             ("aime", "aime"),
-            ("mira", "mira")
+            ("mira", "mira"),
+            ("agentbuddy", "agentbuddy"),
+            ("relay", "relay"),
+            ("pi", "pi"),
+            ("arkcli", "arkcli")
         ] {
             let definition = definitions.first { $0.id == definitionID }
             XCTAssertEqual(definition?.cliProbeID, probeID, "Missing CLI probe for \(definitionID)")
@@ -200,6 +204,87 @@ final class AIToolRegistryTests: XCTestCase {
         let records = try await registry.discover(homeDirectory: home)
 
         XCTAssertTrue(records.isEmpty)
+    }
+
+    func testSurfacesDirectoryPresenceToolWhenDirectoryExists() async throws {
+        let home = URL(filePath: "/Users/test")
+        let definition = AIToolDefinition(
+            id: "cis-cli",
+            displayName: "CIS CLI",
+            dataRootRelativePaths: [".cis-cli"],
+            configRelativePaths: [".cis-cli"],
+            surfacesFromDirectoryPresence: true
+        )
+        let registry = AIToolRegistry(
+            definitions: [definition],
+            applicationLocator: StubApplicationLocator(installed: [:]),
+            directoryProbe: StubDirectoryProbe(results: [
+                canonical(home, ".cis-cli"): .present
+            ]),
+            cliProbe: makeCLIProbe()
+        )
+
+        let records = try await registry.discover(homeDirectory: home)
+
+        XCTAssertEqual(records.count, 1)
+        let record = try XCTUnwrap(records.first)
+        XCTAssertEqual(record.kind, .cli)
+        XCTAssertEqual(record.owner, .tool(definitionID: "cis-cli"))
+        // Directory-backed: proven by its managed directory, not an executable.
+        XCTAssertNil(record.evidence.executableURL)
+        XCTAssertEqual(record.evidence.dataRoots.first?.lastPathComponent, ".cis-cli")
+    }
+
+    func testDirectoryPresenceToolOmittedWhenDirectoryMissing() async throws {
+        let home = URL(filePath: "/Users/test")
+        let definition = AIToolDefinition(
+            id: "cis-cli",
+            displayName: "CIS CLI",
+            dataRootRelativePaths: [".cis-cli"],
+            configRelativePaths: [".cis-cli"],
+            surfacesFromDirectoryPresence: true
+        )
+        let registry = AIToolRegistry(
+            definitions: [definition],
+            applicationLocator: StubApplicationLocator(installed: [:]),
+            directoryProbe: StubDirectoryProbe(results: [:]),
+            cliProbe: makeCLIProbe()
+        )
+
+        let records = try await registry.discover(homeDirectory: home)
+
+        XCTAssertTrue(records.isEmpty)
+    }
+
+    func testDirectoryPresenceAgentAppearsWithoutExecutable() async throws {
+        let home = URL(filePath: "/Users/test")
+        let definition = AIToolDefinition(
+            id: "dsh",
+            displayName: "DeepSeek Harness",
+            dataRootRelativePaths: [".dsh"],
+            configRelativePaths: [".dsh"],
+            agentProfile: KnownAIToolDefinitions.localAgent([.cli], symbol: "cpu"),
+            surfacesFromDirectoryPresence: true
+        )
+        let registry = AIToolRegistry(
+            definitions: [definition],
+            applicationLocator: StubApplicationLocator(installed: [:]),
+            directoryProbe: StubDirectoryProbe(results: [
+                canonical(home, ".dsh"): .present
+            ]),
+            cliProbe: makeCLIProbe()
+        )
+
+        let records = try await registry.discover(homeDirectory: home)
+        let projection = AIAgentProjection(records: records, definitions: [definition])
+
+        // The directory-backed record promotes to a local Agent even though no
+        // executable or app bundle was found.
+        XCTAssertEqual(projection.localAgents.map(\.id), ["dsh"])
+        let agent = try XCTUnwrap(projection.localAgents.first)
+        XCTAssertNil(agent.executableURL)
+        XCTAssertEqual(agent.dataRoots.first?.lastPathComponent, ".dsh")
+        XCTAssertTrue(projection.cliTools.isEmpty)
     }
 
     func testDoesNotFalselyReportUnrelatedBundle() async throws {

@@ -41,7 +41,6 @@ struct AIManagementOverviewView: View {
         switch kind {
         case .duplicateStorage: L10n.text(.aiHealthDuplicate)
         case .largeFootprint: L10n.text(.aiHealthLargeFootprint)
-        case .hookTakeover: L10n.text(.aiHealthHookTakeover)
         case .symlinkDependency: L10n.text(.aiHealthSymlink)
         case .unreferencedSkill: L10n.text(.aiHealthUnreferenced)
         }
@@ -59,8 +58,6 @@ struct AIManagementOverviewView: View {
             )
         case .largeFootprint:
             return "\(finding.subject) · \(ByteCount.string(finding.byteCount))"
-        case .hookTakeover:
-            return "\(finding.subject) · \(finding.detail)"
         case .symlinkDependency:
             // subject is a count; the row's severity colour already distinguishes
             // a broken-link warning from a live-link note.
