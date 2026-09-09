@@ -27,6 +27,14 @@ struct AIAgentDetailView: View {
     let configProfile: AgentConfigProfile?
     let revealURL: URL?
     let formFactorLabels: [String]
+    var isDiscovering = false
+    var cliUpdateAssets: [AIUpdateAsset] = []
+    var updateResults: [AIUpdateAssetKey: UpdateCheckResult] = [:]
+    var isCheckingUpdates = false
+    var isExecutingUpdates = false
+    var updateError: String?
+    var onCheckUpdates: (Set<AIUpdateAssetKey>) -> Void = { _ in }
+    var onUpdate: (Set<AIUpdateAssetKey>) -> Void = { _ in }
     @State private var tab: Tab = .overview
     @State private var skillsScope: SkillsScope = .agent
 
@@ -63,6 +71,7 @@ struct AIAgentDetailView: View {
                     switch tab {
                     case .overview:
                         overviewModule
+                        if !cliUpdateAssets.isEmpty { cliUpdatesModule }
                         if let configProfile, !configProfile.isEmpty { modelConfigModule(configProfile) }
                         if !mcpServers.isEmpty { mcpModule }
                         if !hooks.isEmpty { hooksModule }
@@ -117,7 +126,10 @@ struct AIAgentDetailView: View {
     private var overviewModule: some View {
         moduleCard(title: L10n.overview()) {
             LabeledContent(L10n.version()) {
-                Text(detail.overview.detectedVersion ?? "—")
+                Text(AIUpdateStatusPresentation.currentVersion(
+                    cliUpdateAssets.first.flatMap { updateResults[$0.key] },
+                    fallback: detail.overview.detectedVersion
+                ))
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -125,6 +137,11 @@ struct AIAgentDetailView: View {
                 Text(formFactorLabels.isEmpty ? "—" : formFactorLabels.joined(separator: " · "))
                     .lineLimit(1)
                     .truncationMode(.tail)
+            }
+            if detail.storageAvailability != .notApplicable {
+                LabeledContent(L10n.text(.aiAgentStorage), value: storageTotalText)
+                LabeledContent(L10n.skills(), value: "\(detail.skills.count)")
+                LabeledContent(L10n.plugins(), value: "\(detail.plugins.count)")
             }
             if let appURL = detail.overview.applicationURL {
                 evidenceRow(L10n.text(.application), path: appURL.path)
@@ -168,6 +185,47 @@ struct AIAgentDetailView: View {
                 }
             }
         }
+    }
+
+    private var cliUpdatesModule: some View {
+        moduleCard(title: "\(L10n.text(.aiAgentFormCLI)) · \(L10n.text(.aiUpdateSection))") {
+            ForEach(cliUpdateAssets, id: \.key) { asset in
+                let result = updateResults[asset.key]
+                LabeledContent(L10n.version()) {
+                    Text(AIUpdateStatusPresentation.currentVersion(result, fallback: asset.localVersion.selectedVersion))
+                }
+                LabeledContent(L10n.text(.aiUpdateLatest)) {
+                    Text(AIUpdateStatusPresentation.latestVersion(result))
+                }
+                if let result {
+                    LabeledContent(L10n.text(.aiUpdateStatus), value: AIUpdateStatusPresentation.statusText(result))
+                }
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 10) { cliUpdateButtons(asset) }
+                    VStack(alignment: .leading, spacing: 8) { cliUpdateButtons(asset) }
+                }
+            }
+            if isCheckingUpdates { ProgressView().controlSize(.small) }
+            if let updateError {
+                Text(updateError).font(.caption).foregroundStyle(.red)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func cliUpdateButtons(_ asset: AIUpdateAsset) -> some View {
+        Button {
+            onCheckUpdates([asset.key])
+        } label: {
+            Label(L10n.text(.aiUpdateCheckNow), systemImage: "arrow.triangle.2.circlepath")
+        }
+        .disabled(isCheckingUpdates || isExecutingUpdates)
+        Button {
+            onUpdate([asset.key])
+        } label: {
+            Label(L10n.text(.aiUpdateSelected), systemImage: "square.and.arrow.down")
+        }
+        .disabled(isCheckingUpdates || isExecutingUpdates)
     }
 
     // MARK: - Model & config module
@@ -271,33 +329,67 @@ struct AIAgentDetailView: View {
 
     private var storageModule: some View {
         moduleCard(
-            title: "\(L10n.text(.aiAgentStorage)) — \(ByteCount.string(detail.totalStorageSize))"
+            title: "\(L10n.text(.aiAgentStorage)) · \(detail.storageItems.count) · \(storageTotalText)"
         ) {
+            if isDiscovering {
+                ProgressView(L10n.text(.aiOverviewDiscovering)).controlSize(.small)
+            }
+            if !detail.storageCoverageFailures.isEmpty {
+                Text(L10n.text(.overviewLimitedCoverageDescription))
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
             switch detail.storageAvailability {
             case .notApplicable:
                 moduleUnavailable(L10n.text(.aiAgentNotApplicable))
             case .empty:
                 moduleEmpty
             case .available:
+                HStack {
+                    Text(L10n.location()).frame(maxWidth: .infinity, alignment: .leading)
+                    Text(L10n.text(.category)).frame(width: 72, alignment: .leading)
+                    Text(L10n.space()).frame(width: 90, alignment: .trailing)
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                Divider()
                 ForEach(detail.storageItems) { item in
                     storageRow(item)
+                    Divider()
                 }
             }
         }
     }
 
+    private var storageTotalText: String {
+        let size = ByteCount.string(detail.totalStorageSize)
+        return detail.storageCoverageFailures.isEmpty ? size : "≥ \(size)"
+    }
+
     private func storageRow(_ item: AIAgentStorageItem) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: item.kind == .data ? "internaldrive" : "gearshape")
-                .foregroundStyle(.secondary)
-            Text(item.url.path)
-                .lineLimit(1)
-                .truncationMode(.middle)
-            Spacer(minLength: 8)
-            Text(ByteCount.string(item.allocatedSize))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.url.lastPathComponent)
+                    .lineLimit(1).truncationMode(.middle)
+                Text(item.url.path)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .lineLimit(1).truncationMode(.middle)
+                ProgressView(
+                    value: Double(item.allocatedSize),
+                    total: Double(max(1, detail.storageItems.map(\.allocatedSize).max() ?? 1))
+                )
+                .frame(height: 4)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Text(L10n.name(for: item.category))
+                .font(.caption).foregroundStyle(.secondary)
+                .frame(width: 72, alignment: .leading)
+            Text(item.isSizeKnown ? ByteCount.string(item.allocatedSize) : "≥ \(ByteCount.string(item.allocatedSize))")
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
+                .frame(width: 90, alignment: .trailing)
         }
+        .padding(.vertical, 5)
         .contentShape(Rectangle())
         .contextMenu {
             Button(L10n.text(.revealFinder)) { FinderReveal.reveal(item.url) }
@@ -350,7 +442,7 @@ struct AIAgentDetailView: View {
                 moduleEmpty
             case .available:
                 ForEach(detail.plugins) { plugin in
-                    assetRow(name: plugin.name, url: plugin.url)
+                    assetRow(name: plugin.name, url: plugin.url, allocatedSize: plugin.allocatedSize)
                 }
             }
         }
@@ -408,22 +500,41 @@ struct AIAgentDetailView: View {
             moduleEmpty
         case .available:
             ForEach(records) { skill in
-                assetRow(name: skill.name, url: skill.url)
+                assetRow(
+                    name: skill.name, url: skill.url, allocatedSize: skill.allocatedSize,
+                    source: detail.sourcePluginName(for: skill), symlinkTarget: skill.symlinkTarget
+                )
             }
         }
     }
 
-    private func assetRow(name: String, url: URL) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(name)
-                .lineLimit(1)
-                .truncationMode(.tail)
-            Text(url.path)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.middle)
+    private func assetRow(
+        name: String, url: URL, allocatedSize: Int64,
+        source: String? = nil, symlinkTarget: URL? = nil
+    ) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(name).lineLimit(1).truncationMode(.tail)
+                if let source {
+                    Label("\(L10n.text(.plugin)): \(source)", systemImage: "puzzlepiece.extension")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .lineLimit(2).help(source)
+                }
+                Text(url.path)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .lineLimit(1).truncationMode(.middle)
+                if let symlinkTarget {
+                    Label(symlinkTarget.path, systemImage: "arrow.turn.down.right")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .lineLimit(1).truncationMode(.middle).help(symlinkTarget.path)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Text(ByteCount.string(allocatedSize))
+                .monospacedDigit().foregroundStyle(.secondary)
+                .frame(width: 90, alignment: .trailing)
         }
+        .padding(.vertical, 5)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .contextMenu {
@@ -445,8 +556,7 @@ struct AIAgentDetailView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+        .padding(.vertical, 4)
     }
 
     private var moduleEmpty: some View {

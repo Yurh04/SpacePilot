@@ -47,15 +47,22 @@ public struct AIAgentStorageItem: Identifiable, Hashable, Sendable {
         case config
     }
 
-    public var id: String { url.canonicalizedDiscoveryPath }
+    public var id: String { url.standardizedFileURL.path }
     public let kind: Kind
     public let url: URL
     public let allocatedSize: Int64
+    public let category: ItemCategory
+    public let isSizeKnown: Bool
 
-    public init(kind: Kind, url: URL, allocatedSize: Int64 = 0) {
+    public init(
+        kind: Kind, url: URL, allocatedSize: Int64 = 0,
+        category: ItemCategory = .aiData, isSizeKnown: Bool = true
+    ) {
         self.kind = kind
         self.url = url
         self.allocatedSize = allocatedSize
+        self.category = category
+        self.isSizeKnown = isSizeKnown
     }
 }
 
@@ -106,6 +113,15 @@ public struct AIAgentDetailProjection: Sendable, Equatable {
     /// largest first. Empty when no per-category sizes were supplied (for example
     /// a remote Agent, or a caller that did not pass a breakdown).
     public let storageBreakdown: [AIAgentStorageCategory]
+    public let storageCoverageFailures: Set<AIToolCoverageFailure>
+    public let pluginNamesByID: [UUID: String]
+
+    public func sourcePluginName(for skill: SkillRecord) -> String? {
+        if let id = skill.parentPluginID, let name = pluginNamesByID[id] { return name }
+        if case .pluginProvided(let name) = skill.scope { return name }
+        if case .plugin(let name) = skill.owner { return name }
+        return nil
+    }
 
     public var totalStorageSize: Int64 {
         storageItems.reduce(0) { $0 + $1.allocatedSize }
@@ -116,7 +132,8 @@ public struct AIAgentDetailProjection: Sendable, Equatable {
         skills: [SkillRecord],
         plugins: [PluginRecord],
         storageSizesByPath: [String: Int64] = [:],
-        storageSizesByCategory: [ItemCategory: Int64] = [:]
+        storageSizesByCategory: [ItemCategory: Int64] = [:],
+        storageSnapshot: AIAgentStorageSnapshot? = nil
     ) {
         self.overview = AIAgentOverviewDetail(
             id: agent.id,
@@ -140,24 +157,37 @@ public struct AIAgentDetailProjection: Sendable, Equatable {
         for url in agent.dataRoots {
             let key = url.canonicalizedDiscoveryPath
             guard seenStorage.insert(key).inserted else { continue }
-            items.append(AIAgentStorageItem(kind: .data, url: url, allocatedSize: storageSizesByPath[key] ?? 0))
+            items.append(AIAgentStorageItem(
+                kind: .data, url: url, allocatedSize: storageSizesByPath[key] ?? 0,
+                isSizeKnown: storageSizesByPath[key] != nil
+            ))
         }
         for url in agent.configDirectories {
             let key = url.canonicalizedDiscoveryPath
             guard seenStorage.insert(key).inserted else { continue }
-            items.append(AIAgentStorageItem(kind: .config, url: url, allocatedSize: storageSizesByPath[key] ?? 0))
+            items.append(AIAgentStorageItem(
+                kind: .config, url: url, allocatedSize: storageSizesByPath[key] ?? 0,
+                isSizeKnown: storageSizesByPath[key] != nil
+            ))
         }
-        self.storageItems = items.sorted(by: Self.storageOrder)
+        let resolvedItems = storageSnapshot?.items ?? items.sorted(by: Self.storageOrder)
+        self.storageItems = isRemote ? [] : resolvedItems
+        self.storageCoverageFailures = storageSnapshot?.coverageFailures ?? []
         self.storageAvailability = isRemote
             ? .notApplicable
-            : (items.isEmpty ? .empty : .available)
+            : (resolvedItems.isEmpty ? .empty : .available)
 
         // Space breakdown by semantic category. Remote Agents manage no local
         // storage, so they report none. Zero-size categories are dropped and the
         // rest are ordered largest-first for a stable, meaningful bar chart.
+        let categorySizes = storageSnapshot.map { snapshot in
+            Dictionary(grouping: snapshot.items, by: \.category).mapValues {
+                $0.reduce(Int64(0)) { $0 + $1.allocatedSize }
+            }
+        } ?? storageSizesByCategory
         self.storageBreakdown = isRemote
             ? []
-            : storageSizesByCategory
+            : categorySizes
                 .filter { $0.value > 0 }
                 .map { AIAgentStorageCategory(category: $0.key, allocatedSize: $0.value) }
                 .sorted(by: Self.categoryOrder)
@@ -171,6 +201,9 @@ public struct AIAgentDetailProjection: Sendable, Equatable {
         let pluginOwnerByID = Dictionary(
             plugins.map { ($0.id, $0.owner) },
             uniquingKeysWith: { first, _ in first }
+        )
+        self.pluginNamesByID = Dictionary(
+            plugins.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first }
         )
         let ownedSkills = skills
             .filter { Self.isOwned(by: agent.id, skill: $0, pluginOwnerByID: pluginOwnerByID) }

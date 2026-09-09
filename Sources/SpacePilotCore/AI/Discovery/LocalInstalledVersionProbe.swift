@@ -40,6 +40,12 @@ public struct LocalInstalledVersionProbe: InstalledVersionProbing {
             return ["ls", "--global"]
         case .pipx:
             return ["list", "--short"]
+        case .uv:
+            return ["tool", "list"]
+        case .homebrew:
+            return ["list", "--versions", packageIdentifier]
+        case .claudeNative:
+            return ["--version"]
         }
     }
 
@@ -47,9 +53,31 @@ public struct LocalInstalledVersionProbe: InstalledVersionProbing {
         manager: UpdateExecutionManager,
         packageIdentifier: String
     ) async -> String? {
-        guard let executable = managerLocator.locate(manager) else { return nil }
+        await installedVersion(manager: manager, packageIdentifier: packageIdentifier, installationURL: nil)
+    }
+
+    public func installedVersion(for item: UpdateExecutionPlan.Item) async -> String? {
+        if item.manager == .claudeNative {
+            return try? await SafeCLIVersionProbe(runner: runner)
+                .probeVersion(probeID: "claude", homeDirectory: homeDirectory).version
+        }
+        return await installedVersion(
+            manager: item.manager, packageIdentifier: item.packageIdentifier,
+            installationURL: item.installationURL
+        )
+    }
+
+    private func installedVersion(
+        manager: UpdateExecutionManager, packageIdentifier: String, installationURL: URL?
+    ) async -> String? {
+        guard let executable = managerLocator.locate(
+            manager, installationURL: installationURL, packageIdentifier: packageIdentifier
+        ) else { return nil }
         let arguments = Self.listArguments(manager: manager, packageIdentifier: packageIdentifier)
-        let environment = AIUpdateExecutor.fixedEnvironment(homeDirectory: homeDirectory)
+        let environment = AIUpdateExecutor.environment(
+            homeDirectory: homeDirectory, executable: executable, manager: manager,
+            installationURL: installationURL, package: packageIdentifier
+        )
         do {
             let output = try await runner.run(
                 executableURL: executable,

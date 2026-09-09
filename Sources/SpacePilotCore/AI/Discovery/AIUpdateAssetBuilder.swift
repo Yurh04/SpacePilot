@@ -77,10 +77,11 @@ public enum AIUpdateAssetBuilder {
             guard let executableURL = cli.evidence.executableURL else { continue }
             let definitionID = toolDefinitionID(from: cli.owner)
             let definition = definitionID.flatMap { definitionByID[$0] }
+            let route = definition.map { CLIUpdateRoute(definition: $0, executableURL: executableURL) }
             let evidence = cli.evidence.detectedVersion.map {
                 VersionEvidence(version: $0, source: .cliProbe, confidence: .high)
             }
-            append(AIUpdateAsset(
+            let asset = AIUpdateAsset(
                 key: AIUpdateAssetKey(
                     kind: .cli,
                     owner: owner(from: cli.owner),
@@ -89,8 +90,12 @@ public enum AIUpdateAssetBuilder {
                 displayName: cli.displayName,
                 definitionID: definitionID,
                 localVersion: VersionEvidenceResolver.resolve(evidence.map { [$0] } ?? []),
-                capability: definition?.updateCapability
-            ), executionDefinitionID: definitionID)
+                capability: route?.capability
+            )
+            append(asset)
+            if let execution = route?.execution {
+                executionCapabilities[asset.key] = execution
+            }
         }
 
         for fact in packageFacts {

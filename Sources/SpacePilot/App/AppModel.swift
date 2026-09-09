@@ -48,6 +48,7 @@ final class AppModel {
     /// Configuration-manager tools (for example CC Switch), evidenced by their
     /// config directory existing on disk. Surfaced under "Other AI tools".
     var configManagerTools: [ConfigManagerScanner.Tool] = []
+    var aiAgentStorage: [String: AIAgentStorageSnapshot] = [:]
     var isDiscoveringAITools = false
     /// A read-only error surface for AI discovery. Deliberately separate from
     /// `errorMessage` so a discovery failure never clobbers the main scan error.
@@ -148,7 +149,14 @@ final class AppModel {
     /// Carries both halves of one discovery pass — directory-backed records and
     /// config-file capabilities — so they are cancelled together and published
     /// atomically.
-    private var aiDiscoveryWorker: Task<([AIToolRecord], AICapabilityScanner.Result, [PipxToolScanner.Tool], [ConfigManagerScanner.Tool]), Error>?
+    private struct AIDiscoveryResult: Sendable {
+        let records: [AIToolRecord]
+        let capabilities: AICapabilityScanner.Result
+        let pipxTools: [PipxToolScanner.Tool]
+        let configManagers: [ConfigManagerScanner.Tool]
+        let storage: [String: AIAgentStorageSnapshot]
+    }
+    private var aiDiscoveryWorker: Task<AIDiscoveryResult, Error>?
     private var aiDiscoveryPublicationTask: Task<Void, Never>?
     /// Monotonically increasing token; only the newest discovery may publish.
     private var aiDiscoveryGeneration = 0
@@ -225,10 +233,17 @@ final class AppModel {
     }
 
     private static let liveAIUpdateCheck: @Sendable (AIUpdateCheckInput) async throws -> [UpdateCheckResult] = { input in
+        guard let snapshot = input.snapshot else { return [] }
+        // Re-probe current versions on explicit checks; discovery may predate an
+        // update performed in a terminal.
+        let registry = AIToolRegistry(
+            applicationLocator: SnapshotAIApplicationLocator(snapshot: snapshot)
+        )
+        let records = try await registry.discover(homeDirectory: input.homeDirectory)
         let packageFacts = try AIToolPackageInventory().installedPackages(homeDirectory: input.homeDirectory)
         let inventory = AIUpdateAssetBuilder.inventory(
             snapshot: input.snapshot,
-            managementProjection: input.managementProjection,
+            managementProjection: AIManagementProjection(records: records),
             projectSkills: input.projectSkills,
             projectPlugins: input.projectPlugins,
             packageFacts: packageFacts
@@ -242,7 +257,10 @@ final class AppModel {
             checkable = inventory.assets.filter { $0.capability != nil }
         }
         let checked = await AIUpdateChecker().check(checkable)
-        return inventory.unsupportedResults + checked
+        let unsupported = inventory.unsupportedResults.filter {
+            input.selectedKeys?.contains($0.assetKey) ?? true
+        }
+        return unsupported + checked
     }
 
     /// Builds the production update executor bound to a home directory. Uses the
@@ -1089,20 +1107,29 @@ final class AppModel {
             let capabilities = AICapabilityScanner().scan(homeDirectory: homeDirectory)
             let pipxTools = PipxToolScanner().scan(homeDirectory: homeDirectory)
             let configManagers = ConfigManagerScanner().scan(homeDirectory: homeDirectory)
-            return (try await records, capabilities, pipxTools, configManagers)
+            let discovered = try await records
+            let agents = AIAgentProjection(records: discovered)
+            let storage = try AIAgentStorageScanner(access: LocalFileSystemAccess()).scan(
+                agents: agents.localAgents + agents.remoteAgents
+            )
+            return AIDiscoveryResult(
+                records: discovered, capabilities: capabilities, pipxTools: pipxTools,
+                configManagers: configManagers, storage: storage
+            )
         }
         aiDiscoveryWorker = worker
         aiDiscoveryPublicationTask = Task { [weak self] in
             do {
-                let (records, capabilities, pipxTools, configManagers) = try await worker.value
+                let result = try await worker.value
                 guard let self,
                       !Task.isCancelled,
                       self.aiDiscoveryGeneration == generation,
                       self.latestSnapshot?.id == snapshotID else { return }
-                self.aiManagementProjection = AIManagementProjection(records: records)
-                self.aiCapabilities = capabilities
-                self.pipxAITools = pipxTools
-                self.configManagerTools = configManagers
+                self.aiManagementProjection = AIManagementProjection(records: result.records)
+                self.aiCapabilities = result.capabilities
+                self.pipxAITools = result.pipxTools
+                self.configManagerTools = result.configManagers
+                self.aiAgentStorage = result.storage
                 // Record success only now, so a failed/cancelled pass never marks
                 // these inputs as covered and a retry stays possible.
                 self.lastSuccessfulAIDiscoveryFingerprint = fingerprint
@@ -1280,6 +1307,9 @@ final class AppModel {
                         failure: nil
                     )
                 }
+            }
+            if let snapshot = self.latestSnapshot {
+                self.startAIManagementDiscovery(for: snapshot, force: true)
             }
         }
     }

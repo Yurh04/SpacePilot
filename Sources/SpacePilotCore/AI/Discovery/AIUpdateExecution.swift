@@ -8,6 +8,9 @@ public enum UpdateExecutionManager: String, Codable, Hashable, Sendable {
     case npm
     case pnpm
     case pipx
+    case uv
+    case homebrew
+    case claudeNative
 
     /// The version scheme a manager's packages are published under. `pipx`
     /// installs PyPI packages (PEP 440); the node managers install npm packages
@@ -15,8 +18,8 @@ public enum UpdateExecutionManager: String, Codable, Hashable, Sendable {
     /// installed version after an install.
     public var versionComparator: VersionComparatorKind {
         switch self {
-        case .npm, .pnpm: return .semver
-        case .pipx: return .pep440
+        case .npm, .pnpm, .homebrew, .claudeNative: return .semver
+        case .pipx, .uv: return .pep440
         }
     }
 }
@@ -34,10 +37,13 @@ public struct UpdateExecutionCapability: Hashable, Sendable {
     /// `@openai/codex`, `aider-chat`). Must match the check capability's
     /// package identifier so the version that was checked is the one installed.
     public let packageIdentifier: String
+    /// The discovered executable being updated, not a different global install.
+    public let installationURL: URL?
 
-    public init(manager: UpdateExecutionManager, packageIdentifier: String) {
+    public init(manager: UpdateExecutionManager, packageIdentifier: String, installationURL: URL? = nil) {
         self.manager = manager
         self.packageIdentifier = packageIdentifier
+        self.installationURL = installationURL
     }
 }
 
@@ -74,6 +80,7 @@ public struct UpdateExecutionPlan: Equatable, Sendable {
         /// executor at run time; the plan itself does not need it, but tests and
         /// the confirmation UI can display which manager will be used.
         public let managerDisplayName: String
+        public let installationURL: URL?
 
         public var id: AIUpdateAssetKey { key }
 
@@ -84,7 +91,8 @@ public struct UpdateExecutionPlan: Equatable, Sendable {
             packageIdentifier: String,
             currentVersion: String?,
             targetVersion: String,
-            managerDisplayName: String
+            managerDisplayName: String,
+            installationURL: URL? = nil
         ) {
             self.key = key
             self.displayName = displayName
@@ -93,6 +101,7 @@ public struct UpdateExecutionPlan: Equatable, Sendable {
             self.currentVersion = currentVersion
             self.targetVersion = targetVersion
             self.managerDisplayName = managerDisplayName
+            self.installationURL = installationURL
         }
     }
 
@@ -172,7 +181,7 @@ public struct UpdateExecutionPlan: Equatable, Sendable {
                 skipped.append(SkippedItem(key: key, displayName: asset.displayName, reason: .invalidTargetVersion))
                 continue
             }
-            let packageKey = "\(execution.manager.rawValue):\(execution.packageIdentifier)"
+            let packageKey = "\(execution.manager.rawValue):\(execution.packageIdentifier):\(execution.installationURL?.path ?? "")"
             guard seenPackages.insert(packageKey).inserted else { continue }
             executable.append(Item(
                 key: key,
@@ -181,7 +190,8 @@ public struct UpdateExecutionPlan: Equatable, Sendable {
                 packageIdentifier: execution.packageIdentifier,
                 currentVersion: asset.localVersion.selectedVersion,
                 targetVersion: latest,
-                managerDisplayName: execution.manager.rawValue
+                managerDisplayName: execution.manager.rawValue,
+                installationURL: execution.installationURL
             ))
         }
 

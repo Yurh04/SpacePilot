@@ -161,7 +161,7 @@ final class SafeCLIVersionProbeTests: XCTestCase {
 
         let result = try await probe.probeVersion(probeID: "codex", homeDirectory: home)
 
-        XCTAssertEqual(result.version, "codex 1.2.3")
+        XCTAssertEqual(result.version, "1.2.3")
         XCTAssertNil(result.coverageFailure)
         let invocation = try XCTUnwrap(runner.invocations.first)
         // Absolute, whitelist-defined path — never a shell or env.
@@ -170,8 +170,9 @@ final class SafeCLIVersionProbeTests: XCTestCase {
         XCTAssertNotEqual(invocation.executableURL.lastPathComponent, "bash")
         XCTAssertNotEqual(invocation.executableURL.lastPathComponent, "env")
         XCTAssertEqual(invocation.arguments, ["--version"])
-        XCTAssertEqual(invocation.environment, SafeCLIVersionProbe.fixedEnvironment)
-        XCTAssertFalse(invocation.environment.keys.contains("HOME"))
+        XCTAssertEqual(invocation.environment["PATH"], SafeCLIVersionProbe.fixedEnvironment["PATH"])
+        XCTAssertEqual(invocation.environment["HOME"], home.path)
+        XCTAssertEqual(Set(invocation.environment.keys), ["PATH", "HOME"])
     }
 
     func testAidenProbeUsesOnlyFixedBasenameCandidatesAndVersionArgs() async throws {
@@ -183,11 +184,12 @@ final class SafeCLIVersionProbeTests: XCTestCase {
 
         let result = try await probe.probeVersion(probeID: "aiden", homeDirectory: home)
 
-        XCTAssertEqual(result.version, "aiden 1.8.44")
+        XCTAssertEqual(result.version, "1.8.44")
         let invocation = try XCTUnwrap(runner.invocations.first)
         XCTAssertEqual(invocation.executableURL.lastPathComponent, "aiden")
         XCTAssertEqual(invocation.arguments, ["--version"])
-        XCTAssertEqual(invocation.environment, SafeCLIVersionProbe.fixedEnvironment)
+        XCTAssertEqual(invocation.environment["PATH"], SafeCLIVersionProbe.fixedEnvironment["PATH"])
+        XCTAssertEqual(invocation.environment["HOME"], home.path)
     }
 
     func testProbeFindsFNMInstallationBinWithVerifiedScopedEnvironment() async throws {
@@ -211,7 +213,7 @@ final class SafeCLIVersionProbeTests: XCTestCase {
         let invocation = try XCTUnwrap(runner.invocations.first)
         XCTAssertEqual(invocation.arguments, ["--version"])
         XCTAssertTrue(invocation.environment["PATH"]?.hasPrefix(executable.deletingLastPathComponent().path + ":") == true)
-        XCTAssertFalse(invocation.environment.keys.contains("HOME"))
+        XCTAssertEqual(invocation.environment["HOME"], tree.url.path)
         XCTAssertFalse(invocation.environment["PATH"]?.contains("fnm_multishells") == true)
     }
 
@@ -225,7 +227,8 @@ final class SafeCLIVersionProbeTests: XCTestCase {
         let result = try await probe.probeVersion(probeID: "aiden", homeDirectory: tree.url)
 
         XCTAssertEqual(result.executableURL, executable)
-        XCTAssertEqual(runner.invocations.first?.environment, SafeCLIVersionProbe.fixedEnvironment)
+        XCTAssertEqual(runner.invocations.first?.environment["PATH"], SafeCLIVersionProbe.fixedEnvironment["PATH"])
+        XCTAssertEqual(runner.invocations.first?.environment["HOME"], tree.url.path)
     }
 
     func testProbeFindsMerlinExactHomeRelativeBin() async throws {
@@ -238,8 +241,8 @@ final class SafeCLIVersionProbeTests: XCTestCase {
         let result = try await probe.probeVersion(probeID: "merlin-cli", homeDirectory: tree.url)
 
         XCTAssertEqual(result.executableURL, executable)
-        XCTAssertEqual(result.version, "merlin-cli 3.2.1")
-        XCTAssertEqual(runner.invocations.first?.environment, SafeCLIVersionProbe.fixedEnvironment)
+        XCTAssertEqual(result.version, "3.2.1")
+        XCTAssertEqual(runner.invocations.first?.environment["HOME"], tree.url.path)
     }
 
     func testProbeFindsTraexCurrentSymlinkExecutable() async throws {
@@ -265,7 +268,7 @@ final class SafeCLIVersionProbeTests: XCTestCase {
         // its version parsed.
         let expected = tree.url.appending(path: ".local/share/traex/current/traex", directoryHint: .notDirectory)
         XCTAssertEqual(result.executableURL, expected)
-        XCTAssertEqual(result.version, "traex 0.200.19")
+        XCTAssertEqual(result.version, "0.200.19")
     }
 
     func testProbeFindsUvToolBinForMira() async throws {
@@ -282,8 +285,8 @@ final class SafeCLIVersionProbeTests: XCTestCase {
         let result = try await probe.probeVersion(probeID: "mira", homeDirectory: tree.url)
 
         XCTAssertEqual(result.executableURL, executable.standardizedFileURL.resolvingSymlinksInPath())
-        XCTAssertEqual(result.version, "mira 1.4.0")
-        XCTAssertEqual(runner.invocations.first?.environment, SafeCLIVersionProbe.fixedEnvironment)
+        XCTAssertEqual(result.version, "1.4.0")
+        XCTAssertEqual(runner.invocations.first?.environment["HOME"], tree.url.path)
     }
 
     func testUvToolSymlinkEscapeIsRejected() async throws {
@@ -323,7 +326,8 @@ final class SafeCLIVersionProbeTests: XCTestCase {
         let invocation = try XCTUnwrap(runner.invocations.first)
         // Homebrew path is preferred first for lark-cli.
         XCTAssertEqual(invocation.executableURL.path, "/opt/homebrew/bin/lark-cli")
-        XCTAssertEqual(invocation.environment, SafeCLIVersionProbe.fixedEnvironment)
+        XCTAssertEqual(invocation.environment["PATH"], SafeCLIVersionProbe.fixedEnvironment["PATH"])
+        XCTAssertEqual(invocation.environment["HOME"], home.path)
     }
 
     func testVersionFailureStillReturnsExecutableAndCoverageFailure() async throws {
@@ -440,7 +444,7 @@ final class SafeCLIVersionProbeTests: XCTestCase {
         let result = try await probe.probeVersion(probeID: "one", homeDirectory: home)
 
         XCTAssertEqual(result.executableURL, URL(filePath: resolved))
-        XCTAssertEqual(result.version, "one 3.2.1")
+        XCTAssertEqual(result.version, "3.2.1")
         XCTAssertNil(result.coverageFailure)
         XCTAssertEqual(runner.invocations.first?.executableURL, URL(filePath: resolved))
     }
@@ -665,7 +669,7 @@ final class SafeCLIVersionProbeTests: XCTestCase {
 
         let result = try await probe.probeVersion(probeID: "codex", homeDirectory: home)
 
-        XCTAssertEqual(result.version, "codex v0.9.1")
+        XCTAssertEqual(result.version, "0.9.1")
         XCTAssertNil(result.coverageFailure)
     }
 
@@ -682,12 +686,40 @@ final class SafeCLIVersionProbeTests: XCTestCase {
     // MARK: - parseVersion unit checks
 
     func testParseVersionRequiresDigitAndBoundsLength() {
-        XCTAssertEqual(SafeCLIVersionProbe.parseVersion(from: Data("v1.2.3".utf8)), "v1.2.3")
+        XCTAssertEqual(SafeCLIVersionProbe.parseVersion(from: Data("v1.2.3".utf8)), "1.2.3")
         XCTAssertNil(SafeCLIVersionProbe.parseVersion(from: Data("no digits here".utf8)))
         XCTAssertNil(SafeCLIVersionProbe.parseVersion(from: Data("".utf8)))
         // A very long line (over 200 chars) is skipped, not returned.
         let longLine = String(repeating: "9", count: 5000)
         XCTAssertNil(SafeCLIVersionProbe.parseVersion(from: Data(longLine.utf8)))
+    }
+
+    func testVersionParserNormalizesAgentBannersAndRejectsRuntimeErrors() {
+        for (banner, version) in [
+            ("codex-cli 0.147.0", "0.147.0"),
+            ("3.17.1 (Relay)", "3.17.1"),
+            ("mira v5.25.0", "5.25.0"),
+            ("traecli 0.200.19(internal edition)", "0.200.19")
+        ] {
+            XCTAssertEqual(SafeCLIVersionProbe.parseVersion(from: Data(banner.utf8)), version)
+        }
+        XCTAssertNil(SafeCLIVersionProbe.parseVersion(from: Data("goroutine 1 [running]:".utf8)))
+        XCTAssertNil(SafeCLIVersionProbe.parseVersion(from: Data("Warning: version 2.0.0 is available".utf8)))
+    }
+
+    func testNativeClaudeAndNpmReceiptsAvoidLaunchingRuntime() async throws {
+        let tree = try TemporaryTree(files: [:])
+        let native = tree.url.appending(path: ".local/share/claude/versions/2.1.226")
+        try makeExecutable(at: native)
+        let bin = tree.url.appending(path: ".local/bin")
+        try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(at: bin.appending(path: "claude"), withDestinationURL: native)
+        let runner = RecordingRunner(output: output(stdout: "wrong\n"))
+        let result = try await SafeCLIVersionProbe(runner: runner, locator: LocalExecutableLocator())
+            .probeVersion(probeID: "claude", homeDirectory: tree.url)
+        XCTAssertEqual(result.version, "2.1.226")
+        XCTAssertTrue(runner.invocations.isEmpty)
+        XCTAssertEqual(result.executableURL, bin.appending(path: "claude"))
     }
 
     // MARK: - Cancellation

@@ -448,6 +448,32 @@ final class AIToolRegistryTests: XCTestCase {
         )
     }
 
+    func testCLIRecordRetainsDataConfigRootsAndCoverageWithoutDesktopApp() async throws {
+        let tree = try TemporaryTree(files: [:])
+        try makeExecutable(at: tree.url.appending(path: ".local/bin/aider"))
+        let definition = AIToolDefinition(
+            id: "test-agent", displayName: "Test Agent",
+            dataRootRelativePaths: [".test-agent"], configRelativePaths: [".config/test-agent", ".denied"],
+            cliProbeID: "aider", agentProfile: KnownAIToolDefinitions.localAgent([.cli], symbol: "terminal")
+        )
+        let registry = AIToolRegistry(
+            definitions: [definition],
+            applicationLocator: StubApplicationLocator(installed: [:]),
+            directoryProbe: StubDirectoryProbe(results: [
+                canonical(tree.url, ".test-agent"): .present,
+                canonical(tree.url, ".config/test-agent"): .present,
+                canonical(tree.url, ".denied"): .failure(.permissionDenied)
+            ]),
+            cliProbe: SafeCLIVersionProbe(runner: VersionByBasenameRunner(versions: ["aider": "1.0.0"]))
+        )
+        let records = try await registry.discover(homeDirectory: tree.url)
+        let entry = try XCTUnwrap(AIAgentProjection(records: records, definitions: [definition]).localAgents.first)
+        XCTAssertEqual(entry.dataRoots.map(\.lastPathComponent), [".test-agent"])
+        XCTAssertEqual(entry.configDirectories.map(\.lastPathComponent), ["test-agent"])
+        XCTAssertEqual(entry.coverageFailures, [.permissionDenied])
+        XCTAssertEqual(entry.detectedVersion, "1.0.0")
+    }
+
     // MARK: - Coverage failure retention
 
     func testPermissionDeniedDataRootDoesNotFabricateApplicationForCLIOnlyTool() async throws {

@@ -161,6 +161,11 @@ public struct AIAgentProjection: Sendable, Equatable {
             case .application:
                 detectedFormFactors.insert(.application)
             case .cli:
+                // Desktop and CLI versions are independent; the CLI version is
+                // the one used by the Agent's package update controls.
+                if let version = record.evidence.detectedVersion {
+                    merged.detectedVersion = version
+                }
                 // For a remote Agent, its local client executable is the cloud
                 // form factor's local evidence; for a local Agent it is a CLI.
                 detectedFormFactors.insert(profile.locality == .remote ? .cloud : .cli)

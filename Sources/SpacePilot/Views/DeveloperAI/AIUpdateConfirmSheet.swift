@@ -99,6 +99,11 @@ struct AIUpdateConfirmSheet: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                if let installationURL = item.installationURL {
+                    Text(installationURL.path)
+                        .font(.caption2).foregroundStyle(.secondary)
+                        .lineLimit(2).truncationMode(.middle)
+                }
             }
             Spacer()
             if let result = resultByKey[item.key] {

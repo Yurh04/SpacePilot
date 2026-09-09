@@ -13,6 +13,7 @@ import Foundation
 ///   not depend on the ordering of the snapshot's arrays.
 public struct SnapshotAIApplicationLocator: AIApplicationLocating {
     private let urlsByBundleID: [String: URL]
+    private let versionsByBundleID: [String: String]
 
     public init(snapshot: ScanSnapshot) {
         var aiCandidates: [String: [URL]] = [:]
@@ -38,10 +39,21 @@ public struct SnapshotAIApplicationLocator: AIApplicationLocating {
             }
         }
         urlsByBundleID = map
+        var versions: [String: String] = [:]
+        for app in snapshot.applications {
+            guard let id = app.bundleIdentifier, let version = app.version,
+                  app.url.standardizedFileURL == map[id]?.standardizedFileURL else { continue }
+            versions[id] = version
+        }
+        versionsByBundleID = versions
     }
 
     public func applicationURL(forBundleIdentifier bundleIdentifier: String) -> URL? {
         urlsByBundleID[bundleIdentifier]
+    }
+
+    public func applicationVersion(forBundleIdentifier bundleIdentifier: String) -> String? {
+        versionsByBundleID[bundleIdentifier]
     }
 
     /// Chooses a single deterministic URL from a set of candidates, preferring

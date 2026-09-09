@@ -54,6 +54,11 @@ struct DeveloperAIView: View {
     /// this is computed in one pass for every Agent and cached against the
     /// snapshot identity rather than recomputed on each `body` evaluation.
     private var agentStorageSizesByPath: [String: Int64] {
+        if !model.aiAgentStorage.isEmpty {
+            return model.aiAgentStorage.values.reduce(into: [:]) { sizes, snapshot in
+                sizes.merge(snapshot.sizesByPath, uniquingKeysWith: max)
+            }
+        }
         guard let snapshot = model.latestSnapshot, !snapshot.items.isEmpty else { return [:] }
         let agents = agentProjection.localAgents + agentProjection.remoteAgents
         return AIAgentCache.shared.storageSizes(
@@ -245,7 +250,9 @@ struct DeveloperAIView: View {
                     skills: agentSkills(projection),
                     plugins: agentPlugins(projection),
                     storageSizesByPath: agentStorageSizesByPath,
-                    storageSizesByCategory: agentStorageSizesByCategory[id] ?? [:]
+                    storageSizesByCategory: model.aiAgentStorage[id] == nil
+                        ? agentStorageSizesByCategory[id] ?? [:] : [:],
+                    storageSnapshot: model.aiAgentStorage[id]
                 ),
                 mcpServers: model.aiCapabilities.mcpServers.filter { $0.ownerDefinitionID == id },
                 hooks: model.aiCapabilities.hooks.filter { $0.ownerDefinitionID == id },
@@ -253,7 +260,15 @@ struct DeveloperAIView: View {
                     .filter { $0.ownerDefinitionID == id },
                 configProfile: model.aiCapabilities.configProfiles.first { $0.ownerDefinitionID == id },
                 revealURL: agent.applicationURL ?? agent.executableURL,
-                formFactorLabels: formFactorLabels(agent.formFactors)
+                formFactorLabels: formFactorLabels(agent.formFactors),
+                isDiscovering: model.isDiscoveringAITools,
+                cliUpdateAssets: model.aiUpdateAssets.filter { $0.key.kind == .cli && $0.definitionID == id },
+                updateResults: model.aiUpdateResults,
+                isCheckingUpdates: model.isCheckingAIUpdates,
+                isExecutingUpdates: model.isExecutingAIUpdates,
+                updateError: model.aiUpdateError,
+                onCheckUpdates: model.checkAIUpdatesForSelection,
+                onUpdate: model.prepareAIUpdateExecution
             )
         } else {
             overviewSection(projection)

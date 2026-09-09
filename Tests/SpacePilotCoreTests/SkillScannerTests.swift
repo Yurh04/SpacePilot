@@ -88,6 +88,8 @@ final class SkillScannerTests: XCTestCase {
         XCTAssertNotNil(linked.symlinkTarget)
         XCTAssertFalse(linked.isSymlinkBroken)
         XCTAssertEqual(linked.symlinkTarget?.lastPathComponent, "linked-skill")
+        XCTAssertGreaterThan(linked.allocatedSize, 0)
+        XCTAssertEqual(linked.allocatedSize, ManagedAssetDirectoryMetadata.scan(root: realSkill).allocatedSize)
     }
 
     func testRealDirectorySkillHasNoSymlinkTarget() async throws {

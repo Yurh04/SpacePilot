@@ -49,10 +49,12 @@ public protocol ExecutableLocating: Sendable {
     /// Whether a directory exists at `url`. Used to confirm a
     /// `node_modules/<packageID>` install. Defaults to a real filesystem check.
     func directoryExists(at url: URL) -> Bool
+    func packageVersion(at directory: URL, expectedName: String) -> String?
 }
 
 public extension ExecutableLocating {
     func canonicalExecutable(at url: URL) -> URL { url.canonicalizedForDiscovery }
+    func packageVersion(at directory: URL, expectedName: String) -> String? { nil }
 
     func directoryExists(at url: URL) -> Bool {
         var isDirectory: ObjCBool = false
@@ -63,6 +65,16 @@ public extension ExecutableLocating {
 
 public struct LocalExecutableLocator: ExecutableLocating {
     public init() {}
+
+    public func packageVersion(at directory: URL, expectedName: String) -> String? {
+        let manifest = directory.appending(path: "package.json")
+        guard let size = try? manifest.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+              size <= 256 * 1_024,
+              let data = try? Data(contentsOf: manifest),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              json["name"] as? String == expectedName else { return nil }
+        return json["version"] as? String
+    }
 
     public func isExecutableFile(at url: URL) -> Bool {
         var isDirectory: ObjCBool = false
@@ -141,6 +153,7 @@ public struct SafeCLIVersionProbe: Sendable {
         /// to the same executable as the primary candidate. Used as read-only
         /// evidence only; never executed independently.
         let aliasBasenames: [String]
+        let nativeVersionRoot: String?
         /// Fixed arguments used to request the version (for example `--version`).
         let versionArguments: [String]
 
@@ -152,6 +165,7 @@ public struct SafeCLIVersionProbe: Sendable {
             uvToolPackages: [String] = [],
             nodePackageIdentifiers: [String] = [],
             aliasBasenames: [String] = [],
+            nativeVersionRoot: String? = nil,
             versionArguments: [String]
         ) {
             self.basename = basename
@@ -161,6 +175,7 @@ public struct SafeCLIVersionProbe: Sendable {
             self.uvToolPackages = uvToolPackages
             self.nodePackageIdentifiers = nodePackageIdentifiers
             self.aliasBasenames = aliasBasenames
+            self.nativeVersionRoot = nativeVersionRoot
             self.versionArguments = versionArguments
         }
     }
@@ -194,6 +209,7 @@ public struct SafeCLIVersionProbe: Sendable {
             absoluteCandidatePaths: ["/usr/local/bin/claude", "/opt/homebrew/bin/claude"],
             homeRelativeCandidatePaths: [".local/bin/claude"],
             nodePackageIdentifiers: ["@anthropic-ai/claude-code"],
+            nativeVersionRoot: ".local/share/claude/versions",
             versionArguments: ["--version"]
         ),
         "cursor": ProbeSpec(
@@ -437,6 +453,15 @@ public struct SafeCLIVersionProbe: Sendable {
 
         try Task.checkCancellation()
 
+        // Package receipts and native version directories avoid launching a CLI
+        // that may initialize a runtime even for --version (for example Ollama).
+        if let version = installedVersion(spec: spec, executable: candidate.executableURL, home: homeDirectory) {
+            return SafeCLIProbeResult(
+                executableURL: candidate.executableURL, version: version,
+                coverageFailure: nil, aliasExecutableURLs: aliasURLs
+            )
+        }
+
         let output: CLIProcessOutput
         do {
             output = try await runner.run(
@@ -476,7 +501,7 @@ public struct SafeCLIVersionProbe: Sendable {
         if output.terminationStatus != 0 || parsed == nil {
             return SafeCLIProbeResult(
                 executableURL: candidate.executableURL,
-                version: parsed,
+                version: nil,
                 coverageFailure: .invalidOutput,
                 aliasExecutableURLs: aliasURLs
             )
@@ -522,6 +547,14 @@ public struct SafeCLIVersionProbe: Sendable {
 
     private func probeCandidates(for spec: ProbeSpec, homeDirectory: URL) -> [ProbeCandidate] {
         var candidates: [ProbeCandidate] = []
+        if let nativeRoot = spec.nativeVersionRoot {
+            let root = homeDirectory.appending(path: nativeRoot).canonicalizedForDiscovery
+            let entry = homeDirectory.appending(path: ".local/bin/\(spec.basename)")
+            let resolved = locator.canonicalExecutable(at: entry)
+            if resolved.path.hasPrefix(root.path + "/"), locator.isExecutableFile(at: entry) {
+                candidates.append(ProbeCandidate(executableURL: entry, environment: Self.fixedEnvironment))
+            }
+        }
         // Generic basename candidates (fixed absolute dirs, ~/.local/bin, and the
         // pnpm global bin) carry no package identity, so any executable that
         // merely shares the basename would be executed and attributed. They are
@@ -621,7 +654,51 @@ public struct SafeCLIVersionProbe: Sendable {
         var seen = Set<String>()
         return candidates.filter { candidate in
             seen.insert(candidate.executableURL.standardizedFileURL.path).inserted
+        }.map { candidate in
+            var environment = candidate.environment
+            environment["HOME"] = homeDirectory.path
+            return ProbeCandidate(executableURL: candidate.executableURL, environment: environment)
         }
+    }
+
+    private func installedVersion(spec: ProbeSpec, executable: URL, home: URL) -> String? {
+        let resolved = locator.canonicalExecutable(at: executable)
+        if let nativeRoot = spec.nativeVersionRoot,
+           resolved.path.hasPrefix(home.appending(path: nativeRoot).canonicalizedDiscoveryPath + "/") {
+            return Self.parseVersion(from: Data(resolved.lastPathComponent.utf8))
+        }
+        var directory = resolved.deletingLastPathComponent()
+        for _ in 0..<10 {
+            for package in spec.nodePackageIdentifiers where directory.path.hasSuffix("/node_modules/" + package) {
+                if let version = locator.packageVersion(at: directory, expectedName: package) {
+                    return Self.parseVersion(from: Data(version.utf8))
+                }
+            }
+            if directory.path == "/" { break }
+            directory.deleteLastPathComponent()
+        }
+        for package in spec.uvToolPackages {
+            let root = home.appending(path: ".local/share/uv/tools/\(package)").canonicalizedForDiscovery
+            guard resolved.path.hasPrefix(root.path + "/") else { continue }
+            let lib = root.appending(path: "lib")
+            let pythons = (try? FileManager.default.contentsOfDirectory(at: lib, includingPropertiesForKeys: nil)) ?? []
+            for python in pythons where python.lastPathComponent.hasPrefix("python") {
+                let site = python.appending(path: "site-packages")
+                let entries = (try? FileManager.default.contentsOfDirectory(at: site, includingPropertiesForKeys: nil)) ?? []
+                let prefix = package.replacingOccurrences(of: "-", with: "_") + "-"
+                for entry in entries where entry.lastPathComponent.hasPrefix(prefix) && entry.pathExtension == "dist-info" {
+                    let version = entry.deletingPathExtension().lastPathComponent.dropFirst(prefix.count)
+                    if let parsed = Self.parseVersion(from: Data(version.utf8)) { return parsed }
+                }
+            }
+        }
+        if spec.basename == "ollama" {
+            for prefix in ["/opt/homebrew/Cellar/ollama/", "/usr/local/Cellar/ollama/"] where resolved.path.hasPrefix(prefix) {
+                let version = resolved.path.dropFirst(prefix.count).split(separator: "/").first ?? ""
+                return Self.parseVersion(from: Data(version.utf8))
+            }
+        }
+        return nil
     }
 
     private func versionedManagerCandidates(
@@ -760,22 +837,24 @@ public struct SafeCLIVersionProbe: Sendable {
         return nil
     }
 
-    /// Extracts a plausible version string from captured output. To reject
-    /// malformed floods and arbitrary banners (for example `hello world`), the
-    /// candidate must be a short, printable line that contains at least one
-    /// digit. Anything else yields `nil`, which the caller treats as
-    /// `invalidOutput`.
+    /// Extracts the version token, never the banner or a stack-trace line.
     static func parseVersion(from data: Data) -> String? {
         guard let text = String(data: data, encoding: .utf8) else { return nil }
+        let regex = try! NSRegularExpression(
+            pattern: #"(?<![A-Za-z0-9/._])v?([0-9]+(?:\.[0-9]+){1,3}(?:[-+][A-Za-z0-9.-]+|(?:a|b|rc|\.post|\.dev)[0-9]+)?)(?![A-Za-z0-9])"#
+        )
         for rawLine in text.split(whereSeparator: \.isNewline) {
             let line = rawLine.trimmingCharacters(in: .whitespaces)
             guard !line.isEmpty, line.count <= 200 else { continue }
-            let containsDigit = line.contains { $0.isNumber }
+            let lower = line.lowercased()
+            guard !["warning", "error", "panic", "goroutine", "traceback"].contains(where: { lower.hasPrefix($0) }) else { continue }
             let isPrintable = line.unicodeScalars.allSatisfy {
                 !CharacterSet.controlCharacters.contains($0)
             }
-            if containsDigit && isPrintable {
-                return String(line)
+            if isPrintable,
+               let match = regex.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)),
+               let range = Range(match.range(at: 1), in: line) {
+                return String(line[range])
             }
         }
         return nil

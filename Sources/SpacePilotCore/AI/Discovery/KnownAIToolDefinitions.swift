@@ -88,7 +88,7 @@ public enum KnownAIToolDefinitions {
             id: "claude",
             displayName: "Claude",
             applicationBundleIdentifiers: ["com.anthropic.claudefordesktop"],
-            dataRootRelativePaths: [".claude"],
+            dataRootRelativePaths: [".claude", "Library/Application Support/Claude"],
             skillRoots: [AIToolRootDescriptor(".claude/skills"), sharedAgentsSkillsRoot],
             pluginRoots: [AIToolRootDescriptor(".claude/plugins")],
             configRelativePaths: [".claude"],
@@ -104,7 +104,11 @@ public enum KnownAIToolDefinitions {
             id: "chatgpt",
             displayName: "ChatGPT",
             applicationBundleIdentifiers: ["com.openai.codex"],
-            dataRootRelativePaths: [],
+            dataRootRelativePaths: [
+                "Library/Application Support/Codex",
+                "Library/Application Support/OpenAI/ChatGPT",
+                "Library/Application Support/OpenAI/Codex"
+            ],
             configRelativePaths: [],
             agentProfile: localAgent([.application], symbol: "bubble.left.and.bubble.right")
         ),
@@ -112,7 +116,7 @@ public enum KnownAIToolDefinitions {
             id: "cursor",
             displayName: "Cursor",
             applicationBundleIdentifiers: ["com.todesktop.230313mzl4w4u92"],
-            dataRootRelativePaths: [".cursor"],
+            dataRootRelativePaths: [".cursor", "Library/Application Support/Cursor"],
             configRelativePaths: [".cursor"],
             cliProbeID: "cursor",
             agentProfile: localAgent([.application, .cli], symbol: "cursorarrow.rays")
@@ -121,7 +125,7 @@ public enum KnownAIToolDefinitions {
             id: "trae-cn",
             displayName: "Trae CN",
             applicationBundleIdentifiers: ["cn.trae.app"],
-            dataRootRelativePaths: [".trae"],
+            dataRootRelativePaths: [".trae", ".trae-cn", "Library/Application Support/Trae CN"],
             skillRoots: [
                 AIToolRootDescriptor(".trae/skills"),
                 AIToolRootDescriptor(
@@ -148,7 +152,7 @@ public enum KnownAIToolDefinitions {
             id: "trae-solo-cn",
             displayName: "TRAE SOLO CN",
             applicationBundleIdentifiers: ["cn.trae.solo.app"],
-            dataRootRelativePaths: [".trae-solo", ".traework"],
+            dataRootRelativePaths: [".trae-solo", ".traework", "Library/Application Support/TRAE SOLO CN"],
             configRelativePaths: [".trae-solo", ".traework"],
             cliProbeID: "traework",
             agentProfile: localAgent([.application, .cli], symbol: "sparkles.rectangle.stack")
@@ -157,7 +161,10 @@ public enum KnownAIToolDefinitions {
             id: "antigravity",
             displayName: "Antigravity",
             applicationBundleIdentifiers: ["com.google.antigravity"],
-            dataRootRelativePaths: [".antigravity"],
+            dataRootRelativePaths: [
+                ".antigravity", ".gemini/antigravity-cli",
+                "Library/Application Support/Antigravity"
+            ],
             configRelativePaths: [".antigravity"],
             cliProbeID: "antigravity",
             agentProfile: localAgent([.application, .cli], symbol: "circle.hexagongrid")
@@ -188,7 +195,7 @@ public enum KnownAIToolDefinitions {
             id: "windsurf",
             displayName: "Windsurf",
             applicationBundleIdentifiers: ["com.exafunction.windsurf"],
-            dataRootRelativePaths: [".windsurf", ".codeium"],
+            dataRootRelativePaths: [".windsurf", ".codeium", "Library/Application Support/Windsurf"],
             configRelativePaths: [".windsurf"],
             cliProbeID: "windsurf",
             agentProfile: localAgent([.application, .cli], symbol: "wind")
@@ -236,7 +243,7 @@ public enum KnownAIToolDefinitions {
         AIToolDefinition(
             id: "aiden",
             displayName: "Aiden",
-            dataRootRelativePaths: [".aiden"],
+            dataRootRelativePaths: [".aiden", "Library/Application Support/aiden-cli"],
             pluginRoots: [AIToolRootDescriptor(".aiden/plugins")],
             configRelativePaths: [".aiden"],
             cliProbeID: "aiden",
@@ -262,8 +269,8 @@ public enum KnownAIToolDefinitions {
             id: "copilot",
             displayName: "GitHub Copilot",
             applicationBundleIdentifiers: [],
-            dataRootRelativePaths: [".config/github-copilot"],
-            configRelativePaths: [".config/github-copilot"],
+            dataRootRelativePaths: [".config/github-copilot", ".copilot"],
+            configRelativePaths: [".config/github-copilot", ".copilot"],
             cliProbeID: "copilot",
             agentProfile: localAgent([.cli], symbol: "terminal")
         ),
@@ -275,6 +282,8 @@ public enum KnownAIToolDefinitions {
             id: "relay",
             displayName: "Relay",
             dataRootRelativePaths: [".relay"],
+            skillRoots: [AIToolRootDescriptor(".relay/skills")],
+            pluginRoots: [AIToolRootDescriptor(".relay/plugins")],
             configRelativePaths: [".relay"],
             cliProbeID: "relay",
             agentProfile: localAgent([.cli], symbol: "arrow.triangle.2.circlepath")
@@ -282,8 +291,9 @@ public enum KnownAIToolDefinitions {
         AIToolDefinition(
             id: "pi",
             displayName: "Pi",
-            dataRootRelativePaths: [".pi"],
-            configRelativePaths: [".pi"],
+            dataRootRelativePaths: [".pi/agent"],
+            skillRoots: [AIToolRootDescriptor(".pi/agent/skills")],
+            configRelativePaths: [".pi/agent"],
             cliProbeID: "pi",
             agentProfile: localAgent([.cli], symbol: "terminal")
         ),
@@ -354,6 +364,8 @@ public enum KnownAIToolDefinitions {
             id: "aime",
             displayName: "Aime",
             applicationBundleIdentifiers: ["com.bytedance.aime.electron"],
+            dataRootRelativePaths: [".aime", ".aime_pc", "Library/Application Support/Aime"],
+            configRelativePaths: [".aime"],
             cliProbeID: "aime",
             agentProfile: localAgent([.application, .cli], symbol: "sparkles")
         ),
@@ -361,6 +373,8 @@ public enum KnownAIToolDefinitions {
             id: "mira",
             displayName: "Mira",
             applicationBundleIdentifiers: ["net.byteintl.mira"],
+            dataRootRelativePaths: [".mira", ".mira_cli", ".miramcp", "Library/Application Support/mira"],
+            configRelativePaths: [".mira"],
             cliProbeID: "mira",
             agentProfile: localAgent([.application, .cli], symbol: "sparkles")
         ),
@@ -368,12 +382,14 @@ public enum KnownAIToolDefinitions {
             id: "doubao",
             displayName: "Doubao",
             applicationBundleIdentifiers: ["com.bot.pc.doubao"],
+            dataRootRelativePaths: ["Library/Application Support/Doubao"],
             agentProfile: localAgent([.application], symbol: "bubble.left.and.bubble.right")
         ),
         AIToolDefinition(
             id: "cici",
             displayName: "Cici",
             applicationBundleIdentifiers: ["com.bot.pc.cici"],
+            dataRootRelativePaths: ["Library/Application Support/Cici"],
             agentProfile: localAgent([.application], symbol: "bubble.left.and.bubble.right")
         ),
         AIToolDefinition(

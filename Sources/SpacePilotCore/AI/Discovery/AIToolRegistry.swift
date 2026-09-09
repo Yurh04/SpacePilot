@@ -6,6 +6,11 @@ public protocol AIApplicationLocating: Sendable {
     /// Returns the on-disk URL of an installed application for a bundle
     /// identifier, or `nil` if it is not installed.
     func applicationURL(forBundleIdentifier bundleIdentifier: String) -> URL?
+    func applicationVersion(forBundleIdentifier bundleIdentifier: String) -> String?
+}
+
+public extension AIApplicationLocating {
+    func applicationVersion(forBundleIdentifier bundleIdentifier: String) -> String? { nil }
 }
 
 /// The outcome of probing a single directory. Distinguishing `failure` from
@@ -129,8 +134,15 @@ public struct AIToolRegistry: Sendable {
             try Task.checkCancellation()
             let owner = AIToolOwner.tool(definitionID: definition.id)
 
+            let installedBundleIDs = definition.applicationBundleIdentifiers.filter {
+                applicationLocator.applicationURL(forBundleIdentifier: $0) != nil
+            }
+            let bundleRoots = installedBundleIDs.flatMap { id in
+                ["Library/Application Support/\(id)", "Library/Caches/\(id)",
+                 "Library/Logs/\(id)", "Library/Containers/\(id)"]
+            }
             let dataRoots = existingDirectories(
-                relativePaths: definition.dataRootRelativePaths,
+                relativePaths: definition.dataRootRelativePaths + bundleRoots,
                 homeDirectory: homeDirectory
             )
             let configRoots = existingDirectories(
@@ -156,7 +168,11 @@ public struct AIToolRegistry: Sendable {
 
             if definition.cliProbeID != nil,
                let result = probeResults[definition.id],
-               let cliRecord = cliRecord(from: result, for: definition, owner: owner) {
+               let cliRecord = cliRecord(
+                   from: result, for: definition, owner: owner,
+                   dataRoots: dataRoots.present, configRoots: configRoots.present,
+                   coverageFailures: dataRoots.failures.union(configRoots.failures)
+               ) {
                 records.append(cliRecord)
             }
 
@@ -299,6 +315,7 @@ public struct AIToolRegistry: Sendable {
             if let url = applicationLocator.applicationURL(forBundleIdentifier: bundleID) {
                 evidence.bundleIdentifier = bundleID
                 evidence.applicationURL = url
+                evidence.detectedVersion = applicationLocator.applicationVersion(forBundleIdentifier: bundleID)
                 break
             }
         }
@@ -347,7 +364,10 @@ public struct AIToolRegistry: Sendable {
     private func cliRecord(
         from result: SafeCLIProbeResult,
         for definition: AIToolDefinition,
-        owner: AIToolOwner
+        owner: AIToolOwner,
+        dataRoots: [URL],
+        configRoots: [URL],
+        coverageFailures: Set<AIToolCoverageFailure>
     ) -> AIToolRecord? {
         guard let executableURL = result.executableURL else {
             // CLI not installed; no record.
@@ -358,8 +378,10 @@ public struct AIToolRegistry: Sendable {
         evidence.executableURL = executableURL
         evidence.detectedVersion = result.version
         evidence.aliasExecutableURLs = result.aliasExecutableURLs
+        evidence.dataRoots = dataRoots
+        evidence.configDirectories = configRoots
 
-        var failures = Set<AIToolCoverageFailure>()
+        var failures = coverageFailures
         if let failure = result.coverageFailure {
             failures.insert(failure)
         }
