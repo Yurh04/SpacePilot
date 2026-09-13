@@ -306,24 +306,77 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                 homeDirectory: homeDirectory
             )
 
+            // A Developer & AI refresh is triggered frequently by activity in
+            // ~/.codex, ~/.claude, and similar roots. It must not replace the
+            // richer, on-demand application analysis with the resolver's basic
+            // association set. Re-read the latest saved snapshot here so an
+            // application analysis that completed while this scan was running
+            // also wins.
+            let retainedApplicationDetails: RetainedApplicationDetails
+            if scope == .developerAI {
+                let latest = try await store.latestSnapshot()
+                    ?? previousSnapshot
+                retainedApplicationDetails = Self.retainedApplicationDetails(
+                    from: latest,
+                    for: baseApplications
+                )
+            } else {
+                retainedApplicationDetails = .empty
+            }
+
+            let freshAssociationsByApplicationID = Dictionary(
+                applicationResolution.resolutions.map {
+                    ($0.applicationID, $0.associations)
+                },
+                uniquingKeysWith: { first, _ in first }
+            )
+            let selectedAssociationsByApplicationID = Dictionary(
+                uniqueKeysWithValues: baseApplications.map { application in
+                    let associations = retainedApplicationDetails
+                        .associationsByApplicationID[application.id]
+                        ?? freshAssociationsByApplicationID[
+                            application.id,
+                            default: []
+                        ]
+                    return (application.id, associations)
+                }
+            )
+            let selectedFreshItemIDs = Set(
+                baseApplications
+                    .filter {
+                        retainedApplicationDetails
+                            .associationsByApplicationID[$0.id] == nil
+                    }
+                    .flatMap {
+                        freshAssociationsByApplicationID[
+                            $0.id,
+                            default: []
+                        ]
+                    }
+                    .map(\.itemID)
+            )
+            let selectedApplicationItems = applicationResolution.items.filter {
+                selectedFreshItemIDs.contains($0.id)
+            } + retainedApplicationDetails.items
+
             let sourceItems = homeResult.items
                 + developer.items
                 + codex.items
                 + claude.items
                 + basicAIScans.flatMap(\.items)
-                + applicationResolution.items
+                + selectedApplicationItems
             let canonicalOwnership = try Self.canonicalOwnership(
                 sourceItems: sourceItems,
-                aggregateItems: applicationResolution.items
+                aggregateItems: selectedApplicationItems
             )
             let items = canonicalOwnership.items
             let canonicalItemIDBySourceItemID =
                 canonicalOwnership.itemIDBySourceItemID
             let associationsByApplicationID = Dictionary(
-                applicationResolution.resolutions.map { resolution in
+                selectedAssociationsByApplicationID.map { applicationID, associations in
                     (
-                        resolution.applicationID,
-                        resolution.associations.map {
+                        applicationID,
+                        associations.map {
                             Self.remap(
                                 association: $0,
                                 itemIDs: canonicalItemIDBySourceItemID
@@ -450,6 +503,83 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
 
     private static func canonicalPath(for url: URL) -> String {
         url.standardizedFileURL.resolvingSymlinksInPath().path
+    }
+
+    private static func retainedApplicationDetails(
+        from snapshot: ScanSnapshot?,
+        for applications: [ApplicationRecord]
+    ) -> RetainedApplicationDetails {
+        guard let snapshot else { return .empty }
+        let previousApplicationsByPath = Dictionary(
+            snapshot.applications.map {
+                (canonicalPath(for: $0.url), $0)
+            },
+            uniquingKeysWith: { first, _ in first }
+        )
+        let previousItemsByID = Dictionary(
+            uniqueKeysWithValues: snapshot.items.map { ($0.id, $0) }
+        )
+        let retainedPairs: [(current: ApplicationRecord, previous: ApplicationRecord)] =
+            applications.compactMap { application in
+                guard let previous = previousApplicationsByPath[
+                    canonicalPath(for: application.url)
+                ], previous.bundleIdentifier == application.bundleIdentifier,
+                   previous.version == application.version,
+                   previous.allocatedSize == application.allocatedSize else {
+                    return nil
+                }
+                return (application, previous)
+            }
+        let currentApplicationIDByPreviousID = Dictionary(
+            uniqueKeysWithValues: retainedPairs.map {
+                ($0.previous.id, $0.current.id)
+            }
+        )
+        var itemsByID: [UUID: ScannedItem] = [:]
+        var associationsByApplicationID: [UUID: [ArtifactAssociation]] = [:]
+
+        for (application, previous) in retainedPairs {
+            let associations = previous.associations.compactMap {
+                association -> ArtifactAssociation? in
+                guard let previousItem = previousItemsByID[
+                    association.itemID
+                ] else { return nil }
+                let item = ScannedItem(
+                    id: previousItem.id,
+                    url: previousItem.url,
+                    logicalSize: previousItem.logicalSize,
+                    allocatedSize: previousItem.allocatedSize,
+                    creationDate: previousItem.creationDate,
+                    modificationDate: previousItem.modificationDate,
+                    resourceIdentifier: previousItem.resourceIdentifier,
+                    category: previousItem.category,
+                    risk: previousItem.risk,
+                    ownerID: previousItem.ownerID.map {
+                        currentApplicationIDByPreviousID[$0] ?? $0
+                    },
+                    explanation: previousItem.explanation
+                )
+                itemsByID[item.id] = item
+                return ArtifactAssociation(
+                    id: association.id,
+                    itemID: item.id,
+                    applicationID: application.id,
+                    evidence: association.evidence,
+                    confidence: association.confidence,
+                    risk: association.risk,
+                    ownership: association.ownership
+                )
+            }
+            // Preserve the empty set too. Developer & AI refreshes do not own
+            // application-detail discovery, so they must not silently change
+            // an existing application's association state in either direction.
+            associationsByApplicationID[application.id] = associations
+        }
+
+        return RetainedApplicationDetails(
+            items: Array(itemsByID.values),
+            associationsByApplicationID: associationsByApplicationID
+        )
     }
 
     private static func categoryAggregates(
@@ -651,6 +781,16 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
     private struct CanonicalItemOwnership {
         let items: [ScannedItem]
         let itemIDBySourceItemID: [UUID: UUID]
+    }
+
+    private struct RetainedApplicationDetails {
+        let items: [ScannedItem]
+        let associationsByApplicationID: [UUID: [ArtifactAssociation]]
+
+        static let empty = Self(
+            items: [],
+            associationsByApplicationID: [:]
+        )
     }
 }
 

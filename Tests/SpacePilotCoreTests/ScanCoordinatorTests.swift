@@ -187,6 +187,88 @@ final class ScanCoordinatorTests: XCTestCase {
         XCTAssertTrue(snapshot.items.contains { $0.id == item.id })
     }
 
+    func testDeveloperAIScopeDoesNotReplaceOnDemandApplicationDetails()
+        async throws
+    {
+        let home = try TemporaryTree(files: [
+            "Library/Application Support/DeepOnly/cache.bin": 512
+        ])
+        let applicationsDirectory = home.url.appending(
+            path: "Applications",
+            directoryHint: .isDirectory
+        )
+        _ = try TestAppBuilder.make(
+            in: applicationsDirectory,
+            name: "Focused",
+            bundleID: "com.example.focused",
+            version: "1.0",
+            executableBytes: 16
+        )
+        let scannedApplications = try await ApplicationScanner().scan(
+            locations: [applicationsDirectory]
+        )
+        let scanned = try XCTUnwrap(scannedApplications.first)
+        let detailItem = ScannedItem(
+            url: home.url.appending(
+                path: "Library/Application Support/DeepOnly",
+                directoryHint: .isDirectory
+            ),
+            logicalSize: 512,
+            allocatedSize: 512,
+            category: .application,
+            risk: .rebuildable,
+            ownerID: scanned.id,
+            explanation: "On-demand detail"
+        )
+        let detailAssociation = ArtifactAssociation(
+            itemID: detailItem.id,
+            applicationID: scanned.id,
+            evidence: .knownRule,
+            confidence: .high,
+            risk: .rebuildable,
+            ownership: .owned
+        )
+        let previousApplication = ApplicationRecord(
+            id: scanned.id,
+            name: scanned.name,
+            bundleIdentifier: scanned.bundleIdentifier,
+            version: scanned.version,
+            url: scanned.url,
+            executableURL: scanned.executableURL,
+            allocatedSize: scanned.allocatedSize,
+            lastUsedDate: scanned.lastUsedDate,
+            associations: [detailAssociation]
+        )
+        let previous = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: [detailItem],
+            applications: [previousApplication],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: .complete
+        )
+        let coordinator = ScanCoordinator(
+            homeDirectory: home.url,
+            store: InMemorySnapshotStore(latest: previous)
+        )
+
+        let snapshot = try await coordinator.collectScan(
+            scope: .developerAI
+        )
+
+        let focused = try XCTUnwrap(snapshot.applications.first {
+            $0.bundleIdentifier == "com.example.focused"
+        })
+        XCTAssertEqual(focused.associations.count, 1)
+        XCTAssertEqual(focused.associations.first?.applicationID, focused.id)
+        XCTAssertTrue(snapshot.items.contains {
+            $0.url.standardizedFileURL.path
+                == detailItem.url.standardizedFileURL.path
+        })
+    }
+
     func testSnapshotKeepsOneSharedItemWithAssociationsForBothApplications() async throws {
         let home = try TemporaryTree(files: [
             "Library/Group Containers/TEAM.shared/token.db": 64,

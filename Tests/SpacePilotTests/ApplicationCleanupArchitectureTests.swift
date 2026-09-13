@@ -96,6 +96,28 @@ final class ApplicationCleanupArchitectureTests: XCTestCase {
         XCTAssertTrue(root.contains("applicationAnalysisDates: model.applicationAnalysisDates"))
     }
 
+    func testAutomaticRefreshWaitsForApplicationDetailAnalysis() throws {
+        let model = try source(at: "Sources/SpacePilot/App/AppModel.swift")
+        let requestRefresh = try functionBody(
+            in: model,
+            signature: "private func requestAutomaticRefresh(scope: ScanScope)"
+        )
+        let startPendingRefresh = try functionBody(
+            in: model,
+            signature: "private func startPendingAutomaticRefreshIfNeeded()"
+        )
+        let analyzeApplication = try functionBody(
+            in: model,
+            signature: "func analyzeApplication(_ projection: ApplicationProjection)"
+        )
+
+        XCTAssertTrue(requestRefresh.contains("applicationAnalysisTask != nil"))
+        XCTAssertTrue(startPendingRefresh.contains("applicationAnalysisTask == nil"))
+        XCTAssertTrue(analyzeApplication.contains("startPendingAutomaticRefreshIfNeeded()"))
+        XCTAssertTrue(analyzeApplication.contains("if isBackgroundRefreshing"))
+        XCTAssertTrue(analyzeApplication.contains("scanTask?.cancel()"))
+    }
+
     func testApplicationScreenUsesHorizontalListAndDetailLayout() throws {
         let source = try source(
             at: "Sources/SpacePilot/Views/Applications/ApplicationsView.swift"

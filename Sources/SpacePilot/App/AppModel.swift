@@ -412,6 +412,16 @@ final class AppModel {
               let currentSnapshot = latestSnapshot else {
             return
         }
+        if isBackgroundRefreshing {
+            // Favor the user's explicit detail analysis over an older automatic
+            // refresh already in flight. Re-run that refresh afterwards, when
+            // it can preserve the newly saved associations.
+            pendingAutomaticRefreshScope = Self.mergedRefreshScope(
+                pendingAutomaticRefreshScope,
+                .developerAI
+            )
+            scanTask?.cancel()
+        }
         applicationAnalysisTask?.cancel()
         analyzingApplicationID = projection.id
         let snapshotID = currentSnapshot.id
@@ -453,6 +463,7 @@ final class AppModel {
             if analyzingApplicationID == application.id {
                 analyzingApplicationID = nil
                 applicationAnalysisTask = nil
+                startPendingAutomaticRefreshIfNeeded()
             }
         }
     }
@@ -742,7 +753,7 @@ final class AppModel {
 
     private func requestAutomaticRefresh(scope: ScanScope) {
         guard latestSnapshot != nil else { return }
-        if isScanning || isCleaning {
+        if isScanning || isCleaning || applicationAnalysisTask != nil {
             pendingAutomaticRefreshScope = Self.mergedRefreshScope(
                 pendingAutomaticRefreshScope,
                 scope
@@ -753,7 +764,7 @@ final class AppModel {
     }
 
     private func startPendingAutomaticRefreshIfNeeded() {
-        guard !isScanning, !isCleaning,
+        guard !isScanning, !isCleaning, applicationAnalysisTask == nil,
               let scope = pendingAutomaticRefreshScope else { return }
         pendingAutomaticRefreshScope = nil
         startScan(scope: scope, background: true)
