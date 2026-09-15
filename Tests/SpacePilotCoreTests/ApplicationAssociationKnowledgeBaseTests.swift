@@ -11,7 +11,7 @@ final class ApplicationAssociationKnowledgeBaseTests: XCTestCase {
 
         XCTAssertEqual(decoded, original)
         XCTAssertEqual(decoded.schemaVersion, 1)
-        XCTAssertEqual(decoded.contentVersion, "1.5.0")
+        XCTAssertEqual(decoded.contentVersion, "1.6.0")
         XCTAssertEqual(decoded.rules.count, 18)
     }
 
@@ -319,6 +319,22 @@ final class ApplicationAssociationKnowledgeBaseTests: XCTestCase {
         XCTAssertEqual(vscodeShared.confidence, .medium)
         XCTAssertEqual(vscodeShared.ownership, .possible)
 
+        let vscodeAppSupport = try XCTUnwrap(vscodeCandidates.first {
+            $0.url.lastPathComponent == "Code"
+        })
+        XCTAssertEqual(vscodeAppSupport.category, .application)
+        XCTAssertEqual(vscodeAppSupport.risk, .sensitive)
+        XCTAssertEqual(vscodeAppSupport.confidence, .high)
+        XCTAssertEqual(vscodeAppSupport.ownership, .owned)
+
+        let vscodeCache = try XCTUnwrap(vscodeCandidates.first {
+            $0.url.lastPathComponent == "com.microsoft.VSCode"
+        })
+        XCTAssertEqual(vscodeCache.category, .cache)
+        XCTAssertEqual(vscodeCache.risk, .rebuildable)
+        XCTAssertEqual(vscodeCache.confidence, .high)
+        XCTAssertEqual(vscodeCache.ownership, .owned)
+
         let cursorCandidates = try ApplicationAssociationKnowledgeBase.builtInV1
             .candidates(
                 for: fixture.context(
@@ -379,6 +395,22 @@ final class ApplicationAssociationKnowledgeBaseTests: XCTestCase {
             .filter { $0.ruleID == "vendor.jetbrains.shared-data.v1" }
         XCTAssertEqual(jetBrainsCandidates.count, 3)
         XCTAssertTrue(jetBrainsCandidates.allSatisfy {
+            $0.confidence == .medium
+                && $0.ownership == .shared
+                && $0.disposition == .inspectOnly
+        })
+
+        let intellijCommercial = try ApplicationAssociationKnowledgeBase.builtInV1
+            .candidates(
+                for: fixture.context(
+                    bundleIdentifier: "com.jetbrains.intellij",
+                    teamIdentifier: nil
+                ),
+                homeDirectory: fixture.home
+            )
+            .filter { $0.ruleID == "vendor.jetbrains.shared-data.v1" }
+        XCTAssertEqual(intellijCommercial.count, 3)
+        XCTAssertTrue(intellijCommercial.allSatisfy {
             $0.confidence == .medium
                 && $0.ownership == .shared
                 && $0.disposition == .inspectOnly

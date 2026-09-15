@@ -192,6 +192,28 @@ final class SpotlightApplicationCandidateDiscoveryTests: XCTestCase {
         ])
     }
 
+    func testPythonRuntimeNameDoesNotProduceFuzzyQuery() async throws {
+        let home = URL(fileURLWithPath: "/Users/tester")
+        let query = RecordingSpotlightCandidateQuery(results: [:])
+        let application = makeApplication(
+            name: "Python",
+            bundleID: "org.python.python"
+        )
+
+        _ = try await SpotlightApplicationCandidateFinder(
+            query: query
+        ).candidates(
+            for: application,
+            identity: makeIdentity(for: application),
+            homeDirectory: home
+        )
+        let calls = await query.recordedCalls()
+
+        XCTAssertEqual(calls.map(\.query), [
+            .bundleIdentifier("org.python.python")
+        ])
+    }
+
     func testCanDisableFuzzyNameMatching() async throws {
         let home = URL(fileURLWithPath: "/Users/tester")
         let query = RecordingSpotlightCandidateQuery(results: [:])
