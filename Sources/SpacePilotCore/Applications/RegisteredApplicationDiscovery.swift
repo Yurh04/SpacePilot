@@ -30,7 +30,7 @@ struct RegisteredApplicationDiscovery: Sendable {
 
     private func isEligibleApplicationURL(_ url: URL) -> Bool {
         guard url.pathExtension.lowercased() == "app",
-              !isNestedInsideApplicationBundle(url)
+              !isNestedInsideBundleContainer(url)
         else { return false }
 
         let path = url.path
@@ -43,6 +43,10 @@ struct RegisteredApplicationDiscovery: Sendable {
         if path.hasPrefix(homePath + "/Library/Application Support/")
             || path.hasPrefix("/Library/Application Support/") {
             let lowercasedPath = path.lowercased()
+            // `/opt/` 与 `/cellar/` 是 Homebrew 工具链的固定布局目录。应用把
+            // 整套 Homebrew 环境内嵌进自身沙箱时(如 TRAE SOLO CN 的
+            // ModularData/.../tools/opt/python@3.10),其中的 .app 是 formula
+            // 组件(Python、IDLE、Python Launcher 等),不是用户安装的应用。
             let excludedFragments = [
                 "/deriveddata/",
                 "/build/",
@@ -50,7 +54,9 @@ struct RegisteredApplicationDiscovery: Sendable {
                 "/updates/",
                 "/workspacestorage/",
                 "/globalstorage/redhat.java/",
-                "/script editor/templates/"
+                "/script editor/templates/",
+                "/opt/",
+                "/cellar/"
             ]
             guard !excludedFragments.contains(where: lowercasedPath.contains),
                   url.deletingPathExtension().lastPathComponent
@@ -70,9 +76,20 @@ struct RegisteredApplicationDiscovery: Sendable {
             || toolchainRoot.contains("mambaforge")
     }
 
-    private func isNestedInsideApplicationBundle(_ url: URL) -> Bool {
-        url.deletingLastPathComponent().pathComponents.contains {
-            $0.lowercased().hasSuffix(".app")
+    /// macOS bundle 包装容器的扩展名。按 Apple 约定,嵌套在这些容器内部的
+    /// `.app` 必然是该包的内部组件(如框架自带的解释器 stub、Helper),
+    /// 而非独立安装的应用,因此不应进入已安装应用清单。
+    private static let bundleContainerExtensions: Set<String> = [
+        "app", "framework", "xpc", "plugin", "appex", "bundle"
+    ]
+
+    private func isNestedInsideBundleContainer(_ url: URL) -> Bool {
+        url.deletingLastPathComponent().pathComponents.contains { component in
+            guard let dotIndex = component.lastIndex(of: ".") else {
+                return false
+            }
+            let ext = component[component.index(after: dotIndex)...].lowercased()
+            return Self.bundleContainerExtensions.contains(ext)
         }
     }
 
