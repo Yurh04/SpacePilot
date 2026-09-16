@@ -448,7 +448,7 @@ public extension ApplicationAssociationKnowledgeBase {
     /// Built-in version 1 examples. All results are deliberately inspect-only.
     static let builtInV1 = ApplicationAssociationKnowledgeBase(
         schemaVersion: 1,
-        contentVersion: "1.5.0",
+        contentVersion: "1.6.0",
         rules: [
             ApplicationAssociationKnowledgeRule(
                 id: "product.openai.chatgpt-codex.v1",
@@ -656,6 +656,22 @@ public extension ApplicationAssociationKnowledgeBase {
                         risk: .sensitive,
                         confidence: .medium,
                         ownership: .possible
+                    ),
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: "Library/Application Support/Code",
+                        category: .application,
+                        risk: .sensitive,
+                        confidence: .high,
+                        ownership: .owned
+                    ),
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: "Library/Caches/com.microsoft.VSCode",
+                        category: .cache,
+                        risk: .rebuildable,
+                        confidence: .high,
+                        ownership: .owned
                     )
                 ]
             ),
@@ -826,6 +842,7 @@ public extension ApplicationAssociationKnowledgeBase {
                 id: "vendor.jetbrains.shared-data.v1",
                 match: ApplicationAssociationKnowledgeMatch(
                     bundleIdentifiers: [
+                        "com.jetbrains.intellij",
                         "com.jetbrains.intellij.ce",
                         "com.jetbrains.pycharm.ce"
                     ]

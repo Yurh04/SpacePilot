@@ -165,7 +165,7 @@ public struct SpotlightApplicationCandidateFinder: Sendable {
     private static let maximumApplicationGroups = 16
     private static let ambiguousApplicationNames: Set<String> = [
         "code", "finder", "mail", "music", "notes", "photos", "preview",
-        "xcode"
+        "python", "xcode"
     ]
 
     private let query: any SpotlightApplicationCandidateQuerying
