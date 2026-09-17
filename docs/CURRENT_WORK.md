@@ -1,26 +1,30 @@
 # 当前工作与交接
 
-最后更新：2026-09-16
+最后更新：2026-09-17
 
 ## 仓库检查点
 
 - 当前分支为 `main`，跟踪 `origin/main`。
-- 当前 `main` 已合入 PR #1（`8d7f2d0`）的 Python 关联误判修复与 IntelliJ/VS Code 关联规则。
+- 当前 `main` 已合入 PR #2（`98ca88f`）的内嵌工具链 `.app` 排除修复。
 - 当前预览版本：0.1.3。
 - 开始工作前仍必须运行 `git status --short --branch` 检查实时状态，不能只依赖本文档。
 
 ## 本轮完成
+
+- 收敛应用发现层对沙箱环境的处理：`RegisteredApplicationDiscovery` 新增 UUID 目录组件判定，Application Support 下路径若含 UUID 形态（8-4-4-4-12 十六进制）的祖先目录，判定为应用生成的临时/隔离运行环境并排除；语义化版本号与 `current` 命名的稳定安装布局不受影响。此规则用结构信号泛化覆盖各类 UUID 沙箱，替代逐个补字符串片段。
+- 修复上一轮记录的 DoubaoWork 沙箱环境 `RPADevLocal.app`（`sandbox_envs_dir/envs/<uuid>/override_dlcs/`）被误列为已安装应用的问题。
+- 真机验证：重新扫描后 RPADevLocal 从应用清单消失，三个合法 Application Support 应用（Claude Code `.../2.1.260/`、GoogleUpdater `.../152.0.7933.0/`、JetBrains Toolbox Daemon `.../current/`）保留；应用清单从 36 项降为 35 项。
+- 新增 `RegisteredApplicationDiscoveryTests` 的 UUID 沙箱排除定向测试，同时断言版本号/current 布局不被误伤。
+- 2026-09-17 验证：`swift test` 557 项通过；4 项 `SafeCLIVersionProbeTests` 失败为本机全局安装 `codex` npm 包干扰 fnm 隔离测试所致，与本改动无关，`main` 干净树同样失败。
+
+## 上一轮完成
 
 - 修复应用发现层把其他应用内嵌工具链里的 `.app` 误当作已安装应用的问题：`RegisteredApplicationDiscovery` 新增两类排除——嵌套在 `.framework`/`.xpc`/`.plugin`/`.appex`/`.bundle` 等 macOS bundle 容器内的 `.app`（如 Python.framework 自带的 Python.app），以及位于 Homebrew 工具链 `/opt/`、`/cellar/` 布局下的 `.app`（如内嵌 Homebrew 环境里的 IDLE、Python Launcher）。
 - 真机验证：重新扫描后 TRAE SOLO CN 内嵌 Python 工具链的三个幻影应用（Python、IDLE、Python Launcher）全部从应用清单消失，`org.python.python` 等 owner 及其误归因记录清零；应用清单从 37 项降为 36 项。
 - 新增 `RegisteredApplicationDiscoveryTests` 的 bundle 容器嵌套与 Homebrew 工具链两项定向测试。
 - 2026-09-16 验证：`swift test` 557 项通过；4 项 `SafeCLIVersionProbeTests` 失败为本机全局安装 `codex` npm 包干扰 fnm 隔离测试所致，与本改动无关，`main` 干净树同样失败。
 
-### 待跟进（本轮终检新发现，未处理）
-
-- `RegisteredApplicationDiscovery` 仍会把 DoubaoWork 沙箱环境目录里的 `.app` 当作已安装应用，实例：`Library/Application Support/DoubaoWork/Default/sandbox_envs_dir/envs/<uuid>/override_dlcs/RPADevLocal.app`（bundle id `com.bytedance.rpa-dev-local.signing`）。属于同类误判但触发路径不同（沙箱环境标记，非 Homebrew 布局）。根本问题是 Application Support 下的 `.app` 发现规则偏宽松，建议后续统一收敛而非逐个补片段。
-
-## 上一轮完成
+## 更早完成
 
 - 修复应用深度关联结果被后台“开发与 AI”增量刷新覆盖的问题：非应用范围刷新会按应用路径、Bundle ID、版本和包大小保留最新已保存的关联项与索引项目，不再把 Chrome 等应用退回基础解析器的少量旧数据。
 - 应用详情分析与自动刷新改为串行协调；分析期间到达的刷新请求会排队，若用户分析时已有后台旧刷新在运行，则取消旧任务并在分析保存后重跑，避免旧快照后写覆盖新快照。

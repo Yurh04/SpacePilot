@@ -59,6 +59,7 @@ struct RegisteredApplicationDiscovery: Sendable {
                 "/cellar/"
             ]
             guard !excludedFragments.contains(where: lowercasedPath.contains),
+                  !containsSandboxEnvironmentComponent(url),
                   url.deletingPathExtension().lastPathComponent
                     .localizedCaseInsensitiveCompare("Uninstall") != .orderedSame
             else { return false }
@@ -91,6 +92,35 @@ struct RegisteredApplicationDiscovery: Sendable {
             let ext = component[component.index(after: dotIndex)...].lowercased()
             return Self.bundleContainerExtensions.contains(ext)
         }
+    }
+
+    /// 判断祖先路径中是否存在 UUID 形态的目录组件。应用为每个隔离运行环境
+    /// 生成 UUID 命名的目录(如 DoubaoWork 的
+    /// `sandbox_envs_dir/envs/<uuid>/`),其中的 `.app` 是临时沙箱环境内的
+    /// 组件,而非用户安装的应用。稳定安装布局使用语义化版本号
+    /// (如 `2.1.260`、`current`),不会命中此规则。
+    private func containsSandboxEnvironmentComponent(_ url: URL) -> Bool {
+        url.deletingLastPathComponent().pathComponents.contains {
+            Self.isUUIDComponent($0)
+        }
+    }
+
+    /// 校验字符串是否为标准 UUID 形态(8-4-4-4-12 十六进制,连字符分隔)。
+    private static func isUUIDComponent(_ component: String) -> Bool {
+        let groupLengths = [8, 4, 4, 4, 12]
+        let groups = component.split(
+            separator: "-",
+            omittingEmptySubsequences: false
+        )
+        guard groups.count == groupLengths.count else { return false }
+        for (group, expectedLength) in zip(groups, groupLengths) {
+            guard group.count == expectedLength,
+                  group.allSatisfy(\.isHexDigit)
+            else {
+                return false
+            }
+        }
+        return true
     }
 
     private static func spotlightApplicationURLs() -> [URL] {
