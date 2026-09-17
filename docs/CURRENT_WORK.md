@@ -5,11 +5,22 @@
 ## 仓库检查点
 
 - 当前分支为 `main`，跟踪 `origin/main`。
-- 当前 `main` 已合入 PR #2（`98ca88f`）的内嵌工具链 `.app` 排除修复。
+- 当前 `main` 已合入 PR #3（`4feda1a`）的 UUID 沙箱环境 `.app` 排除修复。
 - 当前预览版本：0.1.3。
 - 开始工作前仍必须运行 `git status --short --branch` 检查实时状态，不能只依赖本文档。
 
 ## 本轮完成
+
+- 补充应用关联知识库规则(`contentVersion` 升至 1.8.0,规则数 18 → 20),覆盖此前仅靠低置信度名称匹配归因的两个字节系大体积应用:
+  - `product.bytedance.trae-solo-data.v1`:TRAE SOLO CN(`cn.trae.solo.app` + team `CG2SCM6AV5`),覆盖 `Library/Application Support/TRAE SOLO CN`(约 3.6GB,含内嵌工具链 ModularData)与 `Library/Caches/TRAE SOLO CN`。
+  - `product.bytedance.doubaowork-data.v1`:DoubaoWork(`com.work.pc.doubao` + team `96L78H6LMH`),覆盖 `Library/Application Support/DoubaoWork` 与 `Library/Caches/DoubaoWork`。
+- 两条规则均用 bundle id + team id 双重匹配防同名冒充;DoubaoWork 与 Doubao 共享 team id,测试断言两条规则严格互斥。
+- 真机验证:点开应用详情触发深度分析后,TRAE SOLO CN 与 DoubaoWork 的主数据目录归因从 `vendorAndNameMatch`(confidence 60)提升为 `knownRule`(confidence 90, ownership owned)。
+- Doubao 个人版、VS Code、Claude、Claude Code 已有规则,本轮未改动(避免重复实现)。
+- 架构确认:知识库规则仅在 `ApplicationDetailAnalyzer.analyze()`(用户点开应用详情)时执行,全量重新扫描走标准解析器、不触发知识库规则。故新规则需点开对应应用详情才在归因中体现,这是既有的性能权衡而非缺陷。
+- 2026-09-17 验证:`swift test` 560 项通过;4 项 `SafeCLIVersionProbeTests` 失败为本机全局安装 `codex` npm 包干扰 fnm 隔离测试所致,与本改动无关,`main` 干净树同样失败。
+
+## 上一轮完成
 
 - 收敛应用发现层对沙箱环境的处理：`RegisteredApplicationDiscovery` 新增 UUID 目录组件判定，Application Support 下路径若含 UUID 形态（8-4-4-4-12 十六进制）的祖先目录，判定为应用生成的临时/隔离运行环境并排除；语义化版本号与 `current` 命名的稳定安装布局不受影响。此规则用结构信号泛化覆盖各类 UUID 沙箱，替代逐个补字符串片段。
 - 修复上一轮记录的 DoubaoWork 沙箱环境 `RPADevLocal.app`（`sandbox_envs_dir/envs/<uuid>/override_dlcs/`）被误列为已安装应用的问题。
@@ -17,7 +28,7 @@
 - 新增 `RegisteredApplicationDiscoveryTests` 的 UUID 沙箱排除定向测试，同时断言版本号/current 布局不被误伤。
 - 2026-09-17 验证：`swift test` 557 项通过；4 项 `SafeCLIVersionProbeTests` 失败为本机全局安装 `codex` npm 包干扰 fnm 隔离测试所致，与本改动无关，`main` 干净树同样失败。
 
-## 上一轮完成
+## 更早完成
 
 - 修复应用发现层把其他应用内嵌工具链里的 `.app` 误当作已安装应用的问题：`RegisteredApplicationDiscovery` 新增两类排除——嵌套在 `.framework`/`.xpc`/`.plugin`/`.appex`/`.bundle` 等 macOS bundle 容器内的 `.app`（如 Python.framework 自带的 Python.app），以及位于 Homebrew 工具链 `/opt/`、`/cellar/` 布局下的 `.app`（如内嵌 Homebrew 环境里的 IDLE、Python Launcher）。
 - 真机验证：重新扫描后 TRAE SOLO CN 内嵌 Python 工具链的三个幻影应用（Python、IDLE、Python Launcher）全部从应用清单消失，`org.python.python` 等 owner 及其误归因记录清零；应用清单从 37 项降为 36 项。

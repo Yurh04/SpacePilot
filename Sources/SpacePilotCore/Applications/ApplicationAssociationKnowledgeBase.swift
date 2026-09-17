@@ -448,7 +448,7 @@ public extension ApplicationAssociationKnowledgeBase {
     /// Built-in version 1 examples. All results are deliberately inspect-only.
     static let builtInV1 = ApplicationAssociationKnowledgeBase(
         schemaVersion: 1,
-        contentVersion: "1.6.0",
+        contentVersion: "1.8.0",
         rules: [
             ApplicationAssociationKnowledgeRule(
                 id: "product.openai.chatgpt-codex.v1",
@@ -492,6 +492,64 @@ public extension ApplicationAssociationKnowledgeBase {
                     ApplicationAssociationPathRule(
                         scope: .homeDirectory,
                         template: "Library/Caches/Doubao",
+                        category: .cache,
+                        risk: .rebuildable,
+                        confidence: .high,
+                        ownership: .owned
+                    )
+                ]
+            ),
+            // TRAE SOLO CN 的主数据目录使用应用显示名而非 bundle id 命名,
+            // 标准解析器的 exactBundleIdentifier 匹配覆盖不到,需精确规则补齐。
+            // 用 bundle id + team id 双重匹配防止同名冒充。ModularData 内嵌的
+            // 工具链体积占主(约 3.1GB),确属该应用的私有运行数据。
+            ApplicationAssociationKnowledgeRule(
+                id: "product.bytedance.trae-solo-data.v1",
+                match: ApplicationAssociationKnowledgeMatch(
+                    bundleIdentifiers: ["cn.trae.solo.app"],
+                    teamIdentifiers: ["CG2SCM6AV5"]
+                ),
+                paths: [
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: "Library/Application Support/TRAE SOLO CN",
+                        category: .application,
+                        risk: .sensitive,
+                        confidence: .high,
+                        ownership: .owned
+                    ),
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: "Library/Caches/TRAE SOLO CN",
+                        category: .cache,
+                        risk: .rebuildable,
+                        confidence: .high,
+                        ownership: .owned
+                    )
+                ]
+            ),
+            // DoubaoWork 的主数据目录同样使用应用显示名而非 bundle id 命名。
+            // Default 子目录含沙箱 UUID 环境(已由发现层 PR #3 的 UUID 检测排除,
+            // 不会被误列为独立应用),但仍属该应用真实用户数据。与 Doubao 共享
+            // 同一 team id,用 bundle id 精确区分两个产品。
+            ApplicationAssociationKnowledgeRule(
+                id: "product.bytedance.doubaowork-data.v1",
+                match: ApplicationAssociationKnowledgeMatch(
+                    bundleIdentifiers: ["com.work.pc.doubao"],
+                    teamIdentifiers: ["96L78H6LMH"]
+                ),
+                paths: [
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: "Library/Application Support/DoubaoWork",
+                        category: .application,
+                        risk: .sensitive,
+                        confidence: .high,
+                        ownership: .owned
+                    ),
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: "Library/Caches/DoubaoWork",
                         category: .cache,
                         risk: .rebuildable,
                         confidence: .high,
