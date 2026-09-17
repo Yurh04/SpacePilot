@@ -76,4 +76,29 @@ final class RegisteredApplicationDiscoveryTests: XCTestCase {
             "/Users/example/Library/Application Support/RealApp.app"
         ])
     }
+
+    func testRejectsAppsInsideUUIDSandboxEnvironmentsButKeepsVersionedInstalls() {
+        let home = URL(fileURLWithPath: "/Users/example", isDirectory: true)
+        // 含 UUID 目录组件的路径是应用为隔离运行环境生成的临时沙箱,其中的
+        // .app 不是用户安装的应用;而用语义化版本号/current 命名的更新器与
+        // 守护进程属于稳定安装布局,必须保留。
+        let candidates = [
+            "/Users/example/Library/Application Support/DoubaoWork/Default/sandbox_envs_dir/envs/68e290cf-3672-4618-89ce-436ffdb72438/override_dlcs/RPADevLocal.app",
+            "/Users/example/Library/Application Support/Claude-3p/claude-code/2.1.260/claude.app",
+            "/Users/example/Library/Application Support/Google/GoogleUpdater/152.0.7933.0/GoogleUpdater.app",
+            "/Users/example/Library/Application Support/JetBrains/Daemon/bundles/current/jetbrainsd.app"
+        ].map { URL(fileURLWithPath: $0) }
+        let discovery = RegisteredApplicationDiscovery(
+            homeDirectory: home,
+            query: { candidates }
+        )
+
+        let result = Set(discovery.applicationURLs().map(\.path))
+
+        XCTAssertEqual(result, [
+            "/Users/example/Library/Application Support/Claude-3p/claude-code/2.1.260/claude.app",
+            "/Users/example/Library/Application Support/Google/GoogleUpdater/152.0.7933.0/GoogleUpdater.app",
+            "/Users/example/Library/Application Support/JetBrains/Daemon/bundles/current/jetbrainsd.app"
+        ])
+    }
 }
