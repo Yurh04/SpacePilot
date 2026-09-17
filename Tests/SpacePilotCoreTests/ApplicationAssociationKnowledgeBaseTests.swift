@@ -11,8 +11,8 @@ final class ApplicationAssociationKnowledgeBaseTests: XCTestCase {
 
         XCTAssertEqual(decoded, original)
         XCTAssertEqual(decoded.schemaVersion, 1)
-        XCTAssertEqual(decoded.contentVersion, "1.6.0")
-        XCTAssertEqual(decoded.rules.count, 18)
+        XCTAssertEqual(decoded.contentVersion, "1.8.0")
+        XCTAssertEqual(decoded.rules.count, 20)
     }
 
     func testMatchesExactBundleAndTeamIdentifiers() throws {
@@ -568,6 +568,132 @@ final class ApplicationAssociationKnowledgeBaseTests: XCTestCase {
             )
         XCTAssertFalse(wrongTeam.contains {
             $0.ruleID == "product.bytedance.doubao-data.v1"
+        })
+    }
+
+    func testBuiltInTraeSoloCNRuleMatchesOnlyExactMainBundleIdentifier() throws {
+        let fixture = try Fixture()
+        let trae = try ApplicationAssociationKnowledgeBase.builtInV1
+            .candidates(
+                for: fixture.context(
+                    bundleIdentifier: "cn.trae.solo.app",
+                    teamIdentifier: "CG2SCM6AV5"
+                ),
+                homeDirectory: fixture.home
+            )
+            .filter { $0.ruleID == "product.bytedance.trae-solo-data.v1" }
+
+        XCTAssertEqual(
+            Set(trae.map(\.url.path)),
+            [
+                fixture.home.appending(
+                    path: "Library/Application Support/TRAE SOLO CN"
+                ).path,
+                fixture.home.appending(path: "Library/Caches/TRAE SOLO CN").path
+            ]
+        )
+        XCTAssertEqual(trae.count, 2)
+        XCTAssertTrue(trae.allSatisfy {
+            $0.confidence == .high
+                && $0.ownership == .owned
+                && $0.disposition == .inspectOnly
+        })
+        XCTAssertEqual(
+            trae.first {
+                $0.url.path.hasSuffix("Library/Application Support/TRAE SOLO CN")
+            }?.risk,
+            .sensitive
+        )
+        XCTAssertEqual(
+            trae.first {
+                $0.url.path.hasSuffix("Library/Caches/TRAE SOLO CN")
+            }?.risk,
+            .rebuildable
+        )
+
+        // bundle id 相似但不完全匹配的应用不应命中此规则
+        let lookalike = try ApplicationAssociationKnowledgeBase.builtInV1
+            .candidates(
+                for: fixture.context(
+                    bundleIdentifier: "cn.trae.solo.app.helper",
+                    teamIdentifier: "CG2SCM6AV5"
+                ),
+                homeDirectory: fixture.home
+            )
+        XCTAssertFalse(lookalike.contains {
+            $0.ruleID == "product.bytedance.trae-solo-data.v1"
+        })
+
+        // team id 不匹配的同名应用不应命中(防冒充)
+        let wrongTeam = try ApplicationAssociationKnowledgeBase.builtInV1
+            .candidates(
+                for: fixture.context(
+                    bundleIdentifier: "cn.trae.solo.app",
+                    teamIdentifier: "FAKETEAM"
+                ),
+                homeDirectory: fixture.home
+            )
+        XCTAssertFalse(wrongTeam.contains {
+            $0.ruleID == "product.bytedance.trae-solo-data.v1"
+        })
+    }
+
+    func testBuiltInDoubaoWorkRuleIsolatesFromDoubaoDespiteSharedTeam() throws {
+        let fixture = try Fixture()
+        let doubaoWork = try ApplicationAssociationKnowledgeBase.builtInV1
+            .candidates(
+                for: fixture.context(
+                    bundleIdentifier: "com.work.pc.doubao",
+                    teamIdentifier: "96L78H6LMH"
+                ),
+                homeDirectory: fixture.home
+            )
+            .filter { $0.ruleID == "product.bytedance.doubaowork-data.v1" }
+
+        XCTAssertEqual(
+            Set(doubaoWork.map(\.url.path)),
+            [
+                fixture.home.appending(
+                    path: "Library/Application Support/DoubaoWork"
+                ).path,
+                fixture.home.appending(path: "Library/Caches/DoubaoWork").path
+            ]
+        )
+        XCTAssertEqual(doubaoWork.count, 2)
+        XCTAssertTrue(doubaoWork.allSatisfy {
+            $0.confidence == .high
+                && $0.ownership == .owned
+                && $0.disposition == .inspectOnly
+        })
+
+        // DoubaoWork 与 Doubao 共享 team id 96L78H6LMH,但 bundle id 不同,
+        // 两条规则必须严格互斥,不能因 team 相同而互相命中。
+        XCTAssertFalse(doubaoWork.contains {
+            $0.ruleID == "product.bytedance.doubao-data.v1"
+        })
+        let doubao = try ApplicationAssociationKnowledgeBase.builtInV1
+            .candidates(
+                for: fixture.context(
+                    bundleIdentifier: "com.bot.pc.doubao",
+                    teamIdentifier: "96L78H6LMH"
+                ),
+                homeDirectory: fixture.home
+            )
+        XCTAssertFalse(doubao.contains {
+            $0.ruleID == "product.bytedance.doubaowork-data.v1"
+        })
+
+        // team id 不匹配的同名应用不应命中(防冒充)
+        let wrongTeam = try ApplicationAssociationKnowledgeBase.builtInV1
+            .candidates(
+                for: fixture.context(
+                    bundleIdentifier: "com.work.pc.doubao",
+                    teamIdentifier: "FAKETEAM"
+                ),
+                homeDirectory: fixture.home
+            )
+        XCTAssertFalse(wrongTeam.contains {
+            $0.ruleID == "product.bytedance.doubaowork-data.v1"
         })
     }
 
