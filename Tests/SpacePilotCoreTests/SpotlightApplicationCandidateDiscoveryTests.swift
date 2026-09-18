@@ -234,6 +234,39 @@ final class SpotlightApplicationCandidateDiscoveryTests: XCTestCase {
         ])
     }
 
+    func testRejectsCrossApplicationNameFragmentMismatches() async throws {
+        let home = URL(fileURLWithPath: "/Users/tester")
+        // 真实场景:Stats 应用(eu.exelban.Stats)用 nameFragment 模糊匹配时,
+        // Spotlight 子串匹配把其他应用目录下的 pstats.py / _stats 文件也
+        // 返回了,因为文件名含 "stats"。这些文件实际属于 Doubao / TRAE 等
+        // 应用的沙箱目录,不应归给 Stats。
+        let legitPath = home.appending(path: "Library/Application Support/Stats")
+        let foreignFile1 = home.appending(
+            path: "Library/Application Support/Doubao/sandbox_runtime/bases/9867/pstats.py"
+        )
+        let foreignFile2 = home.appending(
+            path: "Library/Application Support/TRAE SOLO CN/ModularData/tools/lib/python3.10/_stats"
+        )
+        let query = StubSpotlightCandidateQuery(results: [
+            .nameFragment("Stats"): [legitPath, foreignFile1, foreignFile2]
+        ])
+        let application = makeApplication(name: "Stats", bundleID: "eu.exelban.Stats")
+
+        let candidates = try await SpotlightApplicationCandidateFinder(
+            query: query
+        ).candidates(
+            for: application,
+            identity: makeIdentity(for: application),
+            homeDirectory: home
+        )
+
+        // 只保留合法路径(一级组件是 Stats),拒绝跨应用误匹配(一级组件是
+        // Doubao / TRAE SOLO CN,仅因深处文件名含 stats 子串而被误匹配)
+        XCTAssertEqual(candidates.count, 1)
+        XCTAssertEqual(candidates.first?.url, legitPath)
+        XCTAssertEqual(candidates.first?.reason, .applicationName("Stats"))
+    }
+
     private func makeApplication(
         name: String,
         bundleID: String?
