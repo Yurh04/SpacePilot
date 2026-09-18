@@ -215,6 +215,11 @@ public struct SpotlightApplicationCandidateFinder: Sendable {
                       !Self.isNestedInsideUnrelatedBundleDirectory(
                           safeURL,
                           trustedNamespaces: trustedNamespaces
+                      ),
+                      Self.isTrustworthyNameFragmentLocation(
+                          safeURL,
+                          reason: lookup.reason,
+                          roots: safeRoots
                       )
                 else {
                     continue
@@ -394,6 +399,43 @@ public struct SpotlightApplicationCandidateFinder: Sendable {
             let namespace = parts.prefix(2).joined(separator: ".")
             return !trustedNamespaces.contains(namespace)
         }
+    }
+
+    /// 低置信度名称片段匹配(如 Spotlight 的 `nameFragment` 查询)会用子串
+    /// 匹配文件名,导致把其他应用目录下碰巧含该名称的文件误归因(如 Stats 应用
+    /// 匹配到 Doubao 沙箱里的 pstats.py)。本守卫拒绝不可信的匹配:只有当
+    /// artifact 根目录正下方的一级组件本身包含应用名时,才认为该名称匹配可信。
+    /// 例:Stats 应用下的 `Application Support/Stats` 可信,但
+    /// `Application Support/Doubao/.../pstats.py` 不可信(一级组件是
+    /// Doubao,与 Stats 无关,仅因深处文件名含 stats 子串而被误匹配)。
+    /// 对于非名称匹配的候选(如 bundle id 匹配),直接返回 true 不限制。
+    private static func isTrustworthyNameFragmentLocation(
+        _ url: URL,
+        reason: SpotlightApplicationCandidateReason,
+        roots: [URL]
+    ) -> Bool {
+        guard case let .applicationName(name) = reason else {
+            // 非名称匹配(bundle id/app group)不做此限制,直接放行
+            return true
+        }
+        // 找出 url 所属的最深(最具体)的 artifact 根目录
+        let matchedRoot = roots
+            .filter { url == $0 || isStrictDescendant(url, of: $0) }
+            .max { $0.pathComponents.count < $1.pathComponents.count }
+        guard let root = matchedRoot else { return false }
+
+        let rootDepth = root.pathComponents.count
+        let urlComponents = url.pathComponents
+        guard urlComponents.count > rootDepth else {
+            // url 正好是根目录本身(不太可能,但保险起见放行)
+            return true
+        }
+        // 取根目录下的一级组件(如 Application Support 下的 Doubao / Stats)
+        let topLevelComponent = urlComponents[rootDepth]
+        let normalizedName = name.lowercased()
+        let normalizedComponent = topLevelComponent.lowercased()
+        // 只有一级组件本身包含应用名才可信(Stats 在 Stats/,不在 Doubao/)
+        return normalizedComponent.contains(normalizedName)
     }
 
     private static func isStrictDescendant(_ candidate: URL, of root: URL) -> Bool {
