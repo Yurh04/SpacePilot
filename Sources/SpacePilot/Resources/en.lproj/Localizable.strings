@@ -351,3 +351,7 @@
 "ai.update.summary.unknown" = "Unknown";
 "ai.update.summary.unsupported" = "Unsupported";
 "ai.update.summary.up-to-date" = "Up to date";
+"ai.agents.collapse" = "Collapse AI Agents";
+"ai.agents.expand" = "Expand AI Agents";
+"ai.update.select-hint" = "Select one or more rows first";
+"ai.update.open-app" = "Open app to update…";

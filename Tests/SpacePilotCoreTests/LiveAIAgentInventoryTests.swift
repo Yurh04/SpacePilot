@@ -29,7 +29,7 @@ final class LiveAIAgentInventoryTests: XCTestCase {
         for agent in agents.localAgents {
             let snapshot = try XCTUnwrap(storage[agent.id])
             print("LIVE-STORAGE \(agent.id): \(snapshot.items.count) rows, \(snapshot.items.reduce(0) { $0 + $1.allocatedSize }) bytes, \(snapshot.coverageFailures.count) failures")
-            if agent.id == "codex" {
+            if agent.contains(definitionID: "codex") {
                 for name in ["sessions", "logs_2.sqlite", "thread_history_1.sqlite", "history.jsonl", "computer-use", "cache"] {
                     guard FileManager.default.fileExists(atPath: home.appending(path: ".codex/\(name)").path) else { continue }
                     let row = try XCTUnwrap(snapshot.items.first { $0.url.lastPathComponent == name })
@@ -43,10 +43,10 @@ final class LiveAIAgentInventoryTests: XCTestCase {
         let pluginResult = try await PluginScanner(skillScanner: SkillScanner()).scan(
             roots: PluginRoot.production(homeDirectory: home, discoveredRoots: discovered.roots)
         )
-        if let codex = agents.localAgents.first(where: { $0.id == "codex" }) {
+        if let codex = agents.localAgents.first(where: { $0.contains(definitionID: "codex") }) {
             let detail = AIAgentDetailProjection(
                 agent: codex, skills: standalone + pluginResult.skills, plugins: pluginResult.plugins,
-                storageSnapshot: storage["codex"]
+                storageSnapshot: storage[codex.id]
             )
             let provided = detail.skills.filter { $0.parentPluginID != nil }
             print("LIVE-CODEX-SKILLS \(detail.skills.count) skills, \(provided.count) plugin-provided")

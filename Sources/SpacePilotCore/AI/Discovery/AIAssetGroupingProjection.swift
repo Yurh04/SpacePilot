@@ -100,6 +100,8 @@ public struct GroupedSkillsProjection: Sendable {
         groups: [AIAssetGroup]
     ) -> String? {
         if let current, groups.contains(where: { $0.id == current }) { return current }
+        if current == "tool:codex" || previous == "tool:codex",
+           groups.contains(where: { $0.id == "tool:chatgpt" }) { return "tool:chatgpt" }
         if let previous, let nearest = groups.first(where: { $0.id == previous }) {
             return nearest.id
         }
@@ -121,9 +123,9 @@ public struct GroupedSkillsProjection: Sendable {
             // the skill in that project, otherwise it is bundled.
             switch pluginScope.locationScope {
             case .project(let project):
-                return (.tool(definitionID: definitionID), .project(project))
+                return (OwnerKey(owner: .tool(definitionID: definitionID)), .project(project))
             default:
-                return (.tool(definitionID: definitionID), .bundled)
+                return (OwnerKey(owner: .tool(definitionID: definitionID)), .bundled)
             }
         }
         return (OwnerKey(owner: skill.owner), scopeDetail(for: skill.locationScope))
@@ -266,7 +268,7 @@ private enum OwnerKey: Hashable {
         case .shared:
             self = .shared
         case .tool(let definitionID):
-            self = .tool(definitionID: definitionID)
+            self = .tool(definitionID: AIAgentFamily.canonicalID(definitionID))
         case .plugin, .unknown:
             self = .unknown
         }
@@ -302,13 +304,13 @@ private enum OwnerKey: Hashable {
     ) -> [Self] {
         var keySet = Set(keys)
         for toolID in discoveredToolIDs {
-            keySet.insert(.tool(definitionID: toolID))
+            keySet.insert(OwnerKey(owner: .tool(definitionID: toolID)))
         }
         var ordered: [Self] = []
         if keySet.contains(.shared) { ordered.append(.shared) }
         for definition in definitions {
-            let key = Self.tool(definitionID: definition.id)
-            if keySet.contains(key) { ordered.append(key) }
+            let key = OwnerKey(owner: .tool(definitionID: definition.id))
+            if keySet.contains(key), !ordered.contains(key) { ordered.append(key) }
         }
         let known = Set(ordered)
         let remainingTools = keySet
@@ -333,7 +335,7 @@ private enum OwnerKey: Hashable {
     func title(definitionNames: [String: String]) -> String {
         switch self {
         case .shared: "Shared"
-        case .tool(let definitionID): definitionNames[definitionID] ?? definitionID
+        case .tool(let definitionID): definitionID == "chatgpt" ? "ChatGPT" : definitionNames[definitionID] ?? definitionID
         case .unknown: "Unknown"
         }
     }

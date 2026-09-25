@@ -77,6 +77,28 @@ final class AIAgentStorageScannerTests: XCTestCase {
         XCTAssertEqual(snapshot.items.reduce(0) { $0 + $1.allocatedSize }, 108)
     }
 
+    func testMergedChatGPTFamilyScansBothRootsAndSharedRootOnlyOnce() throws {
+        let records = [
+            AIToolRecord(id: "chatgpt", kind: .application, displayName: "ChatGPT",
+                         owner: .tool(definitionID: "chatgpt"), evidence: AIToolEvidence(
+                            applicationURL: URL(fileURLWithPath: "/Applications/ChatGPT.app"),
+                            dataRoots: [URL(fileURLWithPath: "/fixture/chatgpt"), URL(fileURLWithPath: "/fixture/.codex")])),
+            AIToolRecord(id: "codex", kind: .cli, displayName: "Codex",
+                         owner: .tool(definitionID: "codex"), evidence: AIToolEvidence(
+                            executableURL: URL(fileURLWithPath: "/usr/local/bin/codex"),
+                            dataRoots: [URL(fileURLWithPath: "/fixture/.codex"), URL(fileURLWithPath: "/fixture/.codex/sessions")]))
+        ]
+        let agents = AIAgentProjection(records: records).localAgents
+        let snapshots = try AIAgentStorageScanner(access: MetadataAccess(files: [
+            "/fixture/chatgpt/cache/item": 20,
+            "/fixture/.codex/sessions/one": 100
+        ])).scan(agents: agents)
+        XCTAssertEqual(Set(snapshots.keys), ["chatgpt"])
+        let snapshot = try XCTUnwrap(snapshots["chatgpt"])
+        XCTAssertEqual(snapshot.items.reduce(0) { $0 + $1.allocatedSize }, 120)
+        XCTAssertEqual(snapshot.items.count, 2)
+    }
+
     func testEveryAgentUsesSameScannerAndPermissionFailureIsNotZeroSize() throws {
         let files: [String: Int64] = [
             "/fixture/.pi/agent/sessions/one": 99,

@@ -10,13 +10,14 @@ import SwiftUI
 ///
 /// The internal layout uses `HSplitView` + a section `List` rather than a
 /// nested split container to avoid a second sidebar-collapse/toolbar behavior
-/// and to keep the narrowest-window width small (section ~140 + AI apps ~180 +
-/// detail ~420).
+/// and to keep the narrowest-window width small (section ~200 + asset groups ~180 +
+/// detail ~400).
 struct DeveloperAIView: View {
     @Bindable var model: AppModel
     let projection: DeveloperAIProjection?
     let hasSnapshot: Bool
     @State private var sidebarRow: DeveloperAISidebarRow = .overview
+    @State private var agentsExpanded = true
     // Per-page selection is owned by this persistent shell (not the switched-in
     // subviews) so switching sections never resets a page's selection when
     // SwiftUI destroys/recreates the conditional child subtree.
@@ -97,7 +98,11 @@ struct DeveloperAIView: View {
         if let projection {
             HSplitView {
                 sidebar(projection)
-                    .frame(minWidth: 170, idealWidth: 195, maxWidth: 230)
+                    .frame(
+                        minWidth: AIWorkspaceLayout.sidebarMinimum,
+                        idealWidth: AIWorkspaceLayout.sidebarIdeal,
+                        maxWidth: AIWorkspaceLayout.sidebarMaximum
+                    )
                 rowContent(projection)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -147,27 +152,48 @@ struct DeveloperAIView: View {
             Label(DeveloperAISidebarRow.overview.title,
                   systemImage: DeveloperAISidebarRow.overview.systemImage)
                 .badge(duplicateCount > 0 ? duplicateCount : 0)
+                .padding(.vertical, 7)
                 .tag(DeveloperAISidebarRow.overview)
 
             if !allAgents.isEmpty {
-                sidebarHeader(L10n.text(.aiSectionApps))
-                ForEach(allAgents) { agent in
-                    Label {
-                        Text(agent.displayName)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                    } icon: {
-                        // The real application icon, so the row is recognisable
-                        // at a glance rather than a generic glyph.
-                        AgentIcon(descriptor: agent.icon, size: 16)
+                Button {
+                    agentsExpanded.toggle()
+                } label: {
+                    HStack {
+                        Text(L10n.text(.aiSectionApps))
+                        Spacer()
+                        Text(allAgents.count.formatted()).monospacedDigit()
+                        Image(systemName: agentsExpanded ? "chevron.down" : "chevron.right")
                     }
-                    .tag(DeveloperAISidebarRow.agent(id: agent.id))
-                    .contextMenu {
-                        // Reveal uses the Agent's own evidence: the installed
-                        // application bundle when there is one, otherwise the
-                        // controlled CLI executable.
-                        if let url = agent.applicationURL ?? agent.executableURL {
-                            Button(L10n.text(.revealFinder)) { FinderReveal.reveal(url) }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(L10n.text(agentsExpanded ? .aiAgentsCollapse : .aiAgentsExpand))
+                .accessibilityLabel(L10n.text(agentsExpanded ? .aiAgentsCollapse : .aiAgentsExpand))
+                .selectionDisabled()
+                if agentsExpanded {
+                    ForEach(allAgents) { agent in
+                        Label {
+                            Text(agent.displayName)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                        } icon: {
+                            // The real application icon, so the row is recognisable
+                            // at a glance rather than a generic glyph.
+                            AgentIcon(descriptor: agent.icon, size: 28)
+                        }
+                        .padding(.vertical, 5)
+                        .help(agent.displayName)
+                        .tag(DeveloperAISidebarRow.agent(id: agent.id))
+                        .contextMenu {
+                            // Reveal uses the Agent's own evidence: the installed
+                            // application bundle when there is one, otherwise the
+                            // controlled CLI executable.
+                            if let url = agent.applicationURL ?? agent.executableURL {
+                                Button(L10n.text(.revealFinder)) { FinderReveal.reveal(url) }
+                            }
                         }
                     }
                 }
@@ -175,11 +201,18 @@ struct DeveloperAIView: View {
 
             sidebarHeader(L10n.text(.aiGroupCapabilities))
             ForEach(DeveloperAISidebarRow.capabilityRows) { row in
-                Label(row.title, systemImage: row.systemImage)
-                    .badge(capabilityCount(row, projection: projection))
-                    .tag(row)
+                Label {
+                    Text(row.title)
+                } icon: {
+                    AIWorkspaceIcon(systemImage: row.systemImage, size: 28)
+                }
+                .padding(.vertical, 5)
+                .badge(capabilityCount(row, projection: projection))
+                .tag(row)
             }
         }
+        .listStyle(.sidebar)
+        .environment(\.defaultMinListRowHeight, 42)
     }
 
     /// Count shown beside a capability row, mirroring what the row's page lists so
@@ -205,7 +238,8 @@ struct DeveloperAIView: View {
         Text(text)
             .font(.caption.weight(.semibold))
             .foregroundStyle(.secondary)
-            .padding(.top, 6)
+            .padding(.top, 14)
+            .padding(.bottom, 4)
             // Headers are labels, not destinations: excluding them from
             // selection keeps arrow-key navigation on real rows only.
             .selectionDisabled()
@@ -234,7 +268,13 @@ struct DeveloperAIView: View {
             OtherAIToolsView(
                 tools: otherTools,
                 agents: allAgents,
-                searchText: model.searchText
+                searchText: model.searchText,
+                updateAssets: model.aiUpdateAssets,
+                updateResults: model.aiUpdateResults,
+                isCheckingUpdates: model.isCheckingAIUpdates,
+                onCheckSelectedUpdates: model.checkAIUpdatesForSelection,
+                onUpdateSelected: model.prepareAIUpdateExecution,
+                onCancelUpdateCheck: model.cancelAIUpdateCheck
             )
         }
     }
@@ -254,15 +294,19 @@ struct DeveloperAIView: View {
                         ? agentStorageSizesByCategory[id] ?? [:] : [:],
                     storageSnapshot: model.aiAgentStorage[id]
                 ),
-                mcpServers: model.aiCapabilities.mcpServers.filter { $0.ownerDefinitionID == id },
-                hooks: model.aiCapabilities.hooks.filter { $0.ownerDefinitionID == id },
+                mcpServers: model.aiCapabilities.mcpServers.filter { agent.contains(definitionID: $0.ownerDefinitionID) },
+                hooks: model.aiCapabilities.hooks.filter { agent.contains(definitionID: $0.ownerDefinitionID) },
                 instructionFiles: model.aiCapabilities.instructionFiles
-                    .filter { $0.ownerDefinitionID == id },
-                configProfile: model.aiCapabilities.configProfiles.first { $0.ownerDefinitionID == id },
+                    .filter { agent.contains(definitionID: $0.ownerDefinitionID) },
+                configProfile: model.aiCapabilities.configProfiles.first { agent.contains(definitionID: $0.ownerDefinitionID) },
                 revealURL: agent.applicationURL ?? agent.executableURL,
                 formFactorLabels: formFactorLabels(agent.formFactors),
                 isDiscovering: model.isDiscoveringAITools,
-                cliUpdateAssets: model.aiUpdateAssets.filter { $0.key.kind == .cli && $0.definitionID == id },
+                cliUpdateAssets: model.aiUpdateAssets.filter {
+                    [.cli, .application].contains($0.key.kind) && agent.contains(definitionID: $0.definitionID)
+                        && ($0.key.kind == .cli || !["claude", "chatgpt"].contains(agent.id))
+                },
+                additionalConfigProfiles: Array(model.aiCapabilities.configProfiles.filter { agent.contains(definitionID: $0.ownerDefinitionID) }.dropFirst()),
                 updateResults: model.aiUpdateResults,
                 isCheckingUpdates: model.isCheckingAIUpdates,
                 isExecutingUpdates: model.isExecutingAIUpdates,
@@ -297,13 +341,7 @@ struct DeveloperAIView: View {
     }
 
     private var otherTools: [OtherAIToolRecord] {
-        OtherAIToolProjection.tools(
-            hooks: model.aiCapabilities.hooks,
-            mcpServers: model.aiCapabilities.mcpServers,
-            reclassifiedCLIs: cliClassification.otherTools,
-            pipxTools: model.pipxAITools,
-            configManagers: model.configManagerTools
-        )
+        model.otherAITools
     }
 
     @ViewBuilder
@@ -312,11 +350,10 @@ struct DeveloperAIView: View {
             skills: projection.allSkills + model.projectAIAssetSkills
         )
         AIManagementOverviewView(
+            agents: allAgents,
+            onSelectAgent: { sidebarRow = .agent(id: $0) },
             managementProjection: model.aiManagementProjection,
-            appCount: AIApplicationJoin.applicationCount(
-                deepApplications: projection.applications.map(\.application),
-                registryApplications: model.aiManagementProjection.applications
-            ),
+            appCount: allAgents.count,
             cliCount: cliClassification.commandLineTools.count,
             globalSkillCount: projection.allSkills.count,
             globalPluginCount: projection.allPlugins.count,
@@ -344,7 +381,11 @@ struct DeveloperAIView: View {
         GlobalSkillsView(
             skills: projection.allSkills + model.projectAIAssetSkills,
             plugins: projection.allPlugins + model.projectAIAssetPlugins,
-            discoveredToolIDs: model.aiManagementProjection.discoveredToolDefinitionIDs,
+            // Skills are a per-Agent capability, so the sidebar seeds a group only
+            // for discovered *Agents* — a CLI tool or other AI tool never gets a
+            // skills entry.
+            discoveredToolIDs: model.aiManagementProjection.discoveredToolDefinitionIDs
+                .intersection(KnownAIToolDefinitions.agentDefinitionIDs),
             approvedProjectRoots: model.approvedProjectRoots,
             approvedProjectRootIssues: model.approvedProjectRootIssues,
             projectScanIssues: model.projectAIAssetScanIssues,
@@ -360,7 +401,8 @@ struct DeveloperAIView: View {
             onUpdateSelected: model.prepareAIUpdateExecution,
             onCancelUpdateCheck: model.cancelAIUpdateCheck,
             selectedGroupID: $selectedSkillGroupID,
-            selection: $selectedSkillID
+            selection: $selectedSkillID,
+            agents: allAgents
         )
     }
 
@@ -384,7 +426,8 @@ struct DeveloperAIView: View {
             onUpdateSelected: model.prepareAIUpdateExecution,
             onCancelUpdateCheck: model.cancelAIUpdateCheck,
             selectedGroupID: $selectedPluginGroupID,
-            selection: $selectedPluginID
+            selection: $selectedPluginID,
+            agents: allAgents
         )
     }
 

@@ -26,10 +26,20 @@ struct MCPServersView: View {
     /// Resolves an owner definition ID to the Agent's display name, falling back
     /// to the raw ID so an unmapped owner is still identifiable rather than blank.
     private func displayName(forAgent id: String) -> String {
-        agents.first { $0.id == id }?.displayName ?? id
+        agents.first { $0.contains(definitionID: id) }?.displayName ?? id
     }
 
     var body: some View {
+        VStack(spacing: 0) {
+            AIWorkspaceHeader(title: L10n.text(.aiSectionMCP), systemImage: "network", count: servers.count)
+            Divider()
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
         if servers.isEmpty {
             ContentUnavailableView(
                 L10n.text(.aiMCPEmpty),
@@ -41,44 +51,69 @@ struct MCPServersView: View {
                 systemImage: "magnifyingglass"
             )
         } else {
-            Table(filtered, selection: $selection) {
-                TableColumn(L10n.text(.name)) { server in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(server.name)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                        Text(server.sourceURL.path)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
+            GeometryReader { geometry in
+                if PluginTableLayoutMode(availableWidth: geometry.size.width) == .compact {
+                    compactTable
+                } else {
+                    regularTable
+                }
+            }
+        }
+    }
+
+    private var regularTable: some View {
+        Table(filtered, selection: $selection) {
+            TableColumn(L10n.text(.name)) { server in
+                AIAssetIdentity(name: server.name, subtitle: server.sourceURL.path,
+                                systemImage: "network", tint: .teal)
+            }
+            TableColumn(L10n.text(.aiMCPUsedBy)) { server in
+                HStack(spacing: 8) {
+                        if let agent = agents.first(where: { $0.contains(definitionID: server.ownerDefinitionID) }) {
+                        AgentIcon(descriptor: agent.icon, size: 20)
                     }
-                }
-                TableColumn(L10n.text(.aiMCPUsedBy)) { server in
                     Text(displayName(forAgent: server.ownerDefinitionID))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+                        .lineLimit(1).truncationMode(.tail)
                 }
-                .width(min: 90, ideal: 120, max: 170)
-                TableColumn(L10n.text(.aiMCPTransport)) { server in
-                    Text(server.transport == .unknown ? "—" : server.transport.rawValue)
-                        .foregroundStyle(server.transport == .unknown ? .secondary : .primary)
-                        .lineLimit(1)
-                }
-                .width(min: 64, ideal: 78, max: 96)
-                TableColumn(L10n.text(.aiMCPState)) { server in
-                    Text(server.isEnabled
-                         ? L10n.text(.aiMCPEnabled)
-                         : L10n.text(.aiMCPDisabled))
+            }
+            .width(min: 90, ideal: 120, max: 170)
+            TableColumn(L10n.text(.aiMCPTransport)) { server in
+                Text(server.transport == .unknown ? "—" : server.transport.rawValue)
+                    .foregroundStyle(server.transport == .unknown ? .secondary : .primary)
+                    .lineLimit(1)
+            }
+            .width(min: 64, ideal: 78, max: 96)
+            TableColumn(L10n.text(.aiMCPState)) { server in
+                Text(server.isEnabled
+                     ? L10n.text(.aiMCPEnabled)
+                     : L10n.text(.aiMCPDisabled))
+                    .foregroundStyle(server.isEnabled ? .primary : .secondary)
+                    .lineLimit(1)
+            }
+            .width(min: 56, ideal: 70, max: 88)
+        }
+        .nativeTableDoubleClickReveal { row in
+            guard filtered.indices.contains(row) else { return nil }
+            return filtered[row].sourceURL
+        }
+    }
+
+    private var compactTable: some View {
+        Table(filtered, selection: $selection) {
+            TableColumn(L10n.text(.name)) { server in
+                AIAssetIdentity(name: server.name,
+                                subtitle: "\(displayName(forAgent: server.ownerDefinitionID)) · \(server.sourceURL.path)",
+                                systemImage: "network", tint: .teal)
+            }
+            TableColumn(L10n.text(.aiMCPState)) { server in
+                Text(server.isEnabled ? L10n.text(.aiMCPEnabled) : L10n.text(.aiMCPDisabled))
                         .foregroundStyle(server.isEnabled ? .primary : .secondary)
-                        .lineLimit(1)
-                }
-                .width(min: 56, ideal: 70, max: 88)
             }
-            .nativeTableDoubleClickReveal { row in
-                guard filtered.indices.contains(row) else { return nil }
-                return filtered[row].sourceURL
-            }
+            .width(min: 72, ideal: 100, max: 130)
+        }
+        .nativeTableDoubleClickReveal { row in
+            guard filtered.indices.contains(row) else { return nil }
+            return filtered[row].sourceURL
         }
     }
 }

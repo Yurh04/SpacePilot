@@ -2,6 +2,24 @@ import Foundation
 import XCTest
 
 final class DeveloperAIArchitectureTests: XCTestCase {
+    func testAgentCollapseIconsCompactSizeAndUpdateSelectionWiring() throws {
+        let shell = try source(at: "Sources/SpacePilot/Views/DeveloperAI/DeveloperAIView.swift")
+        XCTAssertTrue(shell.contains("if agentsExpanded"))
+        XCTAssertTrue(shell.contains("agentsExpanded.toggle()"))
+        for file in ["GlobalSkillsView", "GlobalPluginsView"] {
+            let view = try source(at: "Sources/SpacePilot/Views/DeveloperAI/\(file).swift")
+            XCTAssertTrue(view.contains("agents: agents"))
+            XCTAssertFalse(view.contains("Set(selectionPlan.checkableKeys)"))
+        }
+        let skills = try source(at: "Sources/SpacePilot/Views/DeveloperAI/GlobalSkillsView.swift")
+        let compact = skills.components(separatedBy: "private var compactTable")[1].components(separatedBy: "private var regularTable")[0]
+        XCTAssertTrue(compact.contains("ByteCount.string($0.allocatedSize)"))
+        let cli = try source(at: "Sources/SpacePilot/Views/DeveloperAI/CLIToolsView.swift")
+        XCTAssertFalse(cli.contains("Set(selectionPlan.checkableKeys)"))
+        let other = try source(at: "Sources/SpacePilot/Views/DeveloperAI/OtherAIToolsView.swift")
+        XCTAssertTrue(other.contains("AIUpdateActionBar("))
+        XCTAssertTrue(other.contains("AIUpdateIdentity.other"))
+    }
     func testDeveloperAIViewUsesStableSectionListNotSegmentedPicker() throws {
         let source = try source(at: "Sources/SpacePilot/Views/DeveloperAI/DeveloperAIView.swift")
 

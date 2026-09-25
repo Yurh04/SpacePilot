@@ -44,6 +44,14 @@ public enum KnownAIToolDefinitions {
         AIAgentProfile(locality: .remote, formFactors: formFactors, fallbackSymbolName: symbol)
     }
 
+    /// The definition IDs that are AI Agents (carry an `agentProfile`). Skills
+    /// are a per-Agent capability, so the Skills sidebar seeds a group only for
+    /// these — a CLI tool or other AI tool never gets a skills entry, even when
+    /// discovered. Derived from the catalog so it stays correct as tools change.
+    public static let agentDefinitionIDs: Set<String> = Set(
+        all.filter { $0.agentProfile != nil }.map(\.id)
+    )
+
     public static let all: [AIToolDefinition] = [
         AIToolDefinition(
             id: "codex",

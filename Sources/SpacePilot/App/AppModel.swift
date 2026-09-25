@@ -48,6 +48,14 @@ final class AppModel {
     /// Configuration-manager tools (for example CC Switch), evidenced by their
     /// config directory existing on disk. Surfaced under "Other AI tools".
     var configManagerTools: [ConfigManagerScanner.Tool] = []
+    var otherAITools: [OtherAIToolRecord] {
+        let supporting = AIAgentCache.shared.projection(for: aiManagementProjection.records).cliTools
+        return OtherAIToolProjection.tools(
+            hooks: aiCapabilities.hooks, mcpServers: aiCapabilities.mcpServers,
+            reclassifiedCLIs: SupportingCLIClassifier.classify(cliRecords: supporting, mcpServers: aiCapabilities.mcpServers).otherTools,
+            pipxTools: pipxAITools, configManagers: configManagerTools
+        )
+    }
     var aiAgentStorage: [String: AIAgentStorageSnapshot] = [:]
     var isDiscoveringAITools = false
     /// A read-only error surface for AI discovery. Deliberately separate from
@@ -87,7 +95,8 @@ final class AppModel {
             snapshot: latestSnapshot,
             managementProjection: aiManagementProjection,
             projectSkills: projectAIAssetSkills,
-            projectPlugins: projectAIAssetPlugins
+            projectPlugins: projectAIAssetPlugins,
+            otherTools: otherAITools
         )
     }
 
@@ -246,7 +255,8 @@ final class AppModel {
             managementProjection: AIManagementProjection(records: records),
             projectSkills: input.projectSkills,
             projectPlugins: input.projectPlugins,
-            packageFacts: packageFacts
+            packageFacts: packageFacts,
+            otherTools: input.otherTools
         )
         // When the user checks a specific multi-selection, only request the
         // selected supported keys; unsupported keys never produce a request.
@@ -1190,6 +1200,7 @@ final class AppModel {
             projectSkills: projectAIAssetSkills,
             projectPlugins: projectAIAssetPlugins,
             homeDirectory: homeDirectory,
+            otherTools: otherAITools,
             selectedKeys: selectedKeys
         )
         let fingerprint = AIUpdateCheckFingerprint(input: input)
@@ -1321,6 +1332,7 @@ final class AppModel {
             projectSkills: projectAIAssetSkills,
             projectPlugins: projectAIAssetPlugins,
             homeDirectory: homeDirectory,
+            otherTools: otherAITools,
             selectedKeys: selectedKeys
         )
     }
@@ -1497,6 +1509,7 @@ struct AIUpdateCheckInput: Sendable {
     let projectSkills: [SkillRecord]
     let projectPlugins: [PluginRecord]
     let homeDirectory: URL
+    var otherTools: [OtherAIToolRecord] = []
     /// When non-nil, only these stable asset keys are checked (a user's
     /// multi-selection). Nil means the Overview "check all" behavior.
     var selectedKeys: Set<AIUpdateAssetKey>? = nil
@@ -1508,6 +1521,7 @@ private struct AIUpdateCheckFingerprint: Equatable, Sendable {
     init(input: AIUpdateCheckInput) {
         var values: [String] = []
         values.append("home:\(input.homeDirectory.standardizedFileURL.path)")
+        values.append(contentsOf: input.otherTools.map { "other:\($0.id):\($0.cliUpdateKey?.canonicalLocation ?? "")" })
         if let snapshot = input.snapshot {
             values.append("snapshot:\(snapshot.id.uuidString)")
             values.append(contentsOf: snapshot.applications.map {

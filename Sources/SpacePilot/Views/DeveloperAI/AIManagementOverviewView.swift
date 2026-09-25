@@ -6,10 +6,10 @@ import SwiftUI
 /// discovery progress and any discovery error, but never reuses or overwrites
 /// the main scan error surface.
 struct AIManagementOverviewView: View {
+    let agents: [AIAgentEntry]
+    let onSelectAgent: (String) -> Void
     let managementProjection: AIManagementProjection
-    /// The union count of deep + registry-only AI applications, so a deep
-    /// application is never shown as 0 while registry discovery is in flight and
-    /// a tool present in both sources is not double counted.
+    /// Same family-merged Agent count as the sidebar and cards, including CLI-only Agents.
     let appCount: Int
     /// The count of CLI tools shown in the CLI Tools list. Passed in (rather than
     /// read from `managementProjection.clis`) so the overview total matches the
@@ -69,137 +69,153 @@ struct AIManagementOverviewView: View {
     }
 
     var body: some View {
-        List {
-            if isDiscovering {
-                Section {
-                    HStack(spacing: 10) {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text(L10n.text(.aiOverviewDiscovering))
-                            .foregroundStyle(.secondary)
-                    }
+        ScrollView {
+            VStack(alignment: .leading, spacing: AIWorkspaceLayout.sectionSpacing) {
+                AIWorkspaceHeader(
+                    title: L10n.developerAI(),
+                    systemImage: "sparkles.rectangle.stack",
+                    subtitle: L10n.text(.aiNoContentIndexed),
+                    contentPadding: 0
+                )
+                .padding(.bottom, 4)
+
+                if isDiscovering {
+                    AIDiscoveryBanner(text: L10n.text(.aiOverviewDiscovering),
+                                      systemImage: "arrow.triangle.2.circlepath", isError: false)
                 }
-            }
-            if let discoveryError {
-                Section {
-                    Label(discoveryError, systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.secondary)
-                        .lineLimit(3)
-                } header: {
-                    Text(L10n.text(.aiOverviewDiscoveryIssue))
+                if let discoveryError {
+                    AIDiscoveryBanner(text: discoveryError,
+                                      systemImage: "exclamationmark.triangle", isError: true)
                 }
-            }
-            Section {
-                HStack {
-                    Button(L10n.text(.aiUpdateCheckNow)) { onCheckUpdates() }
-                        .disabled(isCheckingUpdates)
-                    if isCheckingUpdates {
-                        Button(L10n.text(.aiUpdateCancel)) { onCancelUpdateCheck() }
-                    }
+
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 135), spacing: 8)], spacing: 8) {
+                    AIMetricTile(title: L10n.text(.aiOverviewApps), value: appCount.formatted(),
+                                 systemImage: "square.grid.2x2.fill")
+                    AIMetricTile(title: L10n.skills(), value: globalSkillCount.formatted(),
+                                 systemImage: "sparkles", tint: .purple)
+                    AIMetricTile(title: L10n.plugins(), value: globalPluginCount.formatted(),
+                                 systemImage: "puzzlepiece.extension.fill", tint: .orange)
+                    AIMetricTile(title: L10n.text(.aiOverviewCLIs), value: cliCount.formatted(),
+                                 systemImage: "terminal.fill", tint: .teal)
                 }
-                if isCheckingUpdates {
-                    Label(L10n.text(.aiUpdateStatusChecking), systemImage: "arrow.triangle.2.circlepath")
-                        .foregroundStyle(.secondary)
-                }
-                if let updateError {
-                    Label(updateError, systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                }
-                LabeledContent(
-                    L10n.text(.aiUpdateSummaryAvailable),
-                    value: updateSummary.updateAvailableCount.formatted()
-                )
-                LabeledContent(
-                    L10n.text(.aiUpdateSummaryUpToDate),
-                    value: updateSummary.upToDateCount.formatted()
-                )
-                LabeledContent(
-                    L10n.text(.aiUpdateSummaryUnknown),
-                    value: updateSummary.unknownCount.formatted()
-                )
-                LabeledContent(
-                    L10n.text(.aiUpdateSummaryFailed),
-                    value: updateSummary.failedCount.formatted()
-                )
-                LabeledContent(
-                    L10n.text(.aiUpdateSummaryUnsupported),
-                    value: updateSummary.unsupportedCount.formatted()
-                )
-            } header: {
-                Text(L10n.text(.aiUpdateSection))
-            } footer: {
-                Text(L10n.text(.aiUpdateReadOnlyFooter))
-            }
-            Section {
-                LabeledContent(
-                    L10n.text(.aiOverviewApps),
-                    value: appCount.formatted()
-                )
-                LabeledContent(
-                    L10n.text(.aiOverviewCLIs),
-                    value: cliCount.formatted()
-                )
-                LabeledContent(
-                    L10n.skills(),
-                    value: globalSkillCount.formatted()
-                )
-                LabeledContent(
-                    L10n.plugins(),
-                    value: globalPluginCount.formatted()
-                )
-                LabeledContent(
-                    L10n.text(.aiSectionMCP),
-                    value: mcpCount.formatted()
-                )
-                LabeledContent(
-                    L10n.text(.aiAgentHooks),
-                    value: hookCount.formatted()
-                )
-                LabeledContent(
-                    L10n.text(.aiOverviewPartialCoverage),
-                    value: partialCoverageCount.formatted()
-                )
-            }
-            if !healthFindings.isEmpty {
-                Section {
-                    ForEach(healthFindings) { finding in
-                        LabeledContent {
-                            Text(healthValue(finding))
-                                .foregroundStyle(finding.severity == .warning ? .orange : .secondary)
-                                .lineLimit(2)
-                                .truncationMode(.middle)
-                        } label: {
-                            Text(healthLabel(finding.kind))
+
+                if !agents.isEmpty {
+                    AIWorkspaceCard(title: L10n.text(.aiSectionApps), systemImage: "square.grid.2x2") {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 8)], spacing: 8) {
+                            ForEach(agents) { agent in
+                                Button { onSelectAgent(agent.id) } label: {
+                                    HStack(spacing: 8) {
+                                        AgentIcon(descriptor: agent.icon, size: 28)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(agent.displayName)
+                                                .fontWeight(.medium).lineLimit(1).truncationMode(.tail)
+                                            Text(agent.locality == .local
+                                                 ? L10n.text(.aiAgentsLocal) : L10n.text(.aiAgentsRemote))
+                                                .font(.caption).foregroundStyle(.secondary)
+                                        }
+                                        Spacer(minLength: 0)
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption).foregroundStyle(.tertiary)
+                                    }
+                                    .padding(8)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(.background.secondary, in: RoundedRectangle(cornerRadius: 10))
+                                    .contentShape(RoundedRectangle(cornerRadius: 10))
+                                }
+                                .buttonStyle(.plain)
+                                .help(agent.displayName)
+                            }
                         }
                     }
-                } header: {
-                    Text(L10n.text(.aiHealthSection))
                 }
-            }
-            if duplication.duplicatedEntityCount > 0 {
-                Section {
-                    // Reports the *reclaimable* size (all copies but one), not
-                    // the combined size of every copy: keeping one copy is
-                    // always required, so the combined figure would overstate
-                    // what can actually be freed.
-                    LabeledContent(
-                        L10n.text(.aiDuplicateStorage),
-                        value: L10n.duplicateSummary(
+
+                AIWorkspaceCard(title: L10n.text(.aiGroupCapabilities), systemImage: "square.stack.3d.up") {
+                    HStack(spacing: 24) {
+                        Label("\(L10n.text(.aiSectionMCP)) · \(mcpCount)", systemImage: "network")
+                        Label("\(L10n.text(.aiAgentHooks)) · \(hookCount)", systemImage: "point.3.connected.trianglepath.dotted")
+                    }
+                    .foregroundStyle(.secondary)
+                    LabeledContent(L10n.text(.aiOverviewPartialCoverage), value: partialCoverageCount.formatted())
+                }
+
+                updateCard
+
+                if !healthFindings.isEmpty {
+                    AIWorkspaceCard(title: L10n.text(.aiHealthSection), systemImage: "heart.text.clipboard", tint: .orange) {
+                        ForEach(healthFindings) { finding in
+                            HStack(alignment: .top, spacing: 12) {
+                                AIWorkspaceIcon(
+                                    systemImage: finding.severity == .warning ? "exclamationmark.triangle" : "info.circle",
+                                    tint: finding.severity == .warning ? .orange : .blue, size: 30
+                                )
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(healthLabel(finding.kind)).fontWeight(.medium)
+                                    Text(healthValue(finding))
+                                        .font(.callout).foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                        }
+                    }
+                }
+                if duplication.duplicatedEntityCount > 0 {
+                    AIWorkspaceCard(title: L10n.text(.aiDuplicateStorage), systemImage: "square.on.square", tint: .purple) {
+                        Text(L10n.duplicateSummary(
                             entities: duplication.duplicatedEntityCount,
                             reclaimable: ByteCount.string(duplication.totalReclaimable)
-                        )
-                    )
-                    ForEach(duplication.groups.prefix(5)) { group in
-                        LabeledContent(group.name) {
-                            Text(verbatim: L10n.duplicateCopies(group.copyCount))
-                                .foregroundStyle(.secondary)
+                        ))
+                        .foregroundStyle(.secondary)
+                        ForEach(duplication.groups.prefix(5)) { group in
+                            HStack(spacing: 12) {
+                                AIWorkspaceIcon(systemImage: "folder.fill", size: 28)
+                                Text(group.name).lineLimit(1).truncationMode(.middle)
+                                Spacer(minLength: 8)
+                                Text(verbatim: L10n.duplicateCopies(group.copyCount))
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
-                } header: {
-                    Text(L10n.text(.aiDuplicateStorage))
                 }
             }
+            .padding(AIWorkspaceLayout.pagePadding)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .background(.background.secondary)
+    }
+
+    private var updateCard: some View {
+        AIWorkspaceCard(title: L10n.text(.aiUpdateSection), systemImage: "arrow.triangle.2.circlepath", tint: .teal) {
+            HStack(spacing: 12) {
+                Button(action: onCheckUpdates) {
+                    Label(L10n.text(.aiUpdateCheckNow), systemImage: "arrow.clockwise")
+                }
+                .disabled(isCheckingUpdates)
+                if isCheckingUpdates {
+                    ProgressView().controlSize(.small)
+                    Text(L10n.text(.aiUpdateStatusChecking)).foregroundStyle(.secondary)
+                    Button(L10n.text(.aiUpdateCancel), action: onCancelUpdateCheck)
+                }
+            }
+            if let updateError {
+                Label(updateError, systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+            }
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 16)], alignment: .leading, spacing: 16) {
+                updateMetric(L10n.text(.aiUpdateSummaryAvailable), count: updateSummary.updateAvailableCount, color: .blue)
+                updateMetric(L10n.text(.aiUpdateSummaryUpToDate), count: updateSummary.upToDateCount, color: .green)
+                updateMetric(L10n.text(.aiUpdateSummaryUnknown), count: updateSummary.unknownCount, color: .secondary)
+                updateMetric(L10n.text(.aiUpdateSummaryFailed), count: updateSummary.failedCount, color: .orange)
+                updateMetric(L10n.text(.aiUpdateSummaryUnsupported), count: updateSummary.unsupportedCount, color: .secondary)
+            }
+            Text(L10n.text(.aiUpdateReadOnlyFooter)).font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    private func updateMetric(_ title: String, count: Int, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(count.formatted()).font(.title2.weight(.semibold)).monospacedDigit().foregroundStyle(color)
+            Text(title).font(.caption).foregroundStyle(.secondary)
+        }
+        .accessibilityElement(children: .combine)
     }
 }

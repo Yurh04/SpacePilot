@@ -72,7 +72,11 @@ public enum OtherAIToolProjection {
         // represented as a hook provider or MCP server above is not duplicated.
         let existingNames = Set(tools.map { $0.name.lowercased() })
         for record in reclassifiedCLIs.sorted(by: { $0.displayName.lowercased() < $1.displayName.lowercased() }) {
-            guard !existingNames.contains(record.displayName.lowercased()) else { continue }
+            if existingNames.contains(record.displayName.lowercased()),
+               let index = tools.firstIndex(where: { $0.name.lowercased() == record.displayName.lowercased() }) {
+                tools[index].cliUpdateKey = AIUpdateIdentity.cli(record)
+                continue
+            }
             let url = record.evidence.executableURL ?? URL(fileURLWithPath: "/")
             let isMCP = SupportingCLIClassifier.isInherentMCPServer(record)
             tools.append(OtherAIToolRecord(
@@ -82,7 +86,8 @@ public enum OtherAIToolProjection {
                 affectedAgentIDs: [],
                 url: url,
                 allocatedSize: 0,
-                interceptedEventCount: 0
+                interceptedEventCount: 0,
+                cliUpdateKey: AIUpdateIdentity.cli(record)
             ))
         }
 

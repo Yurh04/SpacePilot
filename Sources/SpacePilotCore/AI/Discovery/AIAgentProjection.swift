@@ -1,7 +1,14 @@
 import Foundation
 
+/// Presentation identity only; discovery owners and update keys stay intact.
+public enum AIAgentFamily {
+    public static func canonicalID(_ definitionID: String) -> String {
+        definitionID == "codex" ? "chatgpt" : definitionID
+    }
+}
+
 /// A single AI Agent, unified from every piece of evidence that shares one
-/// stable `definitionID`. An Agent is NOT an app-vs-CLI product: an application
+/// stable `definitionID`, then folded by explicit product family. An Agent is NOT an app-vs-CLI product: an application
 /// bundle and a CLI executable for the same definition collapse into one Agent
 /// with multiple `formFactors`.
 ///
@@ -9,8 +16,9 @@ import Foundation
 /// system access, and no process spawning. It is produced by
 /// `AIAgentProjection` from already-discovered `AIToolRecord`s.
 public struct AIAgentEntry: Identifiable, Hashable, Sendable {
-    /// The stable definition ID (for example `"codex"`), used as the identity.
+    /// The stable presentation ID (ChatGPT includes the Codex definition).
     public let id: String
+    public let definitionIDs: Set<String>
     public let displayName: String
     public let locality: AIAgentLocality
     /// The form factors actually evidenced on this machine (a subset of the
@@ -43,9 +51,11 @@ public struct AIAgentEntry: Identifiable, Hashable, Sendable {
         skillRoots: [URL] = [],
         pluginRoots: [URL] = [],
         configDirectories: [URL] = [],
-        coverageFailures: Set<AIToolCoverageFailure> = []
+        coverageFailures: Set<AIToolCoverageFailure> = [],
+        definitionIDs: Set<String>? = nil
     ) {
         self.id = id
+        self.definitionIDs = definitionIDs ?? [id]
         self.displayName = displayName
         self.locality = locality
         self.formFactors = formFactors
@@ -59,6 +69,11 @@ public struct AIAgentEntry: Identifiable, Hashable, Sendable {
         self.pluginRoots = pluginRoots
         self.configDirectories = configDirectories
         self.coverageFailures = coverageFailures
+    }
+
+    public func contains(definitionID: String?) -> Bool {
+        guard let definitionID else { return false }
+        return definitionIDs.contains(definitionID)
     }
 }
 
@@ -121,7 +136,7 @@ public struct AIAgentProjection: Sendable, Equatable {
             if l != r { return l < r }
             return lhs.id < rhs.id
         }
-        self.localAgents = local.sorted(by: order)
+        self.localAgents = Self.mergeProductFamilies(local).sorted(by: order)
         self.remoteAgents = remote.sorted(by: order)
 
         // CLI Tools: only `.cli` records whose owning definition is NOT an
@@ -141,6 +156,33 @@ public struct AIAgentProjection: Sendable, Equatable {
     }
 
     public static let empty = AIAgentProjection(records: [])
+
+    private static func mergeProductFamilies(_ entries: [AIAgentEntry]) -> [AIAgentEntry] {
+        let family = entries.filter { AIAgentFamily.canonicalID($0.id) == "chatgpt" }
+        guard let primary = family.first(where: { $0.id == "chatgpt" }) ?? family.first else { return entries }
+        let desktop = family.first { $0.id == "chatgpt" }
+        let codex = family.first { $0.id == "codex" }
+        func urls(_ values: [URL]) -> [URL] {
+            Array(Set(values.map(\.standardizedFileURL))).sorted { $0.path < $1.path }
+        }
+        let executable = codex?.executableURL ?? desktop?.executableURL
+        let aliases = urls(family.flatMap(\.aliasExecutableURLs) + family.compactMap(\.executableURL))
+            .filter { $0 != executable?.standardizedFileURL }
+        let merged = AIAgentEntry(
+            id: "chatgpt", displayName: "ChatGPT", locality: primary.locality,
+            formFactors: Set(family.flatMap(\.formFactors)), icon: primary.icon,
+            applicationURL: desktop?.applicationURL ?? codex?.applicationURL,
+            executableURL: executable, aliasExecutableURLs: aliases,
+            detectedVersion: codex?.detectedVersion ?? desktop?.detectedVersion,
+            dataRoots: urls(family.flatMap(\.dataRoots)),
+            skillRoots: urls(family.flatMap(\.skillRoots)),
+            pluginRoots: urls(family.flatMap(\.pluginRoots)),
+            configDirectories: urls(family.flatMap(\.configDirectories)),
+            coverageFailures: Set(family.flatMap(\.coverageFailures)),
+            definitionIDs: ["chatgpt", "codex"]
+        )
+        return entries.filter { AIAgentFamily.canonicalID($0.id) != "chatgpt" } + [merged]
+    }
 
     /// Builds one merged Agent entry from all records for a definition. Returns
     /// `nil` when the records carry no qualifying evidence for the Agent's

@@ -26,6 +26,7 @@ public enum AIUpdateAssetBuilder {
         projectSkills: [SkillRecord],
         projectPlugins: [PluginRecord],
         packageFacts: [AIToolPackageInstallFact] = [],
+        otherTools: [OtherAIToolRecord] = [],
         definitions: [AIToolDefinition] = KnownAIToolDefinitions.all
     ) -> AIUpdateAssetInventory {
         let definitionByID = Dictionary(uniqueKeysWithValues: definitions.map { ($0.id, $0) })
@@ -69,24 +70,35 @@ public enum AIUpdateAssetBuilder {
                 displayName: application.name,
                 definitionID: definition?.id,
                 localVersion: VersionEvidenceResolver.resolve(evidence.map { [$0] } ?? []),
-                capability: nil
+                capability: ApplicationUpdateRoute.capability(bundleIdentifier: application.bundleIdentifier)
+            ))
+        }
+
+        for application in managementProjection.applications {
+            guard let url = application.evidence.applicationURL else { continue }
+            let evidence = application.evidence.detectedVersion.map {
+                VersionEvidence(version: $0, source: .applicationBundle, confidence: .high)
+            }
+            append(AIUpdateAsset(
+                key: AIUpdateAssetKey(kind: .application, owner: .unknown, canonicalLocation: canonical(url)),
+                displayName: application.displayName,
+                definitionID: toolDefinitionID(from: application.owner),
+                localVersion: VersionEvidenceResolver.resolve(evidence.map { [$0] } ?? []),
+                capability: ApplicationUpdateRoute.capability(bundleIdentifier: application.evidence.bundleIdentifier)
             ))
         }
 
         for cli in managementProjection.clis {
-            guard let executableURL = cli.evidence.executableURL else { continue }
             let definitionID = toolDefinitionID(from: cli.owner)
             let definition = definitionID.flatMap { definitionByID[$0] }
-            let route = definition.map { CLIUpdateRoute(definition: $0, executableURL: executableURL) }
+            let route = cli.evidence.executableURL.flatMap { url in
+                definition.map { CLIUpdateRoute(definition: $0, executableURL: url) }
+            }
             let evidence = cli.evidence.detectedVersion.map {
                 VersionEvidence(version: $0, source: .cliProbe, confidence: .high)
             }
             let asset = AIUpdateAsset(
-                key: AIUpdateAssetKey(
-                    kind: .cli,
-                    owner: owner(from: cli.owner),
-                    canonicalLocation: canonical(executableURL)
-                ),
+                key: AIUpdateIdentity.cli(cli),
                 displayName: cli.displayName,
                 definitionID: definitionID,
                 localVersion: VersionEvidenceResolver.resolve(evidence.map { [$0] } ?? []),
@@ -114,6 +126,13 @@ public enum AIUpdateAssetBuilder {
                 localVersion: VersionEvidenceResolver.resolve(evidence.map { [$0] } ?? []),
                 capability: definition?.updateCapability
             ), executionDefinitionID: fact.definitionID)
+        }
+
+        for tool in otherTools {
+            let key = AIUpdateIdentity.other(tool, assets: assets)
+            guard !seen.contains(key) else { continue }
+            append(AIUpdateAsset(key: key, displayName: tool.name, definitionID: nil,
+                                 localVersion: .unknown, capability: nil))
         }
 
         for skill in (snapshot?.skills ?? []) + projectSkills {

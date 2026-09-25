@@ -17,39 +17,47 @@ struct AIUpdateActionBar: View {
     let onCancel: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
-            Button(action: onCheckSelected) {
-                Label(L10n.text(.aiUpdateCheckSelected), systemImage: "arrow.triangle.2.circlepath")
-            }
-            // Enabled for ANY visible selection. When nothing is checkable the
-            // action still runs zero network requests but surfaces per-item
-            // "unsupported" reasons rather than leaving the button dead.
-            .disabled(!plan.hasSelection || isChecking)
-
-            Button(action: onUpdateSelected) {
-                Label(L10n.text(.aiUpdateSelected), systemImage: "square.and.arrow.down")
-            }
-            // Enabled for any selection: opens a confirmation sheet that lists
-            // executable vs skipped items. Non-executable items are shown with a
-            // reason inside the sheet; the button itself is never a dead control.
-            .disabled(!plan.hasSelection || isChecking)
-
-            if isChecking {
-                Button(L10n.text(.aiUpdateCancel), action: onCancel)
-                ProgressView().controlSize(.small)
-            }
-
-            Spacer()
-
-            if !plan.selected.isEmpty {
-                Text(summaryText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) { actions }
+            VStack(alignment: .leading, spacing: 10) { actions }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+    }
+
+    @ViewBuilder
+    private var actions: some View {
+        Button(action: onCheckSelected) {
+            Label(L10n.text(.aiUpdateCheckSelected), systemImage: "arrow.triangle.2.circlepath")
+        }
+        // Enabled for ANY visible selection. When nothing is checkable the
+        // action still runs zero network requests but surfaces per-item
+        // "unsupported" reasons rather than leaving the button dead.
+        .disabled(!plan.hasSelection || isChecking)
+
+        Button(action: onUpdateSelected) {
+            Label(L10n.text(.aiUpdateSelected), systemImage: "square.and.arrow.down")
+        }
+        // Enabled for any selection: opens a confirmation sheet that lists
+        // executable vs skipped items. Non-executable items are shown with a
+        // reason inside the sheet; the button itself is never a dead control.
+        .disabled(!plan.hasSelection || isChecking)
+
+        if isChecking {
+            Button(L10n.text(.aiUpdateCancel), action: onCancel)
+            ProgressView().controlSize(.small)
+        }
+
+        if !plan.selected.isEmpty {
+            Text(summaryText)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        } else {
+            Text(L10n.text(.aiUpdateSelectHint))
+                .font(.caption).foregroundStyle(.secondary)
+        }
     }
 
     private var summaryText: String {

@@ -69,10 +69,10 @@ final class ProjectAIAssetScannerTests: XCTestCase {
 
         let grouped = GroupedSkillsProjection(skills: result.skills, plugins: result.plugins)
 
-        // The plugin-provided skill aggregates under the Codex tool owner and
+        // The plugin-provided skill aggregates under the ChatGPT family and
         // keeps its project scope (not the global "bundled" scope).
-        XCTAssertTrue(grouped.groups.contains { $0.kind == .tool(definitionID: "codex") })
-        let codexSkills = grouped.skills(in: "tool:codex")
+        XCTAssertTrue(grouped.groups.contains { $0.kind == .tool(definitionID: "chatgpt") })
+        let codexSkills = grouped.skills(in: "tool:chatgpt")
         XCTAssertEqual(codexSkills.map(\.name), ["child-skill"])
         let childSkill = try XCTUnwrap(codexSkills.first)
         XCTAssertEqual(grouped.scopeDetail(for: childSkill), .project(root.identity))

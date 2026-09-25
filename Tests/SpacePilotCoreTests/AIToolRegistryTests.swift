@@ -448,6 +448,26 @@ final class AIToolRegistryTests: XCTestCase {
         )
     }
 
+    // MARK: - Agent-only skill ownership
+
+    /// Skills are a per-Agent capability. `agentDefinitionIDs` must include AI
+    /// Agents and exclude supporting CLI tools and standalone "other AI tools",
+    /// so the Skills sidebar (seeded from this set) never shows a CLI/other tool.
+    func testAgentDefinitionIDsIncludeAgentsAndExcludeCLIAndOtherTools() {
+        let agentIDs = KnownAIToolDefinitions.agentDefinitionIDs
+        for id in ["codex", "claude", "traex"] {
+            XCTAssertTrue(agentIDs.contains(id), "\(id) should be classified as an Agent")
+        }
+        for id in ["bytedcli", "lark-cli", "agentbuddy", "devspace", "csj-proxy"] {
+            XCTAssertFalse(agentIDs.contains(id), "\(id) is not an Agent and must not seed a skills group")
+        }
+        // The set is exactly the definitions carrying an agent profile.
+        XCTAssertEqual(
+            agentIDs,
+            Set(KnownAIToolDefinitions.all.filter { $0.agentProfile != nil }.map(\.id))
+        )
+    }
+
     func testCLIRecordRetainsDataConfigRootsAndCoverageWithoutDesktopApp() async throws {
         let tree = try TemporaryTree(files: [:])
         try makeExecutable(at: tree.url.appending(path: ".local/bin/aider"))

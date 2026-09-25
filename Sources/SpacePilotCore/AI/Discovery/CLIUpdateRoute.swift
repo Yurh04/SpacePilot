@@ -11,7 +11,9 @@ public struct CLIUpdateRoute: Sendable {
         "codex": "@openai/codex", "claude": "@anthropic-ai/claude-code",
         "gemini-cli": "@google/gemini-cli", "opencode": "opencode-ai",
         "copilot": "@github/copilot", "aiden": "@aiden-cli/core",
-        "relay": "@bytedance-relay/claude-code", "pi": "@earendil-works/pi-coding-agent"
+        "relay": "@bytedance-relay/claude-code", "pi": "@earendil-works/pi-coding-agent",
+        "opencli": "@jackwener/opencli", "botmux": "botmux",
+        "agentbuddy": "agentbuddy", "lark-cli": "@larksuite/cli"
     ]
 
     public init(definition: AIToolDefinition, executableURL: URL) {

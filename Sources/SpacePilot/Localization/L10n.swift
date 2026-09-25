@@ -16,6 +16,10 @@ enum L10n {
         static let aiPrivacy = Self(key: "ai.privacy", english: "Privacy")
         static let aiSearching = Self(key: "ai.searching", english: "Searching…")
         static let aiSection = Self(key: "ai.section", english: "Section")
+        static let aiAgentsCollapse = Self(key: "ai.agents.collapse", english: "Collapse AI Agents")
+        static let aiAgentsExpand = Self(key: "ai.agents.expand", english: "Expand AI Agents")
+        static let aiUpdateSelectHint = Self(key: "ai.update.select-hint", english: "Select one or more rows first")
+        static let aiUpdateOpenApp = Self(key: "ai.update.open-app", english: "Open app to update…")
         static let aiSectionApps = Self(key: "ai.section.apps", english: "AI Agents")
         static let aiSkillsGlobalNote = Self(
             key: "ai.skills.global-note",
@@ -229,6 +233,11 @@ enum L10n {
         static let storageUsed = Self(key: "storage.used", english: "Used")
     }
     static let allKeys: Set<String> = [
+        "ai.agents.collapse",
+        "ai.agents.expand",
+        "ai.update.select-hint",
+        "ai.update.open-app",
+
         "category.ai-data", "category.application", "category.cache", "category.conversation",
         "category.developer", "category.log", "category.model", "category.personal",
         "category.plugin", "category.skill", "category.system", "category.unclassified",

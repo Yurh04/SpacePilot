@@ -206,10 +206,10 @@ public struct AIAgentDetailProjection: Sendable, Equatable {
             plugins.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first }
         )
         let ownedSkills = skills
-            .filter { Self.isOwned(by: agent.id, skill: $0, pluginOwnerByID: pluginOwnerByID) }
+            .filter { skill in agent.definitionIDs.contains { Self.isOwned(by: $0, skill: skill, pluginOwnerByID: pluginOwnerByID) } }
             .sorted(by: Self.skillOrder)
         let ownedPlugins = plugins
-            .filter { Self.isOwned(by: agent.id, owner: $0.owner) }
+            .filter { plugin in agent.definitionIDs.contains { Self.isOwned(by: $0, owner: plugin.owner) } }
             .sorted(by: Self.pluginOrder)
         let sharedSkills = isRemote
             ? []
