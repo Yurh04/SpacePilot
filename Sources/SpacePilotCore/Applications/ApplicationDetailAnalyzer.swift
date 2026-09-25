@@ -2,15 +2,18 @@ import Foundation
 
 public struct ApplicationDetailAnalysis: Sendable {
     public let applicationID: UUID
+    public let applicationLogicalSize: Int64?
     public let items: [ScannedItem]
     public let associations: [ArtifactAssociation]
 
     public init(
         applicationID: UUID,
+        applicationLogicalSize: Int64? = nil,
         items: [ScannedItem],
         associations: [ArtifactAssociation]
     ) {
         self.applicationID = applicationID
+        self.applicationLogicalSize = applicationLogicalSize
         self.items = items
         self.associations = associations
     }
@@ -244,8 +247,10 @@ public struct ApplicationDetailAnalyzer: Sendable {
                 ownership: .shared
             ))
         }
+        let bundleSize = try ApplicationBundleSizeReader.sizes(of: application.url)
         return ApplicationDetailAnalysis(
             applicationID: application.id,
+            applicationLogicalSize: bundleSize.logical,
             items: items,
             associations: associations
         )

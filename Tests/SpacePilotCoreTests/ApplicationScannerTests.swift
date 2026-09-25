@@ -2,6 +2,23 @@ import XCTest
 @testable import SpacePilotCore
 
 final class ApplicationScannerTests: XCTestCase {
+    func testRecordsLogicalSizeIncludingNestedBundlesAndHiddenFiles() async throws {
+        let fixture = try TestAppBuilder.make(
+            name: "SizeFixture", bundleID: "com.example.size-fixture",
+            version: "1", executableBytes: 512
+        )
+        let nested = fixture.appURL.appending(path: "Contents/Frameworks/Nested.bundle")
+        try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
+        try Data(repeating: 7, count: 8192).write(to: nested.appending(path: "payload"))
+        try Data(repeating: 7, count: 123).write(to: fixture.appURL.appending(path: ".hidden"))
+        let infoSize = try Data(contentsOf: fixture.appURL.appending(path: "Contents/Info.plist")).count
+        let records = try await ApplicationScanner().scan(locations: [fixture.appURL.deletingLastPathComponent()])
+        let record = try XCTUnwrap(records.first)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(record)) as? [String: Any])
+        XCTAssertEqual((json["logicalSize"] as? NSNumber)?.int64Value, Int64(512 + 8192 + 123 + infoSize))
+        XCTAssertGreaterThanOrEqual(record.allocatedSize, 8192)
+    }
+
     func testReadsBundleIdentifierVersionAndExecutableSize() async throws {
         let fixture = try TestAppBuilder.make(
             name: "Example",

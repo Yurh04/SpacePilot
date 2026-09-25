@@ -936,6 +936,55 @@ final class ViewProjectionTests: XCTestCase {
         XCTAssertEqual(projection.totalSize(for: smallerID), 200)
     }
 
+    func testApplicationProjectionSeparatesDisplayedTotalFromDiskUsage() throws {
+        let applicationID = UUID()
+        let related = ScannedItem(
+            url: URL(fileURLWithPath: "/tmp/related-data"),
+            logicalSize: 700,
+            allocatedSize: 600,
+            category: .developer,
+            risk: .rebuildable,
+            ownerID: applicationID,
+            explanation: "Fixture"
+        )
+        let application = ApplicationRecord(
+            id: applicationID,
+            name: "Compressed App",
+            bundleIdentifier: "com.example.compressed",
+            version: "1",
+            url: URL(fileURLWithPath: "/Applications/Compressed App.app"),
+            executableURL: nil,
+            allocatedSize: 400,
+            logicalSize: 900,
+            associations: [ArtifactAssociation(
+                itemID: related.id,
+                applicationID: applicationID,
+                evidence: .knownRule,
+                confidence: .high,
+                risk: .rebuildable,
+                ownership: .owned
+            )]
+        )
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: [related],
+            applications: [application],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: .complete
+        )
+
+        let projection = try XCTUnwrap(
+            ApplicationListProjection(snapshot: snapshot, searchText: "")
+                .applications.first
+        )
+
+        XCTAssertEqual(projection.totalSize, 1_500)
+        XCTAssertEqual(projection.totalAllocatedSize, 1_000)
+    }
+
     func testApplicationListProjectionCountsSharedAssociatedAIDataOnce() {
         let applicationID = UUID()
         let aiOwnerID = UUID()

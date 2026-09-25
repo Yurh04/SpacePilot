@@ -156,6 +156,7 @@ enum L10n {
         static let application = Self(key: "app.application", english: "Application")
         static let applicationAnalysisCompleted = Self(key: "app.analysis-completed", english: "Last analyzed")
         static let applicationAnalysisInProgress = Self(key: "app.analysis-in-progress", english: "Analyzing related files…")
+        static let applicationDiskUsage = Self(key: "app.disk-usage", english: "Disk usage")
         static let applicationLastUsed = Self(key: "app.last-used", english: "Last used")
         static let applicationOnlyHighConfidence = Self(key: "app.only-high-confidence", english: "Only high-confidence related files are preselected.")
         static let applicationRelated = Self(key: "app.related", english: "Related")
@@ -164,7 +165,8 @@ enum L10n {
         static let applicationReviewUninstall = Self(key: "app.review-uninstall", english: "Review Uninstall…")
         static let applicationSearch = Self(key: "app.search-applications", english: "Search applications")
         static let applicationSort = Self(key: "app.sort", english: "Sort applications")
-        static let applicationTotalSpace = Self(key: "app.total-space", english: "Total space")
+        static let applicationTotalSpace = Self(key: "app.total-space", english: "Total size")
+        static let applicationBundleSize = Self(key: "app.bundle-size", english: "App size (Finder)")
         static let applicationUninstall = Self(key: "app.uninstall", english: "Uninstall…")
         static let cleanupConfirmSensitive = Self(key: "cleanup.confirm-sensitive", english: "Also move the sensitive conversation, project, or settings data listed above")
         static let cleanupConfirmTrash = Self(key: "cleanup.confirm-trash", english: "I understand these items will be moved to the Trash")
@@ -341,7 +343,7 @@ enum L10n {
         "app.evidence.bundle-id", "app.evidence.container-id", "app.evidence.known-rule",
         "app.evidence.name", "app.evidence.signed-helper", "app.only-high-confidence",
         "app.ownership.owned", "app.ownership.possible", "app.ownership.shared",
-        "app.related", "app.reset", "app.review-reset", "app.review-uninstall",
+        "app.bundle-size", "app.disk-usage", "app.related", "app.reset", "app.review-reset", "app.review-uninstall",
         "app.search-applications", "app.sort", "app.total-space",
         "app.uninstall", "cleanup.clear-selection", "cleanup.confirm-sensitive", "cleanup.confirm-trash",
         "cleanup.history-empty", "cleanup.history-empty-description", "cleanup.move-selected-trash",

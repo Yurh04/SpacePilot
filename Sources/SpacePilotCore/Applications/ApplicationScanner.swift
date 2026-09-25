@@ -1,4 +1,3 @@
-import CoreServices
 import Foundation
 
 public struct ApplicationScanner: Sendable {
@@ -96,13 +95,15 @@ public struct ApplicationScanner: Sendable {
         let executableURL = executableName.map { appURL.appending(path: "Contents/MacOS/\($0)") }
         let lastUsedDate = (try? appURL.resourceValues(forKeys: [.contentAccessDateKey]))?.contentAccessDate
 
+        let sizes = try ApplicationBundleSizeReader.sizes(of: appURL)
         return ApplicationRecord(
             name: name,
             bundleIdentifier: info["CFBundleIdentifier"] as? String,
             version: (info["CFBundleShortVersionString"] as? String) ?? (info["CFBundleVersion"] as? String),
             url: appURL,
             executableURL: executableURL,
-            allocatedSize: allocatedSize(of: appURL),
+            allocatedSize: sizes.allocated,
+            logicalSize: sizes.logical,
             lastUsedDate: lastUsedDate
         )
     }
@@ -121,34 +122,10 @@ public struct ApplicationScanner: Sendable {
             url: record.url,
             executableURL: record.executableURL,
             allocatedSize: record.allocatedSize,
+            logicalSize: record.logicalSize,
             lastUsedDate: lastUsedDate,
             associations: record.associations
         )
     }
 
-    private func allocatedSize(of root: URL) -> Int64 {
-        if let metadataItem = MDItemCreate(
-            kCFAllocatorDefault,
-            root.path as CFString
-        ), let size = MDItemCopyAttribute(
-            metadataItem,
-            "kMDItemPhysicalSize" as CFString
-        ) as? NSNumber, size.int64Value > 0 {
-            return size.int64Value
-        }
-
-        guard let enumerator = FileManager.default.enumerator(
-            at: root,
-            includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .isRegularFileKey],
-            options: [.skipsHiddenFiles, .skipsPackageDescendants]
-        ) else { return 0 }
-
-        var total: Int64 = 0
-        for case let url as URL in enumerator {
-            guard let values = try? url.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .isRegularFileKey]),
-                  values.isRegularFile == true else { continue }
-            total += Int64(values.totalFileAllocatedSize ?? 0)
-        }
-        return total
-    }
 }

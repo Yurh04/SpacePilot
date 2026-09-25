@@ -3,6 +3,67 @@ import XCTest
 @testable import SpacePilotCore
 
 final class ApplicationDetailAnalyzerTests: XCTestCase {
+    func testXcodeDeveloperDataIsIncludedWithoutClaimingSharedSimulatorStorage() async throws {
+        let home = try TemporaryTree(files: [
+            "Library/Developer/Xcode/iOS DeviceSupport/Device/Symbols/data": 101,
+            "Library/Developer/Xcode/DerivedData/Project/Build/App.app/binary": 103,
+            "Library/Developer/Xcode/Archives/Release.xcarchive/data": 107,
+            "Library/Developer/Xcode/UserData/CodeSnippets/snippet": 109,
+            "Library/Developer/CoreSimulator/Devices/data": 211,
+            "Library/Developer/OtherTool/data": 223
+        ])
+        let built = try TestAppBuilder.make(
+            name: "Renamed Xcode", bundleID: "com.apple.dt.Xcode",
+            version: "26.6", executableBytes: 16
+        )
+        let application = ApplicationRecord(
+            name: "Renamed Xcode", bundleIdentifier: "com.apple.dt.Xcode",
+            version: "26.6", url: built.appURL, executableURL: nil,
+            allocatedSize: 16
+        )
+        let identity = ApplicationIdentity(
+            applicationID: application.id, mainBundleIdentifier: "com.apple.dt.Xcode",
+            componentBundleIdentifiers: [], teamIdentifier: "59GAB85EFG",
+            applicationGroups: []
+        )
+        let analyzer = ApplicationDetailAnalyzer(
+            identityReader: FixedApplicationIdentityReader(identity: identity),
+            spotlightFinder: SpotlightApplicationCandidateFinder(
+                query: FixedSpotlightCandidateQuery(urls: [])
+            ),
+            volatileFinder: ApplicationVolatileArtifactFinder(
+                temporaryDirectory: home.url.appending(path: "Temporary/T")
+            )
+        )
+        let result = try await analyzer.analyze(application: application, homeDirectory: home.url)
+        XCTAssertGreaterThan(result.applicationLogicalSize ?? 0, 16)
+        XCTAssertEqual(Set(result.items.map { $0.url.lastPathComponent }),
+                       ["iOS DeviceSupport", "DerivedData", "Archives", "UserData"])
+        XCTAssertEqual(result.items.reduce(Int64(0)) { $0 + $1.logicalSize }, 420)
+        let pairs = result.associations.compactMap { association in
+            result.items.first { $0.id == association.itemID }.map {
+                ApplicationAssociationProjection(association: association, item: $0)
+            }
+        }
+        let projection = ApplicationProjection(
+            application: application, totalSize: 0, associations: pairs
+        )
+        XCTAssertEqual(Set(ApplicationUninstallPlanner().resetItems(for: projection)
+            .map { $0.url.lastPathComponent }), ["DerivedData", "iOS DeviceSupport"])
+        for item in result.items {
+            XCTAssertGreaterThan(item.allocatedSize, 0)
+            XCTAssertEqual(item.category, .developer)
+            let association = try XCTUnwrap(result.associations.first { $0.itemID == item.id })
+            XCTAssertEqual(association.confidence, .high)
+            XCTAssertEqual(association.evidence, .knownRule)
+            XCTAssertEqual(association.ownership, .owned)
+            let risk: RiskLevel = ["Archives", "UserData"].contains(item.url.lastPathComponent)
+                ? .sensitive : .rebuildable
+            XCTAssertEqual(item.risk, risk)
+            XCTAssertEqual(association.risk, risk)
+        }
+    }
+
     func testLinksIndexedCodexDataToMatchingChatGPTApplicationAsShared()
         async throws
     {

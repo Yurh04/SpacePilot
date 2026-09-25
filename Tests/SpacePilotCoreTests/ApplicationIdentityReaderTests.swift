@@ -3,6 +3,28 @@ import XCTest
 @testable import SpacePilotCore
 
 final class ApplicationIdentityReaderTests: XCTestCase {
+    func testDiscoversXcodeCompanionApplicationsInDedicatedRoots() throws {
+        let app = try TestAppBuilder(name: "Xcode", bundleIdentifier: "com.apple.dt.Xcode")
+            .withEmbeddedBundle(
+                relativePath: "Contents/Applications/Instruments.app",
+                bundleIdentifier: "com.apple.dt.Instruments"
+            )
+            .withEmbeddedBundle(
+                relativePath: "Contents/Developer/Applications/Simulator.app",
+                bundleIdentifier: "com.apple.iphonesimulator"
+            )
+            .withEmbeddedBundle(
+                relativePath: "Contents/Developer/Toolchains/Unrelated.app",
+                bundleIdentifier: "com.example.unrelated"
+            )
+            .build()
+        let identity = try ApplicationIdentityReader(
+            signingReader: StubSigningMetadata(teamIdentifier: "59GAB85EFG", applicationGroups: [])
+        ).read(application: app.record)
+        XCTAssertEqual(identity.componentBundleIdentifiers,
+                       ["com.apple.dt.Instruments", "com.apple.iphonesimulator"])
+    }
+
     func testProvidesSecurityBackedDefaultReader() {
         _ = SecurityApplicationSigningMetadataReader()
         _ = ApplicationIdentityReader()

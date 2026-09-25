@@ -31,7 +31,10 @@ struct AppWindowContent: View {
     }
 }
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private let iconController = ApplicationIconController()
+
     func applicationDidFinishLaunching(_ notification: Notification) {
 #if DEBUG
         if ProcessInfo.processInfo.environment["SPACEPILOT_FORCE_DARK"] == "1" {
@@ -39,6 +42,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 #endif
         NSApp.setActivationPolicy(.regular)
+        iconController.start(application: NSApp)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        iconController.stop()
     }
 }

@@ -3,6 +3,32 @@ import XCTest
 @testable import SpacePilotCore
 
 final class ModelAggregationTests: XCTestCase {
+    func testLogicalApplicationSizeSurvivesSnapshotWithoutChangingDiskTotals() throws {
+        let app = ApplicationRecord(
+            name: "Compressed", bundleIdentifier: "com.example.compressed", version: "1",
+            url: URL(fileURLWithPath: "/Applications/Compressed.app"), executableURL: nil,
+            allocatedSize: 400, logicalSize: 900
+        )
+        let snapshot = ScanSnapshot(completedAt: .now, volume: nil, items: [],
+            applications: [app], aiApplications: [], plugins: [], skills: [], coverage: .complete)
+        let decoded = try JSONDecoder().decode(ScanSnapshot.self,
+            from: JSONEncoder().encode(snapshot.compacted(retainedItemLimit: 0)))
+        XCTAssertEqual(decoded.applications.first?.logicalSize, 900)
+        let projection = try XCTUnwrap(ApplicationListProjection(snapshot: decoded, searchText: "").applications.first)
+        XCTAssertEqual(projection.totalSize, 900)
+        XCTAssertEqual(projection.totalAllocatedSize, 400)
+        let cleanup = try XCTUnwrap(ApplicationUninstallPlanner().cleanupItems(for: projection).first)
+        XCTAssertEqual(cleanup.item.allocatedSize, 400)
+        XCTAssertEqual(cleanup.item.logicalSize, 900)
+
+        var legacy = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(app)) as? [String: Any])
+        legacy.removeValue(forKey: "logicalSize")
+        let restored = try JSONDecoder().decode(ApplicationRecord.self,
+            from: JSONSerialization.data(withJSONObject: legacy))
+        XCTAssertNil(restored.logicalSize)
+        XCTAssertEqual(restored.allocatedSize, 400)
+    }
+
     func testArtifactAssociationDefaultsLegacyOwnershipToPossible() throws {
         let json = """
         {"id":"00000000-0000-0000-0000-000000000001",

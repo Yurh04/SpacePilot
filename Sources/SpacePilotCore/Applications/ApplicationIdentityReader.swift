@@ -98,6 +98,10 @@ public struct ApplicationIdentityReader: ApplicationIdentityReading {
         in applicationURL: URL
     ) throws -> Set<String> {
         let embeddedBundleDirectories = [
+            // Companion apps (for example Instruments and Simulator) live here,
+            // outside PlugIns. Inspect only these roots, not SDKs/toolchains.
+            "Contents/Applications",
+            "Contents/Developer/Applications",
             "Contents/PlugIns",
             "Contents/XPCServices",
             "Contents/Library/LoginItems",

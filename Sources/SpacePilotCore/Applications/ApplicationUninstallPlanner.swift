@@ -59,7 +59,7 @@ public struct ApplicationUninstallPlanner: Sendable {
         ])
         let appItem = ScannedItem(
             url: application.url,
-            logicalSize: application.allocatedSize,
+            logicalSize: application.logicalSize ?? application.allocatedSize,
             allocatedSize: application.allocatedSize,
             creationDate: values?.creationDate,
             modificationDate: values?.contentModificationDate,

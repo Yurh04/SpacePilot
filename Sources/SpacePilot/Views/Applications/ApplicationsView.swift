@@ -453,13 +453,19 @@ private struct ApplicationDetail: View {
         ApplicationMetric(
             title: L10n.text(.applicationTotalSpace),
             value: ByteCount.string(projection.totalSize),
-            systemImage: "internaldrive"
+            systemImage: "sum"
         )
         .frame(minWidth: minimumWidth)
         ApplicationMetric(
-            title: L10n.text(.application),
-            value: ByteCount.string(application.allocatedSize),
+            title: L10n.text(.applicationBundleSize),
+            value: application.logicalSize.map { ByteCount.string($0) } ?? "—",
             systemImage: "app"
+        )
+        .frame(minWidth: minimumWidth)
+        ApplicationMetric(
+            title: L10n.text(.applicationDiskUsage),
+            value: ByteCount.string(projection.totalAllocatedSize),
+            systemImage: "internaldrive"
         )
         .frame(minWidth: minimumWidth)
         ApplicationMetric(

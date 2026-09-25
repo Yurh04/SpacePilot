@@ -448,8 +448,52 @@ public extension ApplicationAssociationKnowledgeBase {
     /// Built-in version 1 examples. All results are deliberately inspect-only.
     static let builtInV1 = ApplicationAssociationKnowledgeBase(
         schemaVersion: 1,
-        contentVersion: "1.8.0",
+        contentVersion: "1.9.0",
         rules: [
+            // Developer data is outside the Bundle-ID-named Library roots.
+            // Keep rebuildable outputs separate from archives and user settings;
+            // do not claim the shared CoreSimulator or entire Developer directory.
+            ApplicationAssociationKnowledgeRule(
+                id: "product.apple.xcode-data.v1",
+                match: ApplicationAssociationKnowledgeMatch(
+                    bundleIdentifiers: ["com.apple.dt.Xcode"],
+                    teamIdentifiers: ["59GAB85EFG"]
+                ),
+                paths: [
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: "Library/Developer/Xcode/DerivedData",
+                        category: .developer,
+                        risk: .rebuildable,
+                        confidence: .high,
+                        ownership: .owned
+                    ),
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: "Library/Developer/Xcode/iOS DeviceSupport",
+                        category: .developer,
+                        risk: .rebuildable,
+                        confidence: .high,
+                        ownership: .owned
+                    ),
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: "Library/Developer/Xcode/Archives",
+                        category: .developer,
+                        risk: .sensitive,
+                        confidence: .high,
+                        ownership: .owned
+                    ),
+                    ApplicationAssociationPathRule(
+                        scope: .homeDirectory,
+                        template: "Library/Developer/Xcode/UserData",
+                        category: .developer,
+                        risk: .sensitive,
+                        confidence: .high,
+                        ownership: .owned
+                    )
+                ]
+            ),
             ApplicationAssociationKnowledgeRule(
                 id: "product.openai.chatgpt-codex.v1",
                 match: ApplicationAssociationKnowledgeMatch(

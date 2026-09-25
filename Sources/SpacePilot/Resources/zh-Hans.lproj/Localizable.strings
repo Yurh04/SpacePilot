@@ -158,6 +158,7 @@
 "app.application" = "应用程序";
 "app.analysis-completed" = "上次分析";
 "app.analysis-in-progress" = "正在分析关联文件…";
+"app.disk-usage" = "磁盘占用";
 "app.association-confidence" = "%@ · %@ 置信度";
 "app.evidence.bundle-id" = "Bundle 标识符";
 "app.evidence.container-id" = "容器标识符";
@@ -175,7 +176,7 @@
 "app.review-uninstall" = "检查卸载项…";
 "app.search-applications" = "搜索应用程序";
 "app.sort" = "应用排序";
-"app.total-space" = "总空间";
+"app.total-space" = "总大小";
 "app.uninstall" = "卸载…";
 "cleanup.confirm-sensitive" = "同时移除上方列出的敏感对话、项目或设置数据";
 "cleanup.confirm-trash" = "我了解这些项目将被移到废纸篓";
@@ -400,3 +401,5 @@
 "ai.update.outcome.timed-out" = "超时";
 "ai.update.outcome.cancelled" = "已取消";
 "ai.update.outcome.version-mismatch" = "版本不匹配";
+
+"app.bundle-size" = "应用大小（Finder）";

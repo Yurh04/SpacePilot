@@ -1,15 +1,57 @@
 # 当前工作与交接
 
-最后更新：2026-09-18
+## Dock 图标尺寸修正（2026-09-25）
+
+- 用户截图显示运行时图标明显偏大：Icon Composer 的紧边 PNG 被直接传给 `applicationIconImage`，没有系统图标画布留白。
+- 控制器在加载时将深浅两版居中绘制到 1024×1024 透明画布的 824×824 区域，四周 100；两张结果缓存复用，自动切换不变，原生 Assets.car 不额外缩放。
+- 新增两版 alpha 边界回归测试，修复前边界为 0–100% 而失败，修复后约为 9.77–90.23%。外观切换测试继续通过；运行时输出与系统设置图标同画布对比，主体尺寸一致。
+- `./script/test_release.sh` 通过：573 项测试、Release 构建、启动、签名结构及 ZIP。已重新启动修正版；Gatekeeper 仍拒绝 ad-hoc 签名。
+
+## 图标自动切换（2026-09-25，替代下方固定图标方案）
+
+- 新增 `ApplicationIconController`，启动时选取图标，并观察 `NSApplication.effectiveAppearance` 实时更新 Dock；终止时释放观察。仅记录图标外观名称。
+- `Artwork/AppIcon.icon` 保存深浅色图层，Xcode 26+ 打包生成原生 `Assets.car`，通过 `CFBundleIconName` 接入 Finder 和未运行应用；旧系统保留浅色 ICNS 回退，运行中的 Dock 自动切换支持 macOS 15+。
+- 系统“图标与小组件样式”独立于窗口外观；Finder 自动切换需选择“深色 → 自动”。本机验证过程中该设置从自动回到默认，保留用户当前选择，不继续覆盖。运行中 Dock 通过应用外观监听独立更新。
+- 新增测试覆盖浅→深→浅、资源实际加载和停止观察。最终 `./script/test_release.sh` 通过：572 项测试、Release 构建、启动、签名结构与 ZIP；Gatekeeper 仍拒绝 ad-hoc 签名。
+- 真机通过系统设置执行浅→深→浅，并恢复原“自动”窗口外观；同一 PID 的 AppIcon 日志确认逐次应用 light/dark/light，无需重启。Dock 截图工具超时，未完成 Dock 像素级截图验收；原生图标两种 rendition 均已导出检查，Assets.car 内存在 Aqua/DarkAqua 外观。
+
+## 浅色正式图标（2026-09-25）
+
+- 按用户要求将浅色版设为正式默认图标，更新 `AppIcon/AppIcon-1024.png` 与 `AppIcon.icns` 的 16–1024 px 表示。正式原稿保存为 `output/imagegen/SpacePilot-light-production.png`，深色稿保留。
+- 使用满幅浅色原稿，避免透明边缘生成杂点；已检查本机 macOS 26 的 `NSWorkspace.icon(forFile:)` 渲染结果，显示干净的浅色圆角图标。当前为固定浅色图标，不随系统外观自动切换。
+- `./script/test_release.sh` 通过：571 项测试、Release 构建、启动、签名结构校验与 ZIP 生成；Gatekeeper 仍拒绝 ad-hoc 签名。已确认打包图标与源码一致，刷新 Launch Services 和 Dock 并重新启动应用。
+
+## 图标替换（2026-09-24）
+
+- 正式应用图标替换为简化的深色容量圆环与领航箭头，更新 `AppIcon/AppIcon-1024.png` 和含 16–1024 px 表示的 `AppIcon.icns`；沿用现有应用包图标加载方式。
+- 深浅色生成稿保存在 `output/imagegen/`。浅色稿仍带浅灰背景，未接入应用；当前不按系统外观切换图标。
+- `./script/test_release.sh` 通过：571 项测试、Release 构建、应用启动、签名结构校验和 ZIP 生成。Gatekeeper 仍拒绝现有 ad-hoc 开发签名。
+- 图标显示跟进：Dock 固定项指向当前 `dist/SpacePilot.app`，包内 ICNS 与源码哈希一致，`NSWorkspace.icon(forFile:)` 返回新版。已 touch 应用包、强制重新注册 Launch Services、重启 Dock 并重新打开应用。Computer Use 检查 Dock 时超时，尚未确认用户屏幕上的最终显示；若仍显示旧图标，需先确认具体显示位置。
+
+最后更新：2026-09-25
 
 ## 仓库检查点
 
 - 当前分支为 `main`，跟踪 `origin/main`。
-- 当前 `main` 已合入 PR #4（`6f887a4`）的 TRAE SOLO CN 与 DoubaoWork 应用关联规则。
+- 本轮开始时基线为 `main` 的 `34c2369`（PR #5）；当前批次包含 Xcode 容量口径修复和自适应应用图标。
 - 当前预览版本：0.1.3。
 - 开始工作前仍必须运行 `git status --short --branch` 检查实时状态，不能只依赖本文档。
 
 ## 本轮完成
+
+- 追加修复应用大小显示口径：ApplicationRecord 分别保存可选 logicalSize 与 allocatedSize。应用详情和列表的“总大小”使用 Finder 应用大小加关联项当前占用，Xcode 因此约为 15.8 GB；详情另列“磁盘占用”约 10.65 GB，磁盘分类与清理估算继续只使用 allocatedSize。旧快照缺失 logicalSize 时正常解码，按需分析补齐；应用清单缓存版本升级，快照压缩、后台刷新和清理后的记录复制保留新字段。
+- 应用大小读取优先使用 Spotlight 的逻辑/物理大小；无索引时完整遍历应用包，包含隐藏文件与内嵌 bundle，保留硬链接去重和取消检查。旧实现会跳过内嵌 package，现已修正。本机无 Spotlight 大小字段时复算 Xcode：logical=9,450,671,065 字节、allocated=4,311,171,072 字节，界面应分别显示 9.45 GB 与计入总占用的 4.31 GB。
+- 当前本机快照中，Xcode 的 35 个关联项物理占用为 6,324,056,064 字节；新的“总大小”为 15,774,727,129 字节（约 15.77 GB），“磁盘占用”为 10,635,227,136 字节（约 10.64 GB）。
+
+- 修复 Xcode 详情漏关联 `Library/Developer/Xcode` 开发数据：知识库 1.9.0 使用精确 `com.apple.dt.Xcode` + `59GAB85EFG` 签名 Team，分别关联 DerivedData、iOS DeviceSupport、Archives、UserData。前两项可重建，后两项敏感且不进入默认重置；不把整个 Developer 或共享 CoreSimulator 目录归为 Xcode 专属。
+- 组件发现补充 `Contents/Applications` 与 `Contents/Developer/Applications` 两个有界根目录，覆盖 Instruments、Simulator、Icon Composer 等；保持原有深度、数量与符号链接限制，不扫描整个 SDK/Toolchains。身份缓存 token 升级，旧缓存自动重新解析。
+- 差异证据：本机 `mdls` 报告 Xcode 逻辑大小 9,450,863,849 字节、物理大小 4,311,171,072 字节，分别对应 App Cleaner 的 9.45 GB 和 SpacePilot 的 4.31 GB。App Cleaner 实际明细中的 `Library/Developer/Xcode` 为 6.33 GB；缺失主体为 iOS DeviceSupport 6,078,169,088 字节、DerivedData 224,808,960 字节、UserData 24,473,600 字节。
+- 2026-09-20 本机只读分析器验证：35 个关联项，总磁盘占用 10,648,133,632 字节（约 10.65 GB）。该结果使用真实身份读取、Spotlight、临时目录与知识库分析，不改写用户快照，不清理用户文件。一次性本机探针测试已移除，保留可移植回归测试。
+- 2026-09-20 最终 `swift test`：571 项通过，0 失败。新增测试先在旧代码上复现失败，再验证目录容量、敏感数据重置排除、精确身份匹配、伴随应用发现，以及总大小与磁盘占用分离。
+- `./script/test_release.sh`：571 项测试、Release 构建、临时启动、签名结构和 ZIP 生成通过；Gatekeeper 仍按预期拒绝 ad-hoc 签名。
+- 界面验收限制：构建启动成功，但应用重启后 Computer Use 持续返回 `Sky Computer Use native pipe closed before response`，重置连接仍未恢复；尚未通过真实界面确认刷新后的 Xcode 数值。下一次可用时重新打开 Xcode 详情触发分析，检查新增开发数据与约 10.65 GB 的磁盘占用（缓存和后续文件变化可能带来小幅差异）。
+
+## 上一轮完成（2026-09-18）
 
 - 修复 Spotlight 名称片段(`nameFragment`)查询的跨应用误归因:`SpotlightApplicationCandidateFinder` 新增 `isTrustworthyNameFragmentLocation` 守卫,只有当 artifact 根目录正下方的一级组件本身包含应用名时才接受低置信度名称匹配。拒绝了深埋于别家应用沙箱目录中、仅因文件名含目标应用名子串而被误匹配的文件(如 Stats 应用误归因 Doubao/TRAE 沙箱里的 `pstats.py`、`_stats`)。
 - 真机验证:点开 Stats 详情触发重分析后,关联项从 35 项降至 12 项,总空间从 12.29 GB 降至 36.5 MB,所有跨应用误匹配文件全部消失,仅保留 Stats 真实拥有的路径。

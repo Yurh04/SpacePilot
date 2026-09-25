@@ -819,6 +819,7 @@ final class AppModel {
                 url: application.url,
                 executableURL: application.executableURL,
                 allocatedSize: application.allocatedSize,
+                logicalSize: application.logicalSize,
                 lastUsedDate: application.lastUsedDate,
                 associations: application.associations.filter {
                     remainingItemIDs.contains($0.itemID)
@@ -970,6 +971,7 @@ final class AppModel {
                 url: application.url,
                 executableURL: application.executableURL,
                 allocatedSize: application.allocatedSize,
+                logicalSize: analysis.applicationLogicalSize ?? application.logicalSize,
                 lastUsedDate: application.lastUsedDate,
                 associations: associations
             )

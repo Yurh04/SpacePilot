@@ -152,6 +152,7 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                         url: application.url,
                         executableURL: application.executableURL,
                         allocatedSize: application.allocatedSize,
+                        logicalSize: application.logicalSize,
                         lastUsedDate: application.lastUsedDate,
                         associations: associations
                     )
@@ -395,6 +396,7 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                     url: application.url,
                     executableURL: application.executableURL,
                     allocatedSize: application.allocatedSize,
+                    logicalSize: application.logicalSize,
                     lastUsedDate: application.lastUsedDate,
                     associations: associationsByApplicationID[
                         application.id,

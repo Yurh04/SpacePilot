@@ -417,8 +417,23 @@ public struct ApplicationAssociationProjection: Identifiable, Sendable {
 public struct ApplicationProjection: Identifiable, Sendable {
     public var id: UUID { application.id }
     public let application: ApplicationRecord
+    /// Finder-style application size plus the disk usage of related items.
     public let totalSize: Int64
+    /// Physical bytes currently occupied by the application and related items.
+    public let totalAllocatedSize: Int64
     public let associations: [ApplicationAssociationProjection]
+
+    public init(
+        application: ApplicationRecord,
+        totalSize: Int64,
+        totalAllocatedSize: Int64? = nil,
+        associations: [ApplicationAssociationProjection]
+    ) {
+        self.application = application
+        self.totalSize = totalSize
+        self.totalAllocatedSize = totalAllocatedSize ?? totalSize
+        self.associations = associations
+    }
 }
 
 public enum ApplicationSortOrder: String, CaseIterable, Sendable {
@@ -480,7 +495,9 @@ public struct ApplicationListProjection: Sendable {
                 }
                 relatedSize += item.allocatedSize
             }
-            let totalSize = application.allocatedSize + relatedSize
+            let totalAllocatedSize = application.allocatedSize + relatedSize
+            let totalSize = (application.logicalSize ?? application.allocatedSize)
+                + relatedSize
             allTotalSizes[application.id] = totalSize
             var associations: [ApplicationAssociationProjection] = []
             associations.reserveCapacity(application.associations.count)
@@ -501,6 +518,7 @@ public struct ApplicationListProjection: Sendable {
             applicationProjections.append(ApplicationProjection(
                 application: application,
                 totalSize: totalSize,
+                totalAllocatedSize: totalAllocatedSize,
                 associations: associations
             ))
         }

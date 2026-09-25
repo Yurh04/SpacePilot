@@ -145,6 +145,7 @@ public struct ScanSnapshot: Identifiable, Codable, Sendable {
                 url: application.url,
                 executableURL: application.executableURL,
                 allocatedSize: application.allocatedSize,
+                logicalSize: application.logicalSize,
                 lastUsedDate: application.lastUsedDate,
                 associations: application.associations.filter {
                     retainedIDs.contains($0.itemID)

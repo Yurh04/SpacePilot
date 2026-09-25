@@ -95,6 +95,8 @@ public struct ApplicationRecord: Identifiable, Codable, Hashable, Sendable {
     public let url: URL
     public let executableURL: URL?
     public let allocatedSize: Int64
+    /// Finder-style file size; nil for snapshots written before dual-size support.
+    public let logicalSize: Int64?
     public let lastUsedDate: Date?
     public let associations: [ArtifactAssociation]
 
@@ -106,6 +108,7 @@ public struct ApplicationRecord: Identifiable, Codable, Hashable, Sendable {
         url: URL,
         executableURL: URL?,
         allocatedSize: Int64,
+        logicalSize: Int64? = nil,
         lastUsedDate: Date? = nil,
         associations: [ArtifactAssociation] = []
     ) {
@@ -116,6 +119,7 @@ public struct ApplicationRecord: Identifiable, Codable, Hashable, Sendable {
         self.url = url
         self.executableURL = executableURL
         self.allocatedSize = allocatedSize
+        self.logicalSize = logicalSize
         self.lastUsedDate = lastUsedDate
         self.associations = associations
     }

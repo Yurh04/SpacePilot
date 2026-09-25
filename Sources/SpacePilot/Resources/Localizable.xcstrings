@@ -3057,18 +3057,34 @@
         }
       }
     },
-    "app.total-space": {
+    "app.disk-usage": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Total space"
+            "value": "Disk usage"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "总空间"
+            "value": "磁盘占用"
+          }
+        }
+      }
+    },
+    "app.total-space": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Total size"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "总大小"
           }
         }
       }
@@ -6429,6 +6445,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "显示 %lld 项"
+          }
+        }
+      }
+    },
+    "app.bundle-size": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App size (Finder)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "应用大小（Finder）"
           }
         }
       }

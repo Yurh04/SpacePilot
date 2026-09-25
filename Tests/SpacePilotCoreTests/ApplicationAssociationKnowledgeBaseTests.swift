@@ -3,6 +3,23 @@ import XCTest
 @testable import SpacePilotCore
 
 final class ApplicationAssociationKnowledgeBaseTests: XCTestCase {
+    func testXcodeRuleRequiresExactBundleAndTeam() throws {
+        let fixture = try Fixture()
+        for (bundle, team, shouldMatch) in [
+            ("com.apple.dt.Xcode", "59GAB85EFG", true),
+            ("com.apple.dt.Xcode.helper", "59GAB85EFG", false),
+            ("com.example.Xcode", "59GAB85EFG", false),
+            ("com.apple.dt.Xcode", "OTHER", false)
+        ] {
+            let candidates = try ApplicationAssociationKnowledgeBase.builtInV1.candidates(
+                for: fixture.context(bundleIdentifier: bundle, teamIdentifier: team),
+                homeDirectory: fixture.home
+            ).filter { $0.ruleID == "product.apple.xcode-data.v1" }
+            XCTAssertEqual(!candidates.isEmpty, shouldMatch, "\(bundle) / \(team)")
+            XCTAssertTrue(candidates.allSatisfy { $0.disposition == .inspectOnly })
+        }
+    }
+
     func testCodableRoundTripPreservesVersionedRules() throws {
         let original = ApplicationAssociationKnowledgeBase.builtInV1
 
@@ -11,8 +28,8 @@ final class ApplicationAssociationKnowledgeBaseTests: XCTestCase {
 
         XCTAssertEqual(decoded, original)
         XCTAssertEqual(decoded.schemaVersion, 1)
-        XCTAssertEqual(decoded.contentVersion, "1.8.0")
-        XCTAssertEqual(decoded.rules.count, 20)
+        XCTAssertEqual(decoded.contentVersion, "1.9.0")
+        XCTAssertEqual(decoded.rules.count, 21)
     }
 
     func testMatchesExactBundleAndTeamIdentifiers() throws {

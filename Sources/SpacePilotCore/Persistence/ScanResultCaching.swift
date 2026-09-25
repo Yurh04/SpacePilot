@@ -56,6 +56,8 @@ enum ScanCacheValidation {
 
     static func token(for application: ApplicationRecord) -> String {
         [
+            // Invalidate identities cached before companion-app discovery.
+            "identity-v2",
             token(for: application.url),
             application.bundleIdentifier ?? "",
             application.version ?? "",
@@ -69,7 +71,7 @@ enum ScanCacheValidation {
         ) else {
             return "missing"
         }
-        return candidates
+        return "inventory-dual-size-v1\n" + candidates
             .map { application in
                 let values = try? application.resourceValues(forKeys: [
                     .contentModificationDateKey,

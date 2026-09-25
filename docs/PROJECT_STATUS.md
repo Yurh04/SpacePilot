@@ -1,6 +1,6 @@
 # 项目开发状态
 
-最后更新：2026-09-13
+最后更新：2026-09-25
 当前预览版本：0.1.3
 支持平台：Apple Silicon、macOS 15+
 
@@ -9,6 +9,8 @@
 SpacePilot 已进入 0.1.3 内测稳定阶段。核心扫描、持久化索引、增量刷新、应用管理、AI 管理、选择性清理、中英文界面和主要交互流程均已完成；本阶段补齐权限恢复入口、变化摘要、筛选可读性、应用分析状态、窄窗口回归，以及 AI 配置能力与健康诊断。当前重点是扩大真实环境验证并准备经过正式签名的外部测试版本。
 
 ## 已实现
+
+- 应用图标随有效外观实时切换：运行中的 Dock 使用深浅色资源；Xcode 26+ 打包原生 Icon Composer 资源供 macOS 26 Finder/未运行应用使用，后者遵循系统“图标与小组件样式”。
 
 - 原生 SwiftUI macOS 应用，中英文跟随 macOS 系统语言。
 - 概览、储存空间、应用程序、开发与 AI、清理历史五个主要模块。
@@ -34,6 +36,7 @@ SpacePilot 已进入 0.1.3 内测稳定阶段。核心扫描、持久化索引�
 - 应用详情会在 macOS 当前用户临时区的 `C/T/X` 一级目录中查找与主应用或签名组件 Bundle 命名空间精确匹配的缓存、helper 和代码签名副本，不递归扫描整个 `/private/var`。
 - 应用关联文件分组、逐项选择、重置、完整卸载预览、文件图标和双击在 Finder 中显示。
 - 豆包应用族使用精确 Bundle ID 与签名 Team 规则识别专属支持数据和缓存，相似标识不会命中。
+- Xcode 通过精确 Bundle ID 与 Team 规则关联 DerivedData、iOS DeviceSupport、Archives 和 UserData；归档与用户配置保留敏感标记。伴随应用身份发现覆盖 Contents/Applications 和 Contents/Developer/Applications，补齐 Instruments、Simulator 等组件。详情分别显示“总大小”“应用大小（Finder）”和“磁盘占用”：总大小与屏幕上各项相加一致，磁盘分类与清理估算仍使用物理占用。
 - SQLite 元数据快照和索引、目录大小缓存、启动恢复、FSEvents 失效处理和按范围后台刷新。
 - ChatGPT 与 Codex 产品族合并；Claude 深度分析；Ollama 和 OpenCode 基础空间统计。
 - 以本地/远程 Agent 为中心展示应用、CLI、全局和 Agent 专属 Skill、Plugin、Plugin 提供的 Skill、冲突检测和安装证据。
@@ -53,6 +56,19 @@ SpacePilot 已进入 0.1.3 内测稳定阶段。核心扫描、持久化索引�
 - 本地应用包和 ZIP 可以生成，但正式公开分发仍需配置 Developer ID 签名和 Apple 公证。
 
 ## 最近一次代码验证
+
+2026-09-25 对当前工作树的验证结果：
+
+- `swift test`：573 项测试通过，0 项失败。
+- 深浅色应用图标支持浅→深→浅实时切换，Dock 图标留白回归测试通过；运行时图标与系统应用图标的主体尺寸一致。
+- Xcode 关联、Finder 逻辑大小与物理磁盘占用口径的测试继续通过。
+
+2026-09-20 对 Xcode 关联修复工作树的验证结果：
+
+- `swift test`：571 项测试通过，0 项失败。
+- 本机真实分析器只读验证：Xcode 35 个关联项，总磁盘占用约 10.65 GB；补齐约 6.33 GB 开发数据。
+- App Cleaner 中应用包 9.45 GB 对应逻辑大小，SpacePilot 的 4.31 GB 对应磁盘占用，已通过本机 Spotlight 元数据核对。
+- 应用已成功构建启动；界面自动化连接中断，刷新后详情的界面验收尚待补做，见 `docs/CURRENT_WORK.md`。
 
 2026-09-13 对 0.1.3 内测稳定阶段当前工作树的验证结果：
 
@@ -91,6 +107,10 @@ SpacePilot 已进入 0.1.3 内测稳定阶段。核心扫描、持久化索引�
 - 类别图横轴使用 GB/TB 可读单位，不再显示科学计数法。
 
 ## 最近一次发布验证
+
+2026-09-25 对当前工作树：`./script/test_release.sh` 的 573 项测试、Release 构建、启动、签名结构和 ZIP 生成通过；Gatekeeper 仍按预期拒绝 ad-hoc 开发签名。
+
+2026-09-20 对 Xcode 关联与容量口径修复工作树：`./script/test_release.sh` 的 571 项测试、Release 构建、启动、签名结构和 ZIP 生成通过；Gatekeeper 仍按预期拒绝 ad-hoc 开发签名。
 
 2026-09-13 对 0.1.3 内测稳定阶段当前工作树的验证结果：
 

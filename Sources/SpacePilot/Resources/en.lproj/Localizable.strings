@@ -158,6 +158,7 @@
 "app.application" = "Application";
 "app.analysis-completed" = "Last analyzed";
 "app.analysis-in-progress" = "Analyzing related files…";
+"app.disk-usage" = "Disk usage";
 "app.association-confidence" = "%@ · %@ confidence";
 "app.evidence.bundle-id" = "Bundle identifier";
 "app.evidence.container-id" = "Container identifier";
@@ -175,7 +176,7 @@
 "app.review-uninstall" = "Review Uninstall…";
 "app.search-applications" = "Search applications";
 "app.sort" = "Sort applications";
-"app.total-space" = "Total space";
+"app.total-space" = "Total size";
 "app.uninstall" = "Uninstall…";
 "cleanup.confirm-sensitive" = "Also move the sensitive conversation, project, or settings data listed above";
 "cleanup.confirm-trash" = "I understand these items will be moved to the Trash";
@@ -400,3 +401,5 @@
 "ai.update.summary.unknown" = "Unknown";
 "ai.update.summary.unsupported" = "Unsupported";
 "ai.update.summary.up-to-date" = "Up to date";
+
+"app.bundle-size" = "App size (Finder)";

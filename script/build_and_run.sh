@@ -54,6 +54,15 @@ cp "$ROOT_DIR/script/Info.plist" "$APP_CONTENTS/Info.plist"
 mkdir -p "$APP_RESOURCES"
 cp -R "$RESOURCE_BUNDLE" "$APP_RESOURCES/"
 cp "$APP_ICON" "$APP_RESOURCES/AppIcon.icns"
+# Compile native light/dark variants for Finder and Dock on macOS 26+.
+# Keep the checked-in ICNS as the fallback on older systems/toolchains.
+if [[ "$(xcodebuild -version | awk '/Xcode/ {print int($2)}')" -ge 26 ]]; then
+  xcrun actool "$ROOT_DIR/Artwork/AppIcon.icon" \
+    --compile "$APP_RESOURCES" --platform macosx \
+    --minimum-deployment-target 15.0 --app-icon AppIcon \
+    --output-partial-info-plist "$DIST_DIR/AppIcon-info.plist" \
+    --output-format human-readable-text
+fi
 chmod +x "$APP_BINARY"
 /usr/bin/codesign --force --deep --options runtime --sign - "$APP_BUNDLE" >/dev/null
 

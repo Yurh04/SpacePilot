@@ -17,7 +17,7 @@ struct FileSystemApplicationArtifactSizeResolver:
         return try Self.calculateSizes(of: url)
     }
 
-    private static func calculateSizes(
+    static func calculateSizes(
         of root: URL
     ) throws -> ApplicationArtifactSize {
         let keys: Set<URLResourceKey> = [
