@@ -16,6 +16,10 @@ enum L10n {
         static let aiPrivacy = Self(key: "ai.privacy", english: "Privacy")
         static let aiSearching = Self(key: "ai.searching", english: "Searching…")
         static let aiSection = Self(key: "ai.section", english: "Section")
+        static let aiAgentsCollapse = Self(key: "ai.agents.collapse", english: "Collapse AI Agents")
+        static let aiAgentsExpand = Self(key: "ai.agents.expand", english: "Expand AI Agents")
+        static let aiUpdateSelectHint = Self(key: "ai.update.select-hint", english: "Select one or more rows first")
+        static let aiUpdateOpenApp = Self(key: "ai.update.open-app", english: "Open app to update…")
         static let aiSectionApps = Self(key: "ai.section.apps", english: "AI Agents")
         static let aiSkillsGlobalNote = Self(
             key: "ai.skills.global-note",
@@ -65,7 +69,6 @@ enum L10n {
         static let aiHealthSection = Self(key: "ai.health.section", english: "Health findings")
         static let aiHealthDuplicate = Self(key: "ai.health.duplicate", english: "Duplicated skills")
         static let aiHealthLargeFootprint = Self(key: "ai.health.large-footprint", english: "Large footprint")
-        static let aiHealthHookTakeover = Self(key: "ai.health.hook-takeover", english: "Hooks driven externally")
         static let aiHealthSymlink = Self(key: "ai.health.symlink", english: "Symlinked skills")
         static let aiHealthUnreferenced = Self(key: "ai.health.unreferenced", english: "Unreferenced skills")
         static let aiConfigSection = Self(key: "ai.config.section", english: "Model & configuration")
@@ -278,6 +281,11 @@ enum L10n {
         static let storageChangesCoverageGap = Self(key: "storage.changes.coverage-gap", english: "Some file-system events were unavailable. Totals for this period may be incomplete.")
     }
     static let allKeys: Set<String> = [
+        "ai.agents.collapse",
+        "ai.agents.expand",
+        "ai.update.select-hint",
+        "ai.update.open-app",
+
         "category.ai-data", "category.application", "category.cache", "category.conversation",
         "category.developer", "category.log", "category.model", "category.personal",
         "category.plugin", "category.skill", "category.system", "category.unclassified",
@@ -300,7 +308,7 @@ enum L10n {
         "ai.agents.select", "ai.agent.storage", "ai.agent.not-applicable", "ai.agent.module-empty",
         "ai.agent.form.app", "ai.agent.form.cli", "ai.agent.form.cloud", "ai.agent.form-factors",
         "ai.overview.partial-coverage", "ai.overview.discovering", "ai.overview.discovery-issue",
-        "ai.health.section", "ai.health.duplicate", "ai.health.large-footprint", "ai.health.hook-takeover",
+        "ai.health.section", "ai.health.duplicate", "ai.health.large-footprint",
         "ai.health.symlink",
         "ai.health.unreferenced",
         "ai.config.section", "ai.config.model", "ai.config.reasoning-effort",

@@ -51,6 +51,13 @@ public protocol UpdateManagerLocating: Sendable {
     /// Returns a verified, absolute executable for the manager, or `nil` when no
     /// fixed candidate exists and is executable. Never reads PATH or data.
     func locate(_ manager: UpdateExecutionManager) -> URL?
+    func locate(_ manager: UpdateExecutionManager, installationURL: URL?, packageIdentifier: String) -> URL?
+}
+
+public extension UpdateManagerLocating {
+    func locate(_ manager: UpdateExecutionManager, installationURL: URL?, packageIdentifier: String) -> URL? {
+        locate(manager)
+    }
 }
 
 /// Re-reads the installed version of a package after an update, using the same
@@ -60,6 +67,13 @@ public protocol InstalledVersionProbing: Sendable {
         manager: UpdateExecutionManager,
         packageIdentifier: String
     ) async -> String?
+    func installedVersion(for item: UpdateExecutionPlan.Item) async -> String?
+}
+
+public extension InstalledVersionProbing {
+    func installedVersion(for item: UpdateExecutionPlan.Item) async -> String? {
+        await installedVersion(manager: item.manager, packageIdentifier: item.packageIdentifier)
+    }
 }
 
 /// Production manager locator: fixed absolute candidates plus fixed
@@ -81,12 +95,15 @@ public struct LocalUpdateManagerLocator: UpdateManagerLocating {
     static let absoluteCandidates: [UpdateExecutionManager: [String]] = [
         .npm: ["/opt/homebrew/bin/npm", "/usr/local/bin/npm"],
         .pnpm: ["/opt/homebrew/bin/pnpm", "/usr/local/bin/pnpm"],
-        .pipx: ["/opt/homebrew/bin/pipx", "/usr/local/bin/pipx"]
+        .pipx: ["/opt/homebrew/bin/pipx", "/usr/local/bin/pipx"],
+        .uv: ["/opt/homebrew/bin/uv", "/usr/local/bin/uv"],
+        .homebrew: ["/opt/homebrew/bin/brew", "/usr/local/bin/brew"]
     ]
 
     static let homeRelativeCandidates: [UpdateExecutionManager: [String]] = [
         .pnpm: ["Library/pnpm/pnpm"],
-        .pipx: [".local/bin/pipx"]
+        .pipx: [".local/bin/pipx"],
+        .uv: [".local/bin/uv"]
     ]
 
     public func locate(_ manager: UpdateExecutionManager) -> URL? {
@@ -99,6 +116,40 @@ public struct LocalUpdateManagerLocator: UpdateManagerLocating {
             if locator.isExecutableFile(at: url) { return url }
         }
         return nil
+    }
+
+    public func locate(_ manager: UpdateExecutionManager, installationURL: URL?, packageIdentifier: String) -> URL? {
+        guard let installationURL else { return locate(manager) }
+        let path = installationURL.canonicalizedDiscoveryPath
+        if manager == .npm {
+            guard let prefix = Self.npmPrefix(path: path, package: packageIdentifier),
+                  prefix == "/opt/homebrew" || prefix == "/usr/local"
+                    || prefix.hasPrefix(homeDirectory.path + "/.local/share/fnm/node-versions/")
+                    || prefix.hasPrefix(homeDirectory.path + "/.nvm/versions/node/") else { return nil }
+            let npm = URL(fileURLWithPath: prefix + "/bin/npm")
+            return locator.isExecutableFile(at: npm) ? npm : nil
+        }
+        if manager == .claudeNative {
+            guard packageIdentifier == "@anthropic-ai/claude-code",
+                  path.hasPrefix(homeDirectory.path + "/.local/share/claude/versions/"),
+                  locator.isExecutableFile(at: installationURL) else { return nil }
+            return installationURL
+        }
+        if manager == .homebrew {
+            let prefix = path.hasPrefix("/opt/homebrew/Cellar/") ? "/opt/homebrew" : "/usr/local"
+            guard path.hasPrefix(prefix + "/Cellar/\(packageIdentifier)/") else { return nil }
+            let brew = URL(fileURLWithPath: prefix + "/bin/brew")
+            return locator.isExecutableFile(at: brew) ? brew : nil
+        }
+        if manager == .uv && !path.contains("/uv/tools/\(packageIdentifier)/bin/") { return nil }
+        if manager == .pipx && !path.contains("/pipx/venvs/\(packageIdentifier)/bin/") { return nil }
+        if manager == .pnpm && !path.contains("/pnpm/") { return nil }
+        return locate(manager)
+    }
+
+    static func npmPrefix(path: String, package: String) -> String? {
+        guard let range = path.range(of: "/lib/node_modules/\(package)/") else { return nil }
+        return String(path[..<range.lowerBound])
     }
 }
 
@@ -125,6 +176,29 @@ public struct AIUpdateExecutor: Sendable {
             "HOME": homeDirectory.path,
             "TMPDIR": NSTemporaryDirectory()
         ]
+    }
+
+    static func environment(
+        homeDirectory: URL, executable: URL,
+        manager: UpdateExecutionManager, installationURL: URL?, package: String
+    ) -> [String: String] {
+        var env = fixedEnvironment(homeDirectory: homeDirectory)
+        env["PATH"] = executable.deletingLastPathComponent().path + ":" + (env["PATH"] ?? "")
+        guard let path = installationURL?.canonicalizedDiscoveryPath else { return env }
+        if manager == .npm, let prefix = LocalUpdateManagerLocator.npmPrefix(path: path, package: package) {
+            env["NPM_CONFIG_PREFIX"] = prefix
+        }
+        if manager == .uv, let range = path.range(of: "/uv/tools/\(package)/bin/") {
+            env["UV_TOOL_DIR"] = String(path[..<range.lowerBound]) + "/uv/tools"
+        }
+        if manager == .pipx, let range = path.range(of: "/venvs/\(package)/bin/") {
+            env["PIPX_HOME"] = String(path[..<range.lowerBound])
+        }
+        if manager == .pnpm, let range = path.range(of: "/Library/pnpm/") {
+            let root = String(path[..<range.lowerBound]) + "/Library/pnpm"
+            env["PNPM_HOME"] = root
+        }
+        return env
     }
 
     public init(
@@ -162,7 +236,10 @@ public struct AIUpdateExecutor: Sendable {
     }
 
     private func runStep(_ item: UpdateExecutionPlan.Item) async -> UpdateExecutionOutcome {
-        guard let executable = managerLocator.locate(item.manager) else {
+        guard VersionComparator.isValid(item.targetVersion, kind: item.manager.versionComparator),
+              let executable = managerLocator.locate(
+                item.manager, installationURL: item.installationURL, packageIdentifier: item.packageIdentifier
+              ) else {
             return .managerUnavailable
         }
         let arguments = Self.arguments(
@@ -170,7 +247,10 @@ public struct AIUpdateExecutor: Sendable {
             packageIdentifier: item.packageIdentifier,
             targetVersion: item.targetVersion
         )
-        let environment = Self.fixedEnvironment(homeDirectory: homeDirectory)
+        let environment = Self.environment(
+            homeDirectory: homeDirectory, executable: executable, manager: item.manager,
+            installationURL: item.installationURL, package: item.packageIdentifier
+        )
         do {
             let output = try await runner.run(
                 executableURL: executable,
@@ -184,10 +264,7 @@ public struct AIUpdateExecutor: Sendable {
                 return .failed(terminationStatus: output.terminationStatus)
             }
             // Re-probe: success only if the installed version matches the target.
-            let installed = await versionProbe.installedVersion(
-                manager: item.manager,
-                packageIdentifier: item.packageIdentifier
-            )
+            let installed = await versionProbe.installedVersion(for: item)
             if let installed,
                VersionComparator.compare(installed, item.targetVersion, kind: item.manager.versionComparator) == .orderedSame {
                 return .succeeded(installedVersion: installed)
@@ -215,6 +292,12 @@ public struct AIUpdateExecutor: Sendable {
             return ["add", "--global", "\(packageIdentifier)@\(targetVersion)"]
         case .pipx:
             return ["install", "--force", "\(packageIdentifier)==\(targetVersion)"]
+        case .uv:
+            return ["tool", "install", "--upgrade", "\(packageIdentifier)==\(targetVersion)"]
+        case .homebrew:
+            return ["upgrade", packageIdentifier]
+        case .claudeNative:
+            return ["install", targetVersion]
         }
     }
 

@@ -18,18 +18,18 @@ final class AIAssetGroupingProjectionTests: XCTestCase {
         let projection = GroupedSkillsProjection(skills: Array(skills), plugins: [])
 
         // First level is owner-only: Shared, one entry per tool, then Unknown.
-        XCTAssertEqual(projection.groups.map(\.id), ["shared", "tool:codex", "unknown"])
-        XCTAssertEqual(projection.groups.first { $0.id == "tool:codex" }?.title, "Codex")
-        XCTAssertEqual(projection.groups.first { $0.id == "tool:codex" }?.itemCount, 3)
+        XCTAssertEqual(projection.groups.map(\.id), ["shared", "tool:chatgpt", "unknown"])
+        XCTAssertEqual(projection.groups.first { $0.id == "tool:chatgpt" }?.title, "ChatGPT")
+        XCTAssertEqual(projection.groups.first { $0.id == "tool:chatgpt" }?.itemCount, 3)
 
         // All of a tool's skills appear under its single entry across scopes.
-        XCTAssertEqual(projection.skills(in: "tool:codex").map(\.name), ["global", "project", "system"])
+        XCTAssertEqual(projection.skills(in: "tool:chatgpt").map(\.name), ["global", "project", "system"])
         XCTAssertEqual(projection.skills(in: "shared").map(\.name), ["shared", "shared-project"])
 
         // Scope is exposed per row for the right-pane column/filter.
-        let projectSkill = try XCTUnwrap(projection.skills(in: "tool:codex").first { $0.name == "project" })
+        let projectSkill = try XCTUnwrap(projection.skills(in: "tool:chatgpt").first { $0.name == "project" })
         XCTAssertEqual(projection.scopeDetail(for: projectSkill), .project(project))
-        let systemSkill = try XCTUnwrap(projection.skills(in: "tool:codex").first { $0.name == "system" })
+        let systemSkill = try XCTUnwrap(projection.skills(in: "tool:chatgpt").first { $0.name == "system" })
         XCTAssertEqual(projection.scopeDetail(for: systemSkill), .system)
         let sharedProject = try XCTUnwrap(projection.skills(in: "shared").first { $0.name == "shared-project" })
         XCTAssertEqual(projection.scopeDetail(for: sharedProject), .project(project))
@@ -41,7 +41,7 @@ final class AIAssetGroupingProjectionTests: XCTestCase {
         ], plugins: [])
 
         // Only owners with assets appear; no empty Shared/Unknown rows.
-        XCTAssertEqual(projection.groups.map(\.id), ["tool:codex"])
+        XCTAssertEqual(projection.groups.map(\.id), ["tool:chatgpt"])
     }
 
     func testPluginProvidedSkillGroupsUnderParentPluginToolOwner() {
@@ -72,8 +72,8 @@ final class AIAssetGroupingProjectionTests: XCTestCase {
 
         let projection = GroupedSkillsProjection(skills: [orphan, bundled], plugins: [plugin])
 
-        XCTAssertEqual(projection.groups.map(\.id), ["tool:codex", "unknown"])
-        XCTAssertEqual(projection.skills(in: "tool:codex").map(\.name), ["bundled"])
+        XCTAssertEqual(projection.groups.map(\.id), ["tool:chatgpt", "unknown"])
+        XCTAssertEqual(projection.skills(in: "tool:chatgpt").map(\.name), ["bundled"])
         XCTAssertEqual(projection.skills(in: "unknown").map(\.name), ["orphan"])
         XCTAssertEqual(projection.scopeDetail(for: bundled), .bundled)
     }
@@ -100,7 +100,7 @@ final class AIAssetGroupingProjectionTests: XCTestCase {
 
         let projection = GroupedSkillsProjection(skills: [child], plugins: [plugin])
 
-        XCTAssertEqual(projection.groups.map(\.id), ["tool:codex"])
+        XCTAssertEqual(projection.groups.map(\.id), ["tool:chatgpt"])
         XCTAssertEqual(projection.scopeDetail(for: child), .project(project))
     }
 
@@ -112,9 +112,9 @@ final class AIAssetGroupingProjectionTests: XCTestCase {
         let projection = GroupedSkillsProjection(skills: [sharedDuplicate, codexSameURL, shared], plugins: [])
 
         XCTAssertEqual(projection.skills(in: "shared").map(\.name), ["alpha"])
-        XCTAssertEqual(projection.skills(in: "tool:codex").map(\.name), ["codex"])
+        XCTAssertEqual(projection.skills(in: "tool:chatgpt").map(\.name), ["codex"])
         XCTAssertEqual(projection.groups.first { $0.id == "shared" }?.allocatedSize, 10)
-        XCTAssertEqual(projection.groups.first { $0.id == "tool:codex" }?.allocatedSize, 20)
+        XCTAssertEqual(projection.groups.first { $0.id == "tool:chatgpt" }?.allocatedSize, 20)
     }
 
     func testPluginsGroupAndDeduplicateDeterministically() {
@@ -126,10 +126,10 @@ final class AIAssetGroupingProjectionTests: XCTestCase {
         let reverse = GroupedPluginsProjection(plugins: [first, shared, duplicate].reversed())
 
         XCTAssertEqual(forward.groups.map(\.id), reverse.groups.map(\.id))
-        XCTAssertEqual(forward.groups.map(\.id), ["shared", "tool:codex"])
-        XCTAssertEqual(forward.plugins(in: "tool:codex").map(\.name), ["Alpha"])
-        XCTAssertEqual(forward.groups.first { $0.id == "tool:codex" }?.itemCount, 1)
-        XCTAssertEqual(forward.groups.first { $0.id == "tool:codex" }?.allocatedSize, 8)
+        XCTAssertEqual(forward.groups.map(\.id), ["shared", "tool:chatgpt"])
+        XCTAssertEqual(forward.plugins(in: "tool:chatgpt").map(\.name), ["Alpha"])
+        XCTAssertEqual(forward.groups.first { $0.id == "tool:chatgpt" }?.itemCount, 1)
+        XCTAssertEqual(forward.groups.first { $0.id == "tool:chatgpt" }?.allocatedSize, 8)
     }
 
     func testSearchFiltersItemsWithoutChangingGroups() {
@@ -146,11 +146,11 @@ final class AIAssetGroupingProjectionTests: XCTestCase {
     func testResolverPreservesValidThenNearestOwnerThenFirst() {
         let groups = [
             AIAssetGroup(id: "shared", kind: .shared, title: "Shared", itemCount: 1, allocatedSize: 1),
-            AIAssetGroup(id: "tool:codex", kind: .tool(definitionID: "codex"), title: "Codex", itemCount: 1, allocatedSize: 1)
+            AIAssetGroup(id: "tool:chatgpt", kind: .tool(definitionID: "chatgpt"), title: "ChatGPT", itemCount: 1, allocatedSize: 1)
         ]
 
         XCTAssertEqual(GroupedSkillsProjection.resolvedSelection(current: "shared", preferredOwnerFrom: nil, groups: groups), "shared")
-        XCTAssertEqual(GroupedSkillsProjection.resolvedSelection(current: "missing", preferredOwnerFrom: "tool:codex", groups: groups), "tool:codex")
+        XCTAssertEqual(GroupedSkillsProjection.resolvedSelection(current: "missing", preferredOwnerFrom: "tool:chatgpt", groups: groups), "tool:chatgpt")
         XCTAssertEqual(GroupedSkillsProjection.resolvedSelection(current: "missing", preferredOwnerFrom: nil, groups: groups), "shared")
         XCTAssertNil(GroupedSkillsProjection.resolvedSelection(current: nil, preferredOwnerFrom: nil, groups: []))
     }

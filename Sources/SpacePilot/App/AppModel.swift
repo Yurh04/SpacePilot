@@ -45,6 +45,21 @@ final class AppModel {
     /// separate from `aiManagementProjection` (which describes directory-backed
     /// records) and, like it, only ever replaced whole.
     var aiCapabilities = AICapabilityScanner.Result()
+    /// Standalone AI tools installed via pipx / `uv tool` (for example an
+    /// `openviking` memory tool). Surfaced under "Other AI tools".
+    var pipxAITools: [PipxToolScanner.Tool] = []
+    /// Configuration-manager tools (for example CC Switch), evidenced by their
+    /// config directory existing on disk. Surfaced under "Other AI tools".
+    var configManagerTools: [ConfigManagerScanner.Tool] = []
+    var otherAITools: [OtherAIToolRecord] {
+        let supporting = AIAgentCache.shared.projection(for: aiManagementProjection.records).cliTools
+        return OtherAIToolProjection.tools(
+            hooks: aiCapabilities.hooks, mcpServers: aiCapabilities.mcpServers,
+            reclassifiedCLIs: SupportingCLIClassifier.classify(cliRecords: supporting, mcpServers: aiCapabilities.mcpServers).otherTools,
+            pipxTools: pipxAITools, configManagers: configManagerTools
+        )
+    }
+    var aiAgentStorage: [String: AIAgentStorageSnapshot] = [:]
     var isDiscoveringAITools = false
     /// A read-only error surface for AI discovery. Deliberately separate from
     /// `errorMessage` so a discovery failure never clobbers the main scan error.
@@ -83,7 +98,8 @@ final class AppModel {
             snapshot: latestSnapshot,
             managementProjection: aiManagementProjection,
             projectSkills: projectAIAssetSkills,
-            projectPlugins: projectAIAssetPlugins
+            projectPlugins: projectAIAssetPlugins,
+            otherTools: otherAITools
         )
     }
 
@@ -146,7 +162,14 @@ final class AppModel {
     /// Carries both halves of one discovery pass — directory-backed records and
     /// config-file capabilities — so they are cancelled together and published
     /// atomically.
-    private var aiDiscoveryWorker: Task<([AIToolRecord], AICapabilityScanner.Result), Error>?
+    private struct AIDiscoveryResult: Sendable {
+        let records: [AIToolRecord]
+        let capabilities: AICapabilityScanner.Result
+        let pipxTools: [PipxToolScanner.Tool]
+        let configManagers: [ConfigManagerScanner.Tool]
+        let storage: [String: AIAgentStorageSnapshot]
+    }
+    private var aiDiscoveryWorker: Task<AIDiscoveryResult, Error>?
     private var aiDiscoveryPublicationTask: Task<Void, Never>?
     /// Monotonically increasing token; only the newest discovery may publish.
     private var aiDiscoveryGeneration = 0
@@ -223,13 +246,21 @@ final class AppModel {
     }
 
     private static let liveAIUpdateCheck: @Sendable (AIUpdateCheckInput) async throws -> [UpdateCheckResult] = { input in
+        guard let snapshot = input.snapshot else { return [] }
+        // Re-probe current versions on explicit checks; discovery may predate an
+        // update performed in a terminal.
+        let registry = AIToolRegistry(
+            applicationLocator: SnapshotAIApplicationLocator(snapshot: snapshot)
+        )
+        let records = try await registry.discover(homeDirectory: input.homeDirectory)
         let packageFacts = try AIToolPackageInventory().installedPackages(homeDirectory: input.homeDirectory)
         let inventory = AIUpdateAssetBuilder.inventory(
             snapshot: input.snapshot,
-            managementProjection: input.managementProjection,
+            managementProjection: AIManagementProjection(records: records),
             projectSkills: input.projectSkills,
             projectPlugins: input.projectPlugins,
-            packageFacts: packageFacts
+            packageFacts: packageFacts,
+            otherTools: input.otherTools
         )
         // When the user checks a specific multi-selection, only request the
         // selected supported keys; unsupported keys never produce a request.
@@ -240,7 +271,10 @@ final class AppModel {
             checkable = inventory.assets.filter { $0.capability != nil }
         }
         let checked = await AIUpdateChecker().check(checkable)
-        return inventory.unsupportedResults + checked
+        let unsupported = inventory.unsupportedResults.filter {
+            input.selectedKeys?.contains($0.assetKey) ?? true
+        }
+        return unsupported + checked
     }
 
     /// Builds the production update executor bound to a home directory. Uses the
@@ -1163,18 +1197,31 @@ final class AppModel {
             // partially-updated pane would otherwise be visible between passes.
             async let records = try await discover(snapshot, homeDirectory)
             let capabilities = AICapabilityScanner().scan(homeDirectory: homeDirectory)
-            return (try await records, capabilities)
+            let pipxTools = PipxToolScanner().scan(homeDirectory: homeDirectory)
+            let configManagers = ConfigManagerScanner().scan(homeDirectory: homeDirectory)
+            let discovered = try await records
+            let agents = AIAgentProjection(records: discovered)
+            let storage = try AIAgentStorageScanner(access: LocalFileSystemAccess()).scan(
+                agents: agents.localAgents + agents.remoteAgents
+            )
+            return AIDiscoveryResult(
+                records: discovered, capabilities: capabilities, pipxTools: pipxTools,
+                configManagers: configManagers, storage: storage
+            )
         }
         aiDiscoveryWorker = worker
         aiDiscoveryPublicationTask = Task { [weak self] in
             do {
-                let (records, capabilities) = try await worker.value
+                let result = try await worker.value
                 guard let self,
                       !Task.isCancelled,
                       self.aiDiscoveryGeneration == generation,
                       self.latestSnapshot?.id == snapshotID else { return }
-                self.aiManagementProjection = AIManagementProjection(records: records)
-                self.aiCapabilities = capabilities
+                self.aiManagementProjection = AIManagementProjection(records: result.records)
+                self.aiCapabilities = result.capabilities
+                self.pipxAITools = result.pipxTools
+                self.configManagerTools = result.configManagers
+                self.aiAgentStorage = result.storage
                 // Record success only now, so a failed/cancelled pass never marks
                 // these inputs as covered and a retry stays possible.
                 self.lastSuccessfulAIDiscoveryFingerprint = fingerprint
@@ -1235,6 +1282,7 @@ final class AppModel {
             projectSkills: projectAIAssetSkills,
             projectPlugins: projectAIAssetPlugins,
             homeDirectory: homeDirectory,
+            otherTools: otherAITools,
             selectedKeys: selectedKeys
         )
         let fingerprint = AIUpdateCheckFingerprint(input: input)
@@ -1353,6 +1401,9 @@ final class AppModel {
                     )
                 }
             }
+            if let snapshot = self.latestSnapshot {
+                self.startAIManagementDiscovery(for: snapshot, force: true)
+            }
         }
     }
 
@@ -1363,6 +1414,7 @@ final class AppModel {
             projectSkills: projectAIAssetSkills,
             projectPlugins: projectAIAssetPlugins,
             homeDirectory: homeDirectory,
+            otherTools: otherAITools,
             selectedKeys: selectedKeys
         )
     }
@@ -1539,6 +1591,7 @@ struct AIUpdateCheckInput: Sendable {
     let projectSkills: [SkillRecord]
     let projectPlugins: [PluginRecord]
     let homeDirectory: URL
+    var otherTools: [OtherAIToolRecord] = []
     /// When non-nil, only these stable asset keys are checked (a user's
     /// multi-selection). Nil means the Overview "check all" behavior.
     var selectedKeys: Set<AIUpdateAssetKey>? = nil
@@ -1550,6 +1603,7 @@ private struct AIUpdateCheckFingerprint: Equatable, Sendable {
     init(input: AIUpdateCheckInput) {
         var values: [String] = []
         values.append("home:\(input.homeDirectory.standardizedFileURL.path)")
+        values.append(contentsOf: input.otherTools.map { "other:\($0.id):\($0.cliUpdateKey?.canonicalLocation ?? "")" })
         if let snapshot = input.snapshot {
             values.append("snapshot:\(snapshot.id.uuidString)")
             values.append(contentsOf: snapshot.applications.map {

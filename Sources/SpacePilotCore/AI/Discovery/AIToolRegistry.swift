@@ -6,6 +6,11 @@ public protocol AIApplicationLocating: Sendable {
     /// Returns the on-disk URL of an installed application for a bundle
     /// identifier, or `nil` if it is not installed.
     func applicationURL(forBundleIdentifier bundleIdentifier: String) -> URL?
+    func applicationVersion(forBundleIdentifier bundleIdentifier: String) -> String?
+}
+
+public extension AIApplicationLocating {
+    func applicationVersion(forBundleIdentifier bundleIdentifier: String) -> String? { nil }
 }
 
 /// The outcome of probing a single directory. Distinguishing `failure` from
@@ -129,8 +134,15 @@ public struct AIToolRegistry: Sendable {
             try Task.checkCancellation()
             let owner = AIToolOwner.tool(definitionID: definition.id)
 
+            let installedBundleIDs = definition.applicationBundleIdentifiers.filter {
+                applicationLocator.applicationURL(forBundleIdentifier: $0) != nil
+            }
+            let bundleRoots = installedBundleIDs.flatMap { id in
+                ["Library/Application Support/\(id)", "Library/Caches/\(id)",
+                 "Library/Logs/\(id)", "Library/Containers/\(id)"]
+            }
             let dataRoots = existingDirectories(
-                relativePaths: definition.dataRootRelativePaths,
+                relativePaths: definition.dataRootRelativePaths + bundleRoots,
                 homeDirectory: homeDirectory
             )
             let configRoots = existingDirectories(
@@ -156,8 +168,29 @@ public struct AIToolRegistry: Sendable {
 
             if definition.cliProbeID != nil,
                let result = probeResults[definition.id],
-               let cliRecord = cliRecord(from: result, for: definition, owner: owner) {
+               let cliRecord = cliRecord(
+                   from: result, for: definition, owner: owner,
+                   dataRoots: dataRoots.present, configRoots: configRoots.present,
+                   coverageFailures: dataRoots.failures.union(configRoots.failures)
+               ) {
                 records.append(cliRecord)
+            }
+
+            // Directory-backed presence: for opted-in definitions with no app and
+            // no runnable CLI, the existence of the managed directory is itself
+            // the evidence the tool is installed (installed from source, or a
+            // command outside the fixed probe locations). Emitted as a `.cli`
+            // record with no executable so existing consumers treat it uniformly;
+            // gated so a leftover dot-directory never fabricates a tool.
+            if let presenceRecord = directoryPresenceRecord(
+                for: definition,
+                owner: owner,
+                dataRoots: dataRoots.present,
+                configRoots: configRoots.present,
+                alreadyHasAppOrCLI: records.contains { $0.owner == owner
+                    && ($0.kind == .application || $0.kind == .cli) }
+            ) {
+                records.append(presenceRecord)
             }
 
             records.append(contentsOf: rootRecords(
@@ -282,6 +315,7 @@ public struct AIToolRegistry: Sendable {
             if let url = applicationLocator.applicationURL(forBundleIdentifier: bundleID) {
                 evidence.bundleIdentifier = bundleID
                 evidence.applicationURL = url
+                evidence.detectedVersion = applicationLocator.applicationVersion(forBundleIdentifier: bundleID)
                 break
             }
         }
@@ -330,7 +364,10 @@ public struct AIToolRegistry: Sendable {
     private func cliRecord(
         from result: SafeCLIProbeResult,
         for definition: AIToolDefinition,
-        owner: AIToolOwner
+        owner: AIToolOwner,
+        dataRoots: [URL],
+        configRoots: [URL],
+        coverageFailures: Set<AIToolCoverageFailure>
     ) -> AIToolRecord? {
         guard let executableURL = result.executableURL else {
             // CLI not installed; no record.
@@ -341,8 +378,10 @@ public struct AIToolRegistry: Sendable {
         evidence.executableURL = executableURL
         evidence.detectedVersion = result.version
         evidence.aliasExecutableURLs = result.aliasExecutableURLs
+        evidence.dataRoots = dataRoots
+        evidence.configDirectories = configRoots
 
-        var failures = Set<AIToolCoverageFailure>()
+        var failures = coverageFailures
         if let failure = result.coverageFailure {
             failures.insert(failure)
         }
@@ -358,6 +397,46 @@ public struct AIToolRegistry: Sendable {
             owner: owner,
             evidence: evidence,
             coverageFailures: failures
+        )
+    }
+
+    /// Builds a directory-backed presence record for a definition that opted into
+    /// `surfacesFromDirectoryPresence` and produced no application or CLI record.
+    ///
+    /// The tool is proven present by its managed directory alone (data root
+    /// preferred, else config root). The record is a `.cli` with no executable —
+    /// so version/update/reveal code paths degrade gracefully — anchored to the
+    /// directory so its identifier stays stable across scans. Returns `nil` when
+    /// the definition did not opt in, when an app/CLI record already represents
+    /// it, or when no managed directory exists (so nothing is fabricated).
+    private func directoryPresenceRecord(
+        for definition: AIToolDefinition,
+        owner: AIToolOwner,
+        dataRoots: [URL],
+        configRoots: [URL],
+        alreadyHasAppOrCLI: Bool
+    ) -> AIToolRecord? {
+        guard definition.surfacesFromDirectoryPresence, !alreadyHasAppOrCLI else {
+            return nil
+        }
+        guard let anchor = dataRoots.first ?? configRoots.first else {
+            return nil
+        }
+
+        var evidence = AIToolEvidence()
+        evidence.dataRoots = dataRoots
+        evidence.configDirectories = configRoots
+
+        return AIToolRecord(
+            id: AIToolRecord.stableID(
+                kind: .cli,
+                owner: owner,
+                canonicalLocation: Self.canonicalKey(anchor)
+            ),
+            kind: .cli,
+            displayName: definition.displayName,
+            owner: owner,
+            evidence: evidence
         )
     }
 

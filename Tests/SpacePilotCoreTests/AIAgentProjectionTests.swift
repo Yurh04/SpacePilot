@@ -135,8 +135,8 @@ final class AIAgentProjectionTests: XCTestCase {
         let a = AIAgentProjection(records: [codex, claude]).localAgents.map(\.id)
         let b = AIAgentProjection(records: [claude, codex]).localAgents.map(\.id)
         XCTAssertEqual(a, b)
-        // Catalog order places codex before claude.
-        XCTAssertEqual(a, ["codex", "claude"])
+        // Family identity uses ChatGPT's catalog position, after Claude.
+        XCTAssertEqual(a, ["claude", "chatgpt"])
     }
 
     // MARK: - Detail projection

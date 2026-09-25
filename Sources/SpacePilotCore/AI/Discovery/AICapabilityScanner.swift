@@ -177,20 +177,22 @@ public struct AICapabilityScanner: Sendable {
             // Model: a plain top-level `model` string. Credential presence: an
             // `env` auth-token key, an `apiKeyHelper`, or a sibling auth file —
             // the value is never read, only its existence noted.
-            let model = (root["model"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            let model = ((root["model"] ?? root["defaultModel"]) as? String).flatMap { $0.isEmpty ? nil : $0 }
+            let effort = (root["reasoning_effort"] ?? root["defaultThinkingLevel"]) as? String
             let env = root["env"] as? [String: Any] ?? [:]
             let hasEnvToken = env.keys.contains { key in
                 let k = key.uppercased()
                 return k.contains("AUTH_TOKEN") || k.contains("API_KEY")
             }
             let hasHelper = (root["apiKeyHelper"] as? String).map { !$0.isEmpty } ?? false
-            let siblingAuth = url.deletingLastPathComponent().appending(path: ".credentials.json")
-            let hasSibling = fileManager.fileExists(atPath: siblingAuth.path)
+            let hasSibling = [".credentials.json", "auth.json"].contains {
+                fileManager.fileExists(atPath: url.deletingLastPathComponent().appending(path: $0).path)
+            }
             let profile = AgentConfigProfile(
                 ownerDefinitionID: agentID,
                 sourceURL: url,
                 model: model,
-                reasoningEffort: nil,
+                reasoningEffort: effort,
                 hasCredential: hasEnvToken || hasHelper || hasSibling
             )
             if !profile.isEmpty { result.configProfiles.append(profile) }
@@ -346,6 +348,14 @@ public enum KnownAgentConfigLocations {
         Location(agentID: "cursor", relativePath: ".cursor/mcp.json", format: .claudeRootJSON),
         Location(agentID: "gemini-cli", relativePath: ".gemini/settings.json", format: .claudeSettingsJSON),
         Location(agentID: "gemini-cli", relativePath: ".gemini/GEMINI.md", format: .instructionMarkdown),
-        Location(agentID: "opencode", relativePath: ".config/opencode/opencode.json", format: .claudeRootJSON)
+        Location(agentID: "opencode", relativePath: ".config/opencode/opencode.json", format: .claudeSettingsJSON),
+        Location(agentID: "relay", relativePath: ".relay/settings.json", format: .claudeSettingsJSON),
+        Location(agentID: "relay", relativePath: ".relay/CLAUDE.md", format: .instructionMarkdown),
+        Location(agentID: "pi", relativePath: ".pi/agent/settings.json", format: .claudeSettingsJSON),
+        Location(agentID: "pi", relativePath: ".pi/agent/AGENTS.md", format: .instructionMarkdown),
+        Location(agentID: "aime", relativePath: ".aime/config.json", format: .claudeSettingsJSON),
+        Location(agentID: "mira", relativePath: ".mira/config.json", format: .claudeSettingsJSON),
+        Location(agentID: "copilot", relativePath: ".copilot/config.json", format: .claudeSettingsJSON),
+        Location(agentID: "copilot", relativePath: ".copilot/mcp-config.json", format: .claudeRootJSON)
     ]
 }

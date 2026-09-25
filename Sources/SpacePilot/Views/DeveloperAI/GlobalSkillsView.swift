@@ -24,6 +24,7 @@ struct GlobalSkillsView: View {
     let onCancelUpdateCheck: () -> Void
     @Binding var selectedGroupID: String?
     @Binding var selection: Set<UUID>
+    var agents: [AIAgentEntry] = []
 
     /// Grouped view of the discovered skills.
     ///
@@ -63,6 +64,8 @@ struct GlobalSkillsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            AIWorkspaceHeader(title: L10n.skills(), systemImage: "sparkles", count: skills.count)
+            Divider()
             ProjectApprovalBar(
                 approvedProjectRoots: approvedProjectRoots,
                 approvedProjectRootIssues: approvedProjectRootIssues,
@@ -88,12 +91,12 @@ struct GlobalSkillsView: View {
             } else {
                 HSplitView {
                     groupList
-                        .frame(minWidth: 150, idealWidth: 190, maxWidth: 240)
+                        .frame(minWidth: 160, idealWidth: 180, maxWidth: 220)
                     VStack(spacing: 0) {
                         AIUpdateActionBar(
                             plan: selectionPlan,
                             isChecking: isCheckingUpdates,
-                            onCheckSelected: { onCheckSelectedUpdates(Set(selectionPlan.checkableKeys)) },
+                            onCheckSelected: { onCheckSelectedUpdates(Set(selectionPlan.selected.map(\.key))) },
                             onUpdateSelected: { onUpdateSelected(Set(selectionPlan.selected.map(\.key))) },
                             onCancel: onCancelUpdateCheck
                         )
@@ -113,17 +116,10 @@ struct GlobalSkillsView: View {
 
     private var groupList: some View {
         List(projection.groups, selection: $selectedGroupID) { group in
-            HStack {
-                Text(groupTitle(group))
-                    .lineLimit(1)
-                Spacer(minLength: 8)
-                Text(group.itemCount.formatted())
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-            }
+            AIAssetGroupRow(group: group, title: groupTitle(group), agents: agents)
             .tag(group.id)
         }
+        .listStyle(.sidebar)
     }
 
     private func groupTitle(_ group: AIAssetGroup) -> String {
@@ -156,6 +152,10 @@ struct GlobalSkillsView: View {
             TableColumn(L10n.text(.skill)) { skill in
                 skillNameCell(skill)
             }
+            TableColumn(L10n.space()) {
+                Text(ByteCount.string($0.allocatedSize)).monospacedDigit().lineLimit(1)
+            }
+            .width(min: 64, ideal: 76, max: 92)
             TableColumn(L10n.text(.aiUpdateStatus)) {
                 Text(updateStatusText(for: $0))
                     .lineLimit(1)
@@ -199,16 +199,7 @@ struct GlobalSkillsView: View {
     }
 
     private func skillNameCell(_ skill: SkillRecord) -> some View {
-        VStack(alignment: .leading) {
-            Text(skill.name)
-                .lineLimit(1)
-                .truncationMode(.tail)
-            Text(skill.url.path)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-        }
+        AIAssetIdentity(name: skill.name, subtitle: skill.url.path, url: skill.url)
         .contextMenu {
             Button(L10n.text(.revealFinder)) { FinderReveal.reveal(skill.url) }
         }

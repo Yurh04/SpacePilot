@@ -13,30 +13,16 @@ struct ProjectApprovalBar: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Button(L10n.text(.aiProjectAddFolder), action: chooseFolder)
-                Menu(L10n.text(.aiProjectRemoveFolder)) {
-                    if approvedProjectRoots.isEmpty {
-                        Text(L10n.text(.aiProjectNoApprovedFolders))
-                    } else {
-                        ForEach(approvedProjectRoots) { root in
-                            Button(root.identity.displayName) {
-                                onRemoveProjectRoot(root.id)
-                            }
-                        }
-                    }
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    folderActions
+                    Spacer(minLength: 8)
+                    Text(projectSummary).foregroundStyle(.secondary).lineLimit(1)
                 }
-                .disabled(approvedProjectRoots.isEmpty)
-                if isScanningProjects {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text(L10n.text(.aiProjectScanning))
-                        .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) { folderActions }
+                    Text(projectSummary).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                 }
-                Spacer()
-                Text(projectSummary)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
             }
             if let message = issueSummary {
                 Text(message)
@@ -45,8 +31,33 @@ struct ProjectApprovalBar: View {
                     .lineLimit(2)
             }
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 16)
         .padding(.vertical, 8)
+    }
+
+    @ViewBuilder
+    private var folderActions: some View {
+        Button(action: chooseFolder) {
+            Label(L10n.text(.aiProjectAddFolder), systemImage: "folder.badge.plus")
+        }
+        Menu(L10n.text(.aiProjectRemoveFolder)) {
+            if approvedProjectRoots.isEmpty {
+                Text(L10n.text(.aiProjectNoApprovedFolders))
+            } else {
+                ForEach(approvedProjectRoots) { root in
+                    Button(root.identity.displayName) {
+                        onRemoveProjectRoot(root.id)
+                    }
+                }
+            }
+        }
+        .disabled(approvedProjectRoots.isEmpty)
+        if isScanningProjects {
+            ProgressView()
+                .controlSize(.small)
+            Text(L10n.text(.aiProjectScanning))
+                .foregroundStyle(.secondary)
+        }
     }
 
     private var projectSummary: String {

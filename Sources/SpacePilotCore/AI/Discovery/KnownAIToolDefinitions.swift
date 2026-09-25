@@ -44,6 +44,14 @@ public enum KnownAIToolDefinitions {
         AIAgentProfile(locality: .remote, formFactors: formFactors, fallbackSymbolName: symbol)
     }
 
+    /// The definition IDs that are AI Agents (carry an `agentProfile`). Skills
+    /// are a per-Agent capability, so the Skills sidebar seeds a group only for
+    /// these — a CLI tool or other AI tool never gets a skills entry, even when
+    /// discovered. Derived from the catalog so it stays correct as tools change.
+    public static let agentDefinitionIDs: Set<String> = Set(
+        all.filter { $0.agentProfile != nil }.map(\.id)
+    )
+
     public static let all: [AIToolDefinition] = [
         AIToolDefinition(
             id: "codex",
@@ -88,7 +96,7 @@ public enum KnownAIToolDefinitions {
             id: "claude",
             displayName: "Claude",
             applicationBundleIdentifiers: ["com.anthropic.claudefordesktop"],
-            dataRootRelativePaths: [".claude"],
+            dataRootRelativePaths: [".claude", "Library/Application Support/Claude"],
             skillRoots: [AIToolRootDescriptor(".claude/skills"), sharedAgentsSkillsRoot],
             pluginRoots: [AIToolRootDescriptor(".claude/plugins")],
             configRelativePaths: [".claude"],
@@ -104,7 +112,11 @@ public enum KnownAIToolDefinitions {
             id: "chatgpt",
             displayName: "ChatGPT",
             applicationBundleIdentifiers: ["com.openai.codex"],
-            dataRootRelativePaths: [],
+            dataRootRelativePaths: [
+                "Library/Application Support/Codex",
+                "Library/Application Support/OpenAI/ChatGPT",
+                "Library/Application Support/OpenAI/Codex"
+            ],
             configRelativePaths: [],
             agentProfile: localAgent([.application], symbol: "bubble.left.and.bubble.right")
         ),
@@ -112,7 +124,7 @@ public enum KnownAIToolDefinitions {
             id: "cursor",
             displayName: "Cursor",
             applicationBundleIdentifiers: ["com.todesktop.230313mzl4w4u92"],
-            dataRootRelativePaths: [".cursor"],
+            dataRootRelativePaths: [".cursor", "Library/Application Support/Cursor"],
             configRelativePaths: [".cursor"],
             cliProbeID: "cursor",
             agentProfile: localAgent([.application, .cli], symbol: "cursorarrow.rays")
@@ -121,7 +133,7 @@ public enum KnownAIToolDefinitions {
             id: "trae-cn",
             displayName: "Trae CN",
             applicationBundleIdentifiers: ["cn.trae.app"],
-            dataRootRelativePaths: [".trae"],
+            dataRootRelativePaths: [".trae", ".trae-cn", "Library/Application Support/Trae CN"],
             skillRoots: [
                 AIToolRootDescriptor(".trae/skills"),
                 AIToolRootDescriptor(
@@ -148,7 +160,7 @@ public enum KnownAIToolDefinitions {
             id: "trae-solo-cn",
             displayName: "TRAE SOLO CN",
             applicationBundleIdentifiers: ["cn.trae.solo.app"],
-            dataRootRelativePaths: [".trae-solo", ".traework"],
+            dataRootRelativePaths: [".trae-solo", ".traework", "Library/Application Support/TRAE SOLO CN"],
             configRelativePaths: [".trae-solo", ".traework"],
             cliProbeID: "traework",
             agentProfile: localAgent([.application, .cli], symbol: "sparkles.rectangle.stack")
@@ -157,7 +169,10 @@ public enum KnownAIToolDefinitions {
             id: "antigravity",
             displayName: "Antigravity",
             applicationBundleIdentifiers: ["com.google.antigravity"],
-            dataRootRelativePaths: [".antigravity"],
+            dataRootRelativePaths: [
+                ".antigravity", ".gemini/antigravity-cli",
+                "Library/Application Support/Antigravity"
+            ],
             configRelativePaths: [".antigravity"],
             cliProbeID: "antigravity",
             agentProfile: localAgent([.application, .cli], symbol: "circle.hexagongrid")
@@ -188,7 +203,7 @@ public enum KnownAIToolDefinitions {
             id: "windsurf",
             displayName: "Windsurf",
             applicationBundleIdentifiers: ["com.exafunction.windsurf"],
-            dataRootRelativePaths: [".windsurf", ".codeium"],
+            dataRootRelativePaths: [".windsurf", ".codeium", "Library/Application Support/Windsurf"],
             configRelativePaths: [".windsurf"],
             cliProbeID: "windsurf",
             agentProfile: localAgent([.application, .cli], symbol: "wind")
@@ -236,7 +251,7 @@ public enum KnownAIToolDefinitions {
         AIToolDefinition(
             id: "aiden",
             displayName: "Aiden",
-            dataRootRelativePaths: [".aiden"],
+            dataRootRelativePaths: [".aiden", "Library/Application Support/aiden-cli"],
             pluginRoots: [AIToolRootDescriptor(".aiden/plugins")],
             configRelativePaths: [".aiden"],
             cliProbeID: "aiden",
@@ -262,10 +277,45 @@ public enum KnownAIToolDefinitions {
             id: "copilot",
             displayName: "GitHub Copilot",
             applicationBundleIdentifiers: [],
-            dataRootRelativePaths: [".config/github-copilot"],
-            configRelativePaths: [".config/github-copilot"],
+            dataRootRelativePaths: [".config/github-copilot", ".copilot"],
+            configRelativePaths: [".config/github-copilot", ".copilot"],
             cliProbeID: "copilot",
             agentProfile: localAgent([.cli], symbol: "terminal")
+        ),
+        // CLI Agents installed as npm globals (resolved through the FNM
+        // node-versions template with package-identity gating in the probe, so a
+        // random binary that merely shares the basename is never accepted). Each
+        // keeps its user-global data/config dot-directory as evidence.
+        AIToolDefinition(
+            id: "relay",
+            displayName: "Relay",
+            dataRootRelativePaths: [".relay"],
+            skillRoots: [AIToolRootDescriptor(".relay/skills")],
+            pluginRoots: [AIToolRootDescriptor(".relay/plugins")],
+            configRelativePaths: [".relay"],
+            cliProbeID: "relay",
+            agentProfile: localAgent([.cli], symbol: "arrow.triangle.2.circlepath")
+        ),
+        AIToolDefinition(
+            id: "pi",
+            displayName: "Pi",
+            dataRootRelativePaths: [".pi/agent"],
+            skillRoots: [AIToolRootDescriptor(".pi/agent/skills")],
+            configRelativePaths: [".pi/agent"],
+            cliProbeID: "pi",
+            agentProfile: localAgent([.cli], symbol: "terminal")
+        ),
+        // DeepSeek Harness (DSH): a local Agent installed from source (checked out
+        // under ~/deepseek-harness, data under ~/.dsh). It exposes no command in
+        // the fixed probe locations and ships no app bundle, so it is surfaced
+        // from its managed data directory rather than a runnable executable.
+        AIToolDefinition(
+            id: "dsh",
+            displayName: "DeepSeek Harness",
+            dataRootRelativePaths: [".dsh"],
+            configRelativePaths: [".dsh"],
+            agentProfile: localAgent([.cli], symbol: "cpu"),
+            surfacesFromDirectoryPresence: true
         ),
         // Continue / Cline / Roo are VS Code extensions, not standalone Agents:
         // they ship no independent application bundle and no controlled agent
@@ -322,6 +372,8 @@ public enum KnownAIToolDefinitions {
             id: "aime",
             displayName: "Aime",
             applicationBundleIdentifiers: ["com.bytedance.aime.electron"],
+            dataRootRelativePaths: [".aime", ".aime_pc", "Library/Application Support/Aime"],
+            configRelativePaths: [".aime"],
             cliProbeID: "aime",
             agentProfile: localAgent([.application, .cli], symbol: "sparkles")
         ),
@@ -329,6 +381,8 @@ public enum KnownAIToolDefinitions {
             id: "mira",
             displayName: "Mira",
             applicationBundleIdentifiers: ["net.byteintl.mira"],
+            dataRootRelativePaths: [".mira", ".mira_cli", ".miramcp", "Library/Application Support/mira"],
+            configRelativePaths: [".mira"],
             cliProbeID: "mira",
             agentProfile: localAgent([.application, .cli], symbol: "sparkles")
         ),
@@ -336,12 +390,14 @@ public enum KnownAIToolDefinitions {
             id: "doubao",
             displayName: "Doubao",
             applicationBundleIdentifiers: ["com.bot.pc.doubao"],
+            dataRootRelativePaths: ["Library/Application Support/Doubao"],
             agentProfile: localAgent([.application], symbol: "bubble.left.and.bubble.right")
         ),
         AIToolDefinition(
             id: "cici",
             displayName: "Cici",
             applicationBundleIdentifiers: ["com.bot.pc.cici"],
+            dataRootRelativePaths: ["Library/Application Support/Cici"],
             agentProfile: localAgent([.application], symbol: "bubble.left.and.bubble.right")
         ),
         AIToolDefinition(
@@ -395,6 +451,47 @@ public enum KnownAIToolDefinitions {
             id: "lark-cli",
             displayName: "Lark CLI",
             cliProbeID: "lark-cli"
+        ),
+        AIToolDefinition(
+            id: "arkcli",
+            displayName: "ARK CLI",
+            cliProbeID: "arkcli"
+        ),
+        // AgentBuddy: a skill/plugin/mcp resource manager CLI (a "skill market"
+        // client), not an Agent. It only ever appears in CLI Tools.
+        AIToolDefinition(
+            id: "agentbuddy",
+            displayName: "AgentBuddy",
+            dataRootRelativePaths: [".agentbuddy"],
+            configRelativePaths: [".agentbuddy"],
+            cliProbeID: "agentbuddy"
+        ),
+        // cis-cli: a supporting CLI whose command is not in the fixed probe
+        // locations, but whose config directory (~/.cis-cli, holding its
+        // credential store and data service) proves it is set up. Surfaced from
+        // that directory as a CLI tool.
+        AIToolDefinition(
+            id: "cis-cli",
+            displayName: "CIS CLI",
+            dataRootRelativePaths: [".cis-cli"],
+            configRelativePaths: [".cis-cli"],
+            surfacesFromDirectoryPresence: true
+        ),
+        // Standalone AI-adjacent tools that are not Agents and not per-Agent tool
+        // providers. Discovered as CLIs, then moved to "Other AI tools" by the
+        // runtime classifier (their definition IDs are in its standalone list).
+        // devspace exposes a local workspace through an MCP server; csj-proxy is
+        // an AI-request proxy.
+        AIToolDefinition(
+            id: "devspace",
+            displayName: "devspace",
+            cliProbeID: "devspace"
+        ),
+        AIToolDefinition(
+            id: "csj-proxy",
+            displayName: "csjadk-proxy",
+            configRelativePaths: [".csj"],
+            cliProbeID: "csj-proxy"
         )
     ]
 }

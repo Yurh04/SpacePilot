@@ -5,6 +5,9 @@ struct ManagedAssetDirectoryMetadata {
     let relativeFileNames: [String]
 
     static func scan(root: URL) -> Self {
+        // Resolve the selected asset root, but never follow links encountered
+        // inside it. Linked skills report their target's footprint, not zero.
+        let root = root.standardizedFileURL.resolvingSymlinksInPath()
         let resourceKeys: Set<URLResourceKey> = [
             .isRegularFileKey,
             .isSymbolicLinkKey,

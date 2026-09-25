@@ -221,6 +221,7 @@ public enum OtherAIToolInstallMethod: String, Codable, Hashable, Sendable {
     case applicationBundle
     case npm
     case homebrew
+    case pipx
     case mcpRegistration
     case unknown
 }
@@ -239,6 +240,8 @@ public struct OtherAIToolRecord: Identifiable, Codable, Hashable, Sendable {
     /// For hook providers, how many Agent events it attaches handlers to. Zero
     /// for tools whose role is not event interception.
     public let interceptedEventCount: Int
+    /// Exact discovery identity retained when an installed CLI also has an MCP role.
+    public var cliUpdateKey: AIUpdateAssetKey?
 
     public init(
         name: String,
@@ -247,7 +250,8 @@ public struct OtherAIToolRecord: Identifiable, Codable, Hashable, Sendable {
         affectedAgentIDs: [String],
         url: URL,
         allocatedSize: Int64,
-        interceptedEventCount: Int = 0
+        interceptedEventCount: Int = 0,
+        cliUpdateKey: AIUpdateAssetKey? = nil
     ) {
         self.id = "other:\(name):\(url.canonicalizedDiscoveryPath)"
         self.name = name
@@ -257,5 +261,6 @@ public struct OtherAIToolRecord: Identifiable, Codable, Hashable, Sendable {
         self.url = url
         self.allocatedSize = allocatedSize
         self.interceptedEventCount = interceptedEventCount
+        self.cliUpdateKey = cliUpdateKey
     }
 }

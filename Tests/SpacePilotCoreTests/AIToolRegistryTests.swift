@@ -147,7 +147,11 @@ final class AIToolRegistryTests: XCTestCase {
             ("traex", "traex"),
             ("lark-cli", "lark-cli"),
             ("aime", "aime"),
-            ("mira", "mira")
+            ("mira", "mira"),
+            ("agentbuddy", "agentbuddy"),
+            ("relay", "relay"),
+            ("pi", "pi"),
+            ("arkcli", "arkcli")
         ] {
             let definition = definitions.first { $0.id == definitionID }
             XCTAssertEqual(definition?.cliProbeID, probeID, "Missing CLI probe for \(definitionID)")
@@ -200,6 +204,87 @@ final class AIToolRegistryTests: XCTestCase {
         let records = try await registry.discover(homeDirectory: home)
 
         XCTAssertTrue(records.isEmpty)
+    }
+
+    func testSurfacesDirectoryPresenceToolWhenDirectoryExists() async throws {
+        let home = URL(filePath: "/Users/test")
+        let definition = AIToolDefinition(
+            id: "cis-cli",
+            displayName: "CIS CLI",
+            dataRootRelativePaths: [".cis-cli"],
+            configRelativePaths: [".cis-cli"],
+            surfacesFromDirectoryPresence: true
+        )
+        let registry = AIToolRegistry(
+            definitions: [definition],
+            applicationLocator: StubApplicationLocator(installed: [:]),
+            directoryProbe: StubDirectoryProbe(results: [
+                canonical(home, ".cis-cli"): .present
+            ]),
+            cliProbe: makeCLIProbe()
+        )
+
+        let records = try await registry.discover(homeDirectory: home)
+
+        XCTAssertEqual(records.count, 1)
+        let record = try XCTUnwrap(records.first)
+        XCTAssertEqual(record.kind, .cli)
+        XCTAssertEqual(record.owner, .tool(definitionID: "cis-cli"))
+        // Directory-backed: proven by its managed directory, not an executable.
+        XCTAssertNil(record.evidence.executableURL)
+        XCTAssertEqual(record.evidence.dataRoots.first?.lastPathComponent, ".cis-cli")
+    }
+
+    func testDirectoryPresenceToolOmittedWhenDirectoryMissing() async throws {
+        let home = URL(filePath: "/Users/test")
+        let definition = AIToolDefinition(
+            id: "cis-cli",
+            displayName: "CIS CLI",
+            dataRootRelativePaths: [".cis-cli"],
+            configRelativePaths: [".cis-cli"],
+            surfacesFromDirectoryPresence: true
+        )
+        let registry = AIToolRegistry(
+            definitions: [definition],
+            applicationLocator: StubApplicationLocator(installed: [:]),
+            directoryProbe: StubDirectoryProbe(results: [:]),
+            cliProbe: makeCLIProbe()
+        )
+
+        let records = try await registry.discover(homeDirectory: home)
+
+        XCTAssertTrue(records.isEmpty)
+    }
+
+    func testDirectoryPresenceAgentAppearsWithoutExecutable() async throws {
+        let home = URL(filePath: "/Users/test")
+        let definition = AIToolDefinition(
+            id: "dsh",
+            displayName: "DeepSeek Harness",
+            dataRootRelativePaths: [".dsh"],
+            configRelativePaths: [".dsh"],
+            agentProfile: KnownAIToolDefinitions.localAgent([.cli], symbol: "cpu"),
+            surfacesFromDirectoryPresence: true
+        )
+        let registry = AIToolRegistry(
+            definitions: [definition],
+            applicationLocator: StubApplicationLocator(installed: [:]),
+            directoryProbe: StubDirectoryProbe(results: [
+                canonical(home, ".dsh"): .present
+            ]),
+            cliProbe: makeCLIProbe()
+        )
+
+        let records = try await registry.discover(homeDirectory: home)
+        let projection = AIAgentProjection(records: records, definitions: [definition])
+
+        // The directory-backed record promotes to a local Agent even though no
+        // executable or app bundle was found.
+        XCTAssertEqual(projection.localAgents.map(\.id), ["dsh"])
+        let agent = try XCTUnwrap(projection.localAgents.first)
+        XCTAssertNil(agent.executableURL)
+        XCTAssertEqual(agent.dataRoots.first?.lastPathComponent, ".dsh")
+        XCTAssertTrue(projection.cliTools.isEmpty)
     }
 
     func testDoesNotFalselyReportUnrelatedBundle() async throws {
@@ -361,6 +446,52 @@ final class AIToolRegistryTests: XCTestCase {
             traex.evidence.aliasExecutableURLs.map(\.lastPathComponent),
             ["trae-agent", "trae-cli"]
         )
+    }
+
+    // MARK: - Agent-only skill ownership
+
+    /// Skills are a per-Agent capability. `agentDefinitionIDs` must include AI
+    /// Agents and exclude supporting CLI tools and standalone "other AI tools",
+    /// so the Skills sidebar (seeded from this set) never shows a CLI/other tool.
+    func testAgentDefinitionIDsIncludeAgentsAndExcludeCLIAndOtherTools() {
+        let agentIDs = KnownAIToolDefinitions.agentDefinitionIDs
+        for id in ["codex", "claude", "traex"] {
+            XCTAssertTrue(agentIDs.contains(id), "\(id) should be classified as an Agent")
+        }
+        for id in ["bytedcli", "lark-cli", "agentbuddy", "devspace", "csj-proxy"] {
+            XCTAssertFalse(agentIDs.contains(id), "\(id) is not an Agent and must not seed a skills group")
+        }
+        // The set is exactly the definitions carrying an agent profile.
+        XCTAssertEqual(
+            agentIDs,
+            Set(KnownAIToolDefinitions.all.filter { $0.agentProfile != nil }.map(\.id))
+        )
+    }
+
+    func testCLIRecordRetainsDataConfigRootsAndCoverageWithoutDesktopApp() async throws {
+        let tree = try TemporaryTree(files: [:])
+        try makeExecutable(at: tree.url.appending(path: ".local/bin/aider"))
+        let definition = AIToolDefinition(
+            id: "test-agent", displayName: "Test Agent",
+            dataRootRelativePaths: [".test-agent"], configRelativePaths: [".config/test-agent", ".denied"],
+            cliProbeID: "aider", agentProfile: KnownAIToolDefinitions.localAgent([.cli], symbol: "terminal")
+        )
+        let registry = AIToolRegistry(
+            definitions: [definition],
+            applicationLocator: StubApplicationLocator(installed: [:]),
+            directoryProbe: StubDirectoryProbe(results: [
+                canonical(tree.url, ".test-agent"): .present,
+                canonical(tree.url, ".config/test-agent"): .present,
+                canonical(tree.url, ".denied"): .failure(.permissionDenied)
+            ]),
+            cliProbe: SafeCLIVersionProbe(runner: VersionByBasenameRunner(versions: ["aider": "1.0.0"]))
+        )
+        let records = try await registry.discover(homeDirectory: tree.url)
+        let entry = try XCTUnwrap(AIAgentProjection(records: records, definitions: [definition]).localAgents.first)
+        XCTAssertEqual(entry.dataRoots.map(\.lastPathComponent), [".test-agent"])
+        XCTAssertEqual(entry.configDirectories.map(\.lastPathComponent), ["test-agent"])
+        XCTAssertEqual(entry.coverageFailures, [.permissionDenied])
+        XCTAssertEqual(entry.detectedVersion, "1.0.0")
     }
 
     // MARK: - Coverage failure retention

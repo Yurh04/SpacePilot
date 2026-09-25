@@ -99,7 +99,6 @@
 "ai.health.section" = "体检发现";
 "ai.health.duplicate" = "技能重复存储";
 "ai.health.large-footprint" = "占用偏大";
-"ai.health.hook-takeover" = "钩子被外部接管";
 "ai.health.symlink" = "软链接技能";
 "ai.health.unreferenced" = "无引用技能";
 "ai.config.section" = "模型与配置";
@@ -401,5 +400,8 @@
 "ai.update.outcome.timed-out" = "超时";
 "ai.update.outcome.cancelled" = "已取消";
 "ai.update.outcome.version-mismatch" = "版本不匹配";
-
 "app.bundle-size" = "应用大小（Finder）";
+"ai.agents.collapse" = "折叠全部 AI Agent";
+"ai.agents.expand" = "展开全部 AI Agent";
+"ai.update.select-hint" = "请先选中一个或多个项目";
+"ai.update.open-app" = "打开应用以更新…";

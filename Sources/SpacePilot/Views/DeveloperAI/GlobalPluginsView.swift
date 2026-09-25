@@ -21,6 +21,7 @@ struct GlobalPluginsView: View {
     let onCancelUpdateCheck: () -> Void
     @Binding var selectedGroupID: String?
     @Binding var selection: Set<UUID>
+    var agents: [AIAgentEntry] = []
 
     /// Grouped view of the discovered plugins. Memoised for the same reason as
     /// the skills page: it is read once per rendered row.
@@ -52,6 +53,8 @@ struct GlobalPluginsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            AIWorkspaceHeader(title: L10n.plugins(), systemImage: "puzzlepiece.extension", count: plugins.count)
+            Divider()
             ProjectApprovalBar(
                 approvedProjectRoots: approvedProjectRoots,
                 approvedProjectRootIssues: approvedProjectRootIssues,
@@ -77,12 +80,12 @@ struct GlobalPluginsView: View {
             } else {
                 HSplitView {
                     groupList
-                        .frame(minWidth: 150, idealWidth: 190, maxWidth: 240)
+                        .frame(minWidth: 160, idealWidth: 180, maxWidth: 220)
                     VStack(spacing: 0) {
                         AIUpdateActionBar(
                             plan: selectionPlan,
                             isChecking: isCheckingUpdates,
-                            onCheckSelected: { onCheckSelectedUpdates(Set(selectionPlan.checkableKeys)) },
+                            onCheckSelected: { onCheckSelectedUpdates(Set(selectionPlan.selected.map(\.key))) },
                             onUpdateSelected: { onUpdateSelected(Set(selectionPlan.selected.map(\.key))) },
                             onCancel: onCancelUpdateCheck
                         )
@@ -102,17 +105,10 @@ struct GlobalPluginsView: View {
 
     private var groupList: some View {
         List(projection.groups, selection: $selectedGroupID) { group in
-            HStack {
-                Text(groupTitle(group))
-                    .lineLimit(1)
-                Spacer(minLength: 8)
-                Text(group.itemCount.formatted())
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-            }
+            AIAssetGroupRow(group: group, title: groupTitle(group), agents: agents)
             .tag(group.id)
         }
+        .listStyle(.sidebar)
     }
 
     private func groupTitle(_ group: AIAssetGroup) -> String {
@@ -199,16 +195,7 @@ struct GlobalPluginsView: View {
     }
 
     private func pluginNameCell(_ plugin: PluginRecord) -> some View {
-        VStack(alignment: .leading) {
-            Text(plugin.name)
-                .lineLimit(1)
-                .truncationMode(.tail)
-            Text(plugin.source)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.tail)
-        }
+        AIAssetIdentity(name: plugin.name, subtitle: plugin.source, url: plugin.url)
         .contextMenu {
             Button(L10n.text(.revealFinder)) { FinderReveal.reveal(plugin.url) }
         }

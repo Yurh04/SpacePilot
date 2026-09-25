@@ -57,13 +57,12 @@ final class AIHealthFindingsTests: XCTestCase {
         XCTAssertFalse(large.contains { $0.detail == "/Users/test/.opencode" })
     }
 
-    func testHookTakeoverOnlyWhenSingleExternalProvider() {
+    func testHookProvidersDoNotProduceFindings() {
+        // Hook takeover was removed as a finding: externally-provided hooks are
+        // informational elsewhere and must not appear in the health list.
         let hooks = [
-            // Single external provider + handlers -> takeover.
             hook(owner: "cursor", event: "sessionStart", handlers: 1, providers: ["Flux Island"]),
-            // No provider attributed -> not a takeover.
             hook(owner: "codex", event: "PreToolUse", handlers: 3, providers: []),
-            // Two providers -> ambiguous, not flagged.
             hook(owner: "codex", event: "Stop", handlers: 2, providers: ["A", "B"])
         ]
         let findings = AIHealthFindings.analyze(
@@ -71,10 +70,7 @@ final class AIHealthFindingsTests: XCTestCase {
             sizesByPath: [:],
             hooks: hooks
         )
-        let takeovers = findings.filter { $0.kind == .hookTakeover }
-        XCTAssertEqual(takeovers.count, 1)
-        XCTAssertEqual(takeovers.first?.subject, "Flux Island")
-        XCTAssertEqual(takeovers.first?.detail, "cursor · sessionStart")
+        XCTAssertTrue(findings.isEmpty)
     }
 
     func testEmptyInputsYieldNoFindings() {

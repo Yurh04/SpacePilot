@@ -99,7 +99,6 @@
 "ai.health.section" = "Health findings";
 "ai.health.duplicate" = "Duplicated skills";
 "ai.health.large-footprint" = "Large footprint";
-"ai.health.hook-takeover" = "Hooks driven externally";
 "ai.health.symlink" = "Symlinked skills";
 "ai.health.unreferenced" = "Unreferenced skills";
 "ai.config.section" = "Model & configuration";
@@ -401,5 +400,8 @@
 "ai.update.summary.unknown" = "Unknown";
 "ai.update.summary.unsupported" = "Unsupported";
 "ai.update.summary.up-to-date" = "Up to date";
-
 "app.bundle-size" = "App size (Finder)";
+"ai.agents.collapse" = "Collapse AI Agents";
+"ai.agents.expand" = "Expand AI Agents";
+"ai.update.select-hint" = "Select one or more rows first";
+"ai.update.open-app" = "Open app to update…";

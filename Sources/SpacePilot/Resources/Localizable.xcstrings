@@ -881,22 +881,6 @@
         }
       }
     },
-    "ai.health.hook-takeover": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hooks driven externally"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "钩子被外部接管"
-          }
-        }
-      }
-    },
     "ai.health.large-footprint": {
       "localizations": {
         "en": {
@@ -6461,6 +6445,70 @@
           "stringUnit": {
             "state": "translated",
             "value": "应用大小（Finder）"
+          }
+        }
+      }
+    },
+    "ai.agents.collapse": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Collapse AI Agents"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "折叠全部 AI Agent"
+          }
+        }
+      }
+    },
+    "ai.agents.expand": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Expand AI Agents"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "展开全部 AI Agent"
+          }
+        }
+      }
+    },
+    "ai.update.select-hint": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select one or more rows first"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先选中一个或多个项目"
+          }
+        }
+      }
+    },
+    "ai.update.open-app": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open app to update…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开应用以更新…"
           }
         }
       }

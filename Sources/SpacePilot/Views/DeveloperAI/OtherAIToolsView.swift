@@ -12,7 +12,26 @@ struct OtherAIToolsView: View {
     let tools: [OtherAIToolRecord]
     let agents: [AIAgentEntry]
     let searchText: String
+    var updateAssets: [AIUpdateAsset] = []
+    var updateResults: [AIUpdateAssetKey: UpdateCheckResult] = [:]
+    var isCheckingUpdates = false
+    var onCheckSelectedUpdates: (Set<AIUpdateAssetKey>) -> Void = { _ in }
+    var onUpdateSelected: (Set<AIUpdateAssetKey>) -> Void = { _ in }
+    var onCancelUpdateCheck: () -> Void = {}
     @State private var selection: Set<String> = []
+
+    private var selectionPlan: AIUpdateSelectionPlan {
+        AIUpdateSelectionPlan(selection: filtered.filter { selection.contains($0.id) }.map {
+            .init(key: AIUpdateIdentity.other($0, assets: updateAssets), displayName: $0.name)
+        }, assets: updateAssets, results: updateResults)
+    }
+
+    private func updateStatus(_ tool: OtherAIToolRecord) -> String {
+        AIUpdateStatusPresentation.statusText(AIUpdateStatusPresentation.result(
+            for: AIUpdateIdentity.other(tool, assets: updateAssets),
+            in: updateResults, isChecking: isCheckingUpdates
+        ))
+    }
 
     private var filtered: [OtherAIToolRecord] {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -21,14 +40,14 @@ struct OtherAIToolsView: View {
     }
 
     private func displayName(forAgent id: String) -> String {
-        agents.first { $0.id == id }?.displayName ?? id
+        agents.first { $0.contains(definitionID: id) }?.displayName ?? id
     }
 
     /// The Agents a tool touches, named rather than shown as raw IDs. Truncated
     /// past three so a tool wired into many Agents does not stretch the column.
     private func usedByText(_ tool: OtherAIToolRecord) -> String {
         guard !tool.affectedAgentIDs.isEmpty else { return "—" }
-        let names = tool.affectedAgentIDs.map(displayName(forAgent:))
+        let names = Array(Set(tool.affectedAgentIDs.map(displayName(forAgent:)))).sorted()
         if names.count <= 3 { return names.joined(separator: " · ") }
         return names.prefix(3).joined(separator: " · ")
             + L10n.andMore(names.count - 3)
@@ -49,12 +68,30 @@ struct OtherAIToolsView: View {
         case .applicationBundle: L10n.text(.aiOtherInstallApp)
         case .npm: "npm"
         case .homebrew: "Homebrew"
+        case .pipx: "pipx"
         case .mcpRegistration: L10n.text(.aiOtherInstallMCP)
         case .unknown: "—"
         }
     }
 
     var body: some View {
+        VStack(spacing: 0) {
+            AIWorkspaceHeader(title: L10n.text(.aiSectionOtherTools), systemImage: "wrench.and.screwdriver", count: tools.count)
+            Divider()
+            if !tools.isEmpty {
+                AIUpdateActionBar(plan: selectionPlan, isChecking: isCheckingUpdates,
+                    onCheckSelected: { onCheckSelectedUpdates(Set(selectionPlan.selected.map(\.key))) },
+                    onUpdateSelected: { onUpdateSelected(Set(selectionPlan.selected.map(\.key))) },
+                    onCancel: onCancelUpdateCheck)
+                Divider()
+            }
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
         if tools.isEmpty {
             ContentUnavailableView(
                 L10n.text(.aiOtherToolsEmpty),
@@ -66,42 +103,63 @@ struct OtherAIToolsView: View {
                 systemImage: "magnifyingglass"
             )
         } else {
-            Table(filtered, selection: $selection) {
-                TableColumn(L10n.text(.name)) { tool in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(tool.name)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                        Text(tool.url.path)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
-                    }
+            GeometryReader { geometry in
+                if PluginTableLayoutMode(availableWidth: geometry.size.width) == .compact {
+                    compactTable
+                } else {
+                    regularTable
                 }
-                TableColumn(L10n.text(.aiOtherKind)) { tool in
-                    Text(kindText(tool.kind))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                }
-                .width(min: 84, ideal: 110, max: 150)
-                TableColumn(L10n.text(.aiOtherInstall)) { tool in
-                    Text(installText(tool.installMethod))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                }
-                .width(min: 70, ideal: 92, max: 120)
-                TableColumn(L10n.text(.aiMCPUsedBy)) { tool in
-                    Text(usedByText(tool))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                }
-                .width(min: 110, ideal: 170, max: 260)
             }
-            .nativeTableDoubleClickReveal { row in
-                guard filtered.indices.contains(row) else { return nil }
-                return filtered[row].url
+        }
+    }
+
+    private var regularTable: some View {
+        Table(filtered, selection: $selection) {
+            TableColumn(L10n.text(.name)) { tool in
+                AIAssetIdentity(name: tool.name, subtitle: tool.url.path, url: tool.url)
             }
+            TableColumn(L10n.text(.aiUpdateStatus)) { Text(updateStatus($0)).lineLimit(2) }
+                .width(min: 90, ideal: 110, max: 145)
+            TableColumn(L10n.text(.aiOtherKind)) { tool in
+                Text(kindText(tool.kind))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            .width(min: 84, ideal: 110, max: 150)
+            TableColumn(L10n.text(.aiOtherInstall)) { tool in
+                Text(installText(tool.installMethod))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            .width(min: 70, ideal: 92, max: 120)
+            TableColumn(L10n.text(.aiMCPUsedBy)) { tool in
+                Text(usedByText(tool))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            .width(min: 110, ideal: 170, max: 260)
+        }
+        .nativeTableDoubleClickReveal { row in
+            guard filtered.indices.contains(row) else { return nil }
+            return filtered[row].url
+        }
+    }
+
+    private var compactTable: some View {
+        Table(filtered, selection: $selection) {
+            TableColumn(L10n.text(.name)) { tool in
+                AIAssetIdentity(name: tool.name, subtitle: tool.url.path, url: tool.url)
+            }
+            TableColumn(L10n.text(.aiUpdateStatus)) { Text(updateStatus($0)).lineLimit(2) }
+                .width(min: 90, ideal: 110, max: 145)
+            TableColumn(L10n.text(.aiMCPUsedBy)) { tool in
+                Text(usedByText(tool)).lineLimit(2).truncationMode(.tail)
+            }
+            .width(min: 72, ideal: 100, max: 130)
+        }
+        .nativeTableDoubleClickReveal { row in
+            guard filtered.indices.contains(row) else { return nil }
+            return filtered[row].url
         }
     }
 }

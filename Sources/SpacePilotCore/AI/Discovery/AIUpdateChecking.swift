@@ -164,6 +164,8 @@ public struct UpdateCheckSummary: Codable, Hashable, Sendable {
 public enum UpdateProviderKind: String, Codable, Hashable, Sendable {
     case npmRegistry
     case pypi
+    case homebrew
+    case homebrewCask
 }
 
 public enum VersionComparatorKind: String, Codable, Hashable, Sendable {
@@ -199,7 +201,8 @@ public struct UpdateCapability: Hashable, Sendable {
 
     private static func defaultComparator(for providerKind: UpdateProviderKind) -> VersionComparatorKind {
         switch providerKind {
-        case .npmRegistry: return .semver
+        case .npmRegistry, .homebrew: return .semver
+        case .homebrewCask: return .pep440
         case .pypi: return .pep440
         }
     }
@@ -230,11 +233,15 @@ public struct AIUpdateAsset: Hashable, Sendable {
 public enum UpdateMetadataRequest: Hashable, Sendable {
     case npm(package: String)
     case pypi(package: String)
+    case homebrew(formula: String)
+    case homebrewCask(token: String)
 
     public var providerKey: String {
         switch self {
         case .npm(let package): "npm:\(package)"
         case .pypi(let package): "pypi:\(package)"
+        case .homebrew(let formula): "homebrew:\(formula)"
+        case .homebrewCask(let token): "homebrew-cask:\(token)"
         }
     }
 
@@ -242,10 +249,15 @@ public enum UpdateMetadataRequest: Hashable, Sendable {
         switch self {
         case .npm(let package):
             let encoded = package.split(separator: "/").map { String($0).addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? String($0) }.joined(separator: "/")
-            return URL(string: "https://registry.npmjs.org/\(encoded)")
+            return URL(string: "https://registry.npmjs.org/\(encoded)/latest")
         case .pypi(let package):
             let encoded = package.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? package
             return URL(string: "https://pypi.org/pypi/\(encoded)/json")
+        case .homebrew(let formula):
+            let encoded = formula.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? formula
+            return URL(string: "https://formulae.brew.sh/api/formula/\(encoded).json")
+        case .homebrewCask(let token):
+            return URL(string: "https://formulae.brew.sh/api/cask/\(token).json")
         }
     }
 }
@@ -348,9 +360,16 @@ public struct LocalUpdateMetadataFetcher: UpdateMetadataFetching {
         let latest: String?
         switch request {
         case .npm:
-            latest = (object["dist-tags"] as? [String: Any])?["latest"] as? String
+            latest = object["version"] as? String
+                ?? (object["dist-tags"] as? [String: Any])?["latest"] as? String
         case .pypi:
             latest = (object["info"] as? [String: Any])?["version"] as? String
+        case .homebrew:
+            latest = (object["versions"] as? [String: Any])?["stable"] as? String
+        case .homebrewCask:
+            // Some casks publish "marketingVersion,build". Compare only the
+            // marketing version with CFBundleShortVersionString, never a build.
+            latest = (object["version"] as? String)?.components(separatedBy: ",").first
         }
         guard let latest, !latest.isEmpty else { throw UpdateCheckFailure.invalidResponse }
         return UpdateMetadataResponse(latestVersion: latest)
@@ -370,9 +389,13 @@ public enum UpdateRequestValidator {
         }
         switch request {
         case .npm(let package):
-            return host == "registry.npmjs.org" && url.path(percentEncoded: false) == "/\(package)"
+            return host == "registry.npmjs.org" && url.path(percentEncoded: false) == "/\(package)/latest"
         case .pypi(let package):
             return host == "pypi.org" && url.path(percentEncoded: false) == "/pypi/\(package)/json"
+        case .homebrew(let formula):
+            return host == "formulae.brew.sh" && url.path(percentEncoded: false) == "/api/formula/\(formula).json"
+        case .homebrewCask(let token):
+            return host == "formulae.brew.sh" && url.path(percentEncoded: false) == "/api/cask/\(token).json"
         }
     }
 
@@ -459,6 +482,12 @@ public struct AIUpdateChecker: Sendable {
         case .pypi:
             guard capability.providerID == "pypi" else { return nil }
             return .pypi(package: capability.packageIdentifier)
+        case .homebrew:
+            guard capability.providerID == "homebrew" else { return nil }
+            return .homebrew(formula: capability.packageIdentifier)
+        case .homebrewCask:
+            guard capability.providerID == "homebrew-cask" else { return nil }
+            return .homebrewCask(token: capability.packageIdentifier)
         }
     }
 

@@ -24,8 +24,8 @@ enum AIUpdateStatusPresentation {
     static func statusText(_ result: UpdateCheckResult?) -> String {
         guard let result else { return L10n.text(.aiUpdateStatusUnknown) }
         return switch result.status {
-        case .unknown: L10n.text(.aiUpdateStatusUnknown)
-        case .unsupported: L10n.text(.aiUpdateStatusUnsupported)
+        case .unknown: L10n.text(result.failure == .noTrustedLocalVersion ? .aiUpdateEvidenceUnknown : .aiUpdateStatusUnknown)
+        case .unsupported: L10n.text(.aiUpdateSkipUnsupported)
         case .checking: L10n.text(.aiUpdateStatusChecking)
         case .upToDate: L10n.text(.aiUpdateStatusUpToDate)
         case .updateAvailable: L10n.text(.aiUpdateStatusAvailable)
@@ -86,12 +86,7 @@ enum AIUpdateKeyBuilder {
     }
 
     static func key(for cli: AIToolRecord) -> AIUpdateAssetKey? {
-        guard let executableURL = cli.evidence.executableURL else { return nil }
-        return AIUpdateAssetKey(
-            kind: .cli,
-            owner: owner(from: cli.owner),
-            canonicalLocation: canonical(executableURL)
-        )
+        AIUpdateIdentity.cli(cli)
     }
 
     static func key(for skill: SkillRecord) -> AIUpdateAssetKey {

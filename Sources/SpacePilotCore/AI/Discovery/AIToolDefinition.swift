@@ -142,6 +142,16 @@ public struct AIToolDefinition: Identifiable, Hashable, Sendable {
     /// and is never inferred from names or the presence of a local executable.
     public let agentProfile: AIAgentProfile?
 
+    /// Opt-in: surface this tool purely from its managed directory when no
+    /// application bundle and no runnable CLI executable are found. Some tools
+    /// have no discoverable command (installed from source, or a command that
+    /// lives outside the fixed probe locations) yet clearly exist on the machine
+    /// because their config/data directory does. Only definitions that set this
+    /// are ever surfaced from directory presence alone; every other tool keeps
+    /// the strict "must have a real app or executable" rule, so a leftover
+    /// dot-directory never fabricates a tool. Default `false`.
+    public let surfacesFromDirectoryPresence: Bool
+
     public init(
         id: String,
         displayName: String,
@@ -156,7 +166,8 @@ public struct AIToolDefinition: Identifiable, Hashable, Sendable {
         updateCapability: UpdateCapability? = nil,
         updateExecutionCapability: UpdateExecutionCapability? = nil,
         projectAssetDescriptors: [AIProjectAssetDescriptor] = [],
-        agentProfile: AIAgentProfile? = nil
+        agentProfile: AIAgentProfile? = nil,
+        surfacesFromDirectoryPresence: Bool = false
     ) {
         self.id = id
         self.displayName = displayName
@@ -172,5 +183,6 @@ public struct AIToolDefinition: Identifiable, Hashable, Sendable {
         self.updateExecutionCapability = updateExecutionCapability
         self.projectAssetDescriptors = projectAssetDescriptors
         self.agentProfile = agentProfile
+        self.surfacesFromDirectoryPresence = surfacesFromDirectoryPresence
     }
 }

@@ -42,6 +42,14 @@ struct CLIToolsView: View {
     }
 
     var body: some View {
+        VStack(spacing: 0) {
+            AIWorkspaceHeader(title: L10n.text(.aiSectionCLI), systemImage: "terminal", count: clis.count)
+            Divider()
+            content
+        }
+    }
+
+    private var content: some View {
         GeometryReader { geometry in
             let layout = PluginTableLayoutMode(availableWidth: geometry.size.width)
             if clis.isEmpty {
@@ -77,7 +85,7 @@ struct CLIToolsView: View {
                     AIUpdateActionBar(
                         plan: selectionPlan,
                         isChecking: isCheckingUpdates,
-                        onCheckSelected: { onCheckSelectedUpdates(Set(selectionPlan.checkableKeys)) },
+                        onCheckSelected: { onCheckSelectedUpdates(Set(selectionPlan.selected.map(\.key))) },
                         onUpdateSelected: { onUpdateSelected(Set(selectionPlan.selected.map(\.key))) },
                         onCancel: onCancelUpdateCheck
                     )
@@ -161,15 +169,9 @@ struct CLIToolsView: View {
     }
 
     private func cliNameCell(_ tool: AIToolRecord) -> some View {
-        VStack(alignment: .leading) {
-            Text(tool.displayName)
-                .lineLimit(1)
-                .truncationMode(.tail)
-            Text(executablePath(for: tool))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.middle)
+        VStack(alignment: .leading, spacing: 0) {
+            AIAssetIdentity(name: tool.displayName, subtitle: executablePath(for: tool),
+                            systemImage: "terminal", tint: .teal)
             if !tool.evidence.aliasExecutableURLs.isEmpty {
                 // Known aliases resolved to the same executable are surfaced as
                 // evidence so the user recognizes the names they invoke (for
