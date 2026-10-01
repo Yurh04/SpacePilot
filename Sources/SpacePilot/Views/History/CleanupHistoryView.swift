@@ -3,6 +3,7 @@ import SwiftUI
 
 struct CleanupHistoryView: View {
     let transactions: [CleanupTransaction]
+    @State private var expandedTransactionIDs: Set<UUID> = []
 
     var body: some View {
         if transactions.isEmpty {
@@ -13,8 +14,20 @@ struct CleanupHistoryView: View {
             }
             .navigationTitle(L10n.cleanupHistory())
         } else {
+            let hoverRows = transactions.flatMap { transaction -> [Bool] in
+                var rows = [true]
+                if expandedTransactionIDs.contains(transaction.id) {
+                    rows.append(contentsOf: transaction.outcomes.map { outcome in
+                        FinderReveal.cleanupHistoryURL(
+                            resultingURL: outcome.resultingURL,
+                            sourceURL: outcome.sourceURL
+                        ) != nil
+                    })
+                }
+                return rows
+            }
             List(transactions) { transaction in
-                DisclosureGroup {
+                DisclosureGroup(isExpanded: expansionBinding(for: transaction.id)) {
                     ForEach(transaction.outcomes) { outcome in
                         let revealURL = FinderReveal.cleanupHistoryURL(
                             resultingURL: outcome.resultingURL,
@@ -76,7 +89,23 @@ struct CleanupHistoryView: View {
                     }
                 }
             }
+            .nativeTableHoverHighlight { row in
+                hoverRows.indices.contains(row) && hoverRows[row]
+            }
             .navigationTitle(L10n.cleanupHistory())
         }
+    }
+
+    private func expansionBinding(for transactionID: UUID) -> Binding<Bool> {
+        Binding(
+            get: { expandedTransactionIDs.contains(transactionID) },
+            set: { isExpanded in
+                if isExpanded {
+                    expandedTransactionIDs.insert(transactionID)
+                } else {
+                    expandedTransactionIDs.remove(transactionID)
+                }
+            }
+        )
     }
 }

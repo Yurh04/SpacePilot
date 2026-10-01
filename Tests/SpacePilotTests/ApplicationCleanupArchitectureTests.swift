@@ -2,6 +2,21 @@ import Foundation
 import XCTest
 
 final class ApplicationCleanupArchitectureTests: XCTestCase {
+    func testAssociationHoverUsesGroupedVisibleRowsIncludingCollapsedState() throws {
+        let applications = try source(at: "Sources/SpacePilot/Views/Applications/ApplicationsView.swift")
+        guard applications.components(separatedBy: ".nativeTableHoverHighlight { row in").count == 3 else {
+            XCTFail("Both application lists must install whole-row hover")
+            return
+        }
+        let hover = try block(in: applications, following: ".nativeTableHoverHighlight { row in", occurrence: 2)
+
+        XCTAssertTrue(hover.contains("ApplicationAssociationGroup.tableRowURLs("))
+        XCTAssertTrue(hover.contains("for: associationGroups"))
+        XCTAssertTrue(hover.contains("collapsedCategories: collapsedCategories"))
+        XCTAssertTrue(hover.contains("expandAll: !searchText.isEmpty"))
+        XCTAssertTrue(hover.contains("rowURLs.indices.contains(row)"))
+    }
+
     func testApplicationCleanupHandlersUseBoundedProjectionInputs() throws {
         let source = try source(at: "Sources/SpacePilot/App/AppModel.swift")
         let uninstall = try functionBody(
@@ -239,6 +254,20 @@ final class ApplicationCleanupArchitectureTests: XCTestCase {
             throw ArchitectureSourceError.markerNotFound(marker)
         }
         return try block(in: source, followingIndex: markerRange.upperBound, marker: marker)
+    }
+
+    private func block(in source: String, following marker: String, occurrence: Int) throws -> String {
+        var remaining = source.startIndex..<source.endIndex
+        for index in 1...occurrence {
+            guard let range = source.range(of: marker, range: remaining) else {
+                throw ArchitectureSourceError.markerNotFound(marker)
+            }
+            if index == occurrence {
+                return try block(in: source, followingIndex: range.lowerBound, marker: marker)
+            }
+            remaining = range.upperBound..<source.endIndex
+        }
+        throw ArchitectureSourceError.markerNotFound(marker)
     }
 
     private func block(

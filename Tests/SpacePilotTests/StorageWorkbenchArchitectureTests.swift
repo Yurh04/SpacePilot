@@ -2,6 +2,18 @@ import Foundation
 import XCTest
 
 final class StorageWorkbenchArchitectureTests: XCTestCase {
+    func testHoverUsesSortedVisibleRowsAndPreservesDeletedChangeSelection() throws {
+        let source = try storageViewSource()
+
+        XCTAssertTrue(source.contains(
+            ".nativeTableHoverHighlight { row in\n                visibleItems.indices.contains(row)"
+        ))
+        XCTAssertTrue(source.contains(
+            ".nativeTableHoverHighlight { row in\n                visibleChanges.indices.contains(row)"
+        ), "Deleted changes remain selectable even though Finder reveal is unavailable")
+        XCTAssertTrue(source.contains("visibleChanges[row].kind != .deleted"))
+    }
+
     func testStorageViewConnectsCategoryAndTableSelection() throws {
         let source = try storageViewSource()
 

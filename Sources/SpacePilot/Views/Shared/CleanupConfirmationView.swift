@@ -90,6 +90,9 @@ struct CleanupConfirmationView: View {
                     }
                 }
             }
+            .nativeTableHoverHighlight { row in
+                !isExecuting && items.indices.contains(row)
+            }
             .frame(minHeight: 220)
 
             Text(verbatim: L10n.selectedItems(

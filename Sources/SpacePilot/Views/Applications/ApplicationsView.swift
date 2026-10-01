@@ -161,6 +161,7 @@ private struct ApplicationListPane: View {
                                 .foregroundStyle(.secondary)
                         }
                         .buttonStyle(.plain)
+                        .interactiveHover(cornerRadius: 6)
                         .accessibilityLabel(L10n.text(.cleanupClearSelection))
                     }
                 }
@@ -217,6 +218,9 @@ private struct ApplicationListPane: View {
                 applications.indices.contains(row)
                     ? applications[row].application.url
                     : nil
+            }
+            .nativeTableHoverHighlight { row in
+                applications.indices.contains(row)
             }
             .listStyle(.sidebar)
             .overlay {
@@ -391,6 +395,14 @@ private struct ApplicationDetail: View {
                 return rowURLs.indices.contains(row)
                     ? rowURLs[row]
                     : nil
+            }
+            .nativeTableHoverHighlight { row in
+                let rowURLs = ApplicationAssociationGroup.tableRowURLs(
+                    for: associationGroups,
+                    collapsedCategories: collapsedCategories,
+                    expandAll: !searchText.isEmpty
+                )
+                return rowURLs.indices.contains(row)
             }
             .listStyle(.inset)
             .overlay {

@@ -91,6 +91,9 @@ struct StorageView: View {
             }
         }
         .listStyle(.inset)
+        .nativeTableHoverHighlight { row in
+            row > 0 && row <= projection.categories.count + 1
+        }
     }
 
     private func itemsWorkspace(_ projection: StorageProjection) -> some View {
@@ -198,6 +201,9 @@ struct StorageView: View {
             }
             .nativeTableDoubleClickReveal { row in
                 visibleItems.indices.contains(row) ? visibleItems[row].url : nil
+            }
+            .nativeTableHoverHighlight { row in
+                visibleItems.indices.contains(row)
             }
         }
 
@@ -319,6 +325,9 @@ struct StorageView: View {
                     visibleChanges[row].kind != .deleted
                 else { return nil }
                 return visibleChanges[row].url
+            }
+            .nativeTableHoverHighlight { row in
+                visibleChanges.indices.contains(row)
             }
         }
 
