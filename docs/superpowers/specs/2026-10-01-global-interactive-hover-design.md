@@ -1,7 +1,7 @@
 # 全局可点击元素悬停反馈设计
 
 日期：2026-10-01  
-状态：待用户审阅  
+状态：已批准
 产品：SpacePilot for macOS 15+，Apple Silicon
 
 ## 目标
