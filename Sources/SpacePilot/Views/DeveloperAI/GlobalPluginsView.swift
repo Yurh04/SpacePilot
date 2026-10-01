@@ -104,11 +104,15 @@ struct GlobalPluginsView: View {
     }
 
     private var groupList: some View {
-        List(projection.groups, selection: $selectedGroupID) { group in
+        let groups = projection.groups
+        return List(groups, selection: $selectedGroupID) { group in
             AIAssetGroupRow(group: group, title: groupTitle(group), agents: agents)
             .tag(group.id)
         }
         .listStyle(.sidebar)
+        .nativeTableHoverHighlight { row in
+            groups.indices.contains(row)
+        }
     }
 
     private func groupTitle(_ group: AIAssetGroup) -> String {
@@ -137,7 +141,8 @@ struct GlobalPluginsView: View {
     }
 
     private var compactTable: some View {
-        Table(filteredPlugins, selection: $selection) {
+        let visiblePlugins = filteredPlugins
+        return Table(visiblePlugins, selection: $selection) {
             TableColumn(L10n.text(.plugin)) { plugin in
                 pluginNameCell(plugin)
             }
@@ -147,11 +152,15 @@ struct GlobalPluginsView: View {
             }
             .width(min: 90, ideal: 110, max: 130)
         }
+        .nativeTableHoverHighlight { row in
+            visiblePlugins.indices.contains(row)
+        }
         .nativeTableDoubleClickReveal(urlAtRow: urlForRow)
     }
 
     private var regularTable: some View {
-        Table(filteredPlugins, selection: $selection) {
+        let visiblePlugins = filteredPlugins
+        return Table(visiblePlugins, selection: $selection) {
             TableColumn(L10n.text(.plugin)) { plugin in
                 pluginNameCell(plugin)
             }
@@ -190,6 +199,9 @@ struct GlobalPluginsView: View {
                     .lineLimit(1)
             }
             .width(min: 76, ideal: 92, max: 104)
+        }
+        .nativeTableHoverHighlight { row in
+            visiblePlugins.indices.contains(row)
         }
         .nativeTableDoubleClickReveal(urlAtRow: urlForRow)
     }

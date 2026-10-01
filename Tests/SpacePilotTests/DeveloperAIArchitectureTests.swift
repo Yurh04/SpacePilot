@@ -88,7 +88,7 @@ final class DeveloperAIArchitectureTests: XCTestCase {
         // Overview first, then one row per discovered AI, then capabilities.
         let overview = try XCTUnwrap(source.range(of: "DeveloperAISidebarRow.overview"))
         let agents = try XCTUnwrap(source.range(of: "ForEach(allAgents)"))
-        let caps = try XCTUnwrap(source.range(of: "DeveloperAISidebarRow.capabilityRows"))
+        let caps = try XCTUnwrap(source.range(of: "ForEach(DeveloperAISidebarRow.capabilityRows)"))
         XCTAssertTrue(overview.lowerBound < agents.lowerBound)
         XCTAssertTrue(agents.lowerBound < caps.lowerBound)
 
@@ -153,7 +153,8 @@ final class DeveloperAIArchitectureTests: XCTestCase {
             XCTAssertTrue(source.contains(".nativeTableDoubleClickReveal(urlAtRow:"))
             XCTAssertTrue(source.contains(".truncationMode("))
             XCTAssertTrue(source.contains("HSplitView"))
-            XCTAssertTrue(source.contains("List(projection.groups"))
+            XCTAssertTrue(source.contains("let groups = projection.groups"))
+            XCTAssertTrue(source.contains("List(groups, selection: $selectedGroupID)"))
             XCTAssertFalse(source.contains(".onTapGesture"))
         }
     }
@@ -250,6 +251,34 @@ final class DeveloperAIArchitectureTests: XCTestCase {
         XCTAssertTrue(cli.contains("discoveryError"))
         // A lightweight refresh banner keeps existing read-only data visible.
         XCTAssertTrue(cli.contains("AIDiscoveryBanner"))
+    }
+
+    func testSidebarSeparatesCustomCollapseHoverFromNativeSelectableRows() throws {
+        let shell = try source(at: "Sources/SpacePilot/Views/DeveloperAI/DeveloperAIView.swift")
+        XCTAssertTrue(shell.contains(".buttonStyle(.plain)\n                .interactiveHover(cornerRadius: 6)"))
+        XCTAssertTrue(shell.contains("let hoverRows = DeveloperAISidebarHoverRows.make("))
+        XCTAssertTrue(shell.contains("hoverRows.indices.contains(row) && hoverRows[row]"))
+        XCTAssertEqual(shell.components(separatedBy: ".interactiveHover").count - 1, 1,
+            "Selectable Agent rows and the read-only capabilities header use no custom hover")
+        let callback = try XCTUnwrap(shell.range(of: ".nativeTableHoverHighlight { row in"))
+        let closure = shell[callback.lowerBound...].components(separatedBy: "\n        }")[0]
+        XCTAssertFalse(closure.contains("allAgents"), "Pointer updates must use the precomputed visible rows")
+    }
+
+    func testAgentDetailHoverCoversRevealRowsAndLeavesSummaryChromeReadOnly() throws {
+        let detail = try source(at: "Sources/SpacePilot/Views/DeveloperAI/AIAgentDetailView.swift")
+        for target in ["file.url", "server.sourceURL", "hook.sourceURL", "item.url", "url"] {
+            let gesture = try XCTUnwrap(detail.range(of: ".onDoubleClickRevealInFinder(\(target))"))
+            XCTAssertTrue(detail[gesture.lowerBound...].prefix(150).contains(".interactiveHover"), target)
+        }
+        XCTAssertTrue(detail.contains(".interactiveHover(isEnabled: revealURL != nil"))
+        XCTAssertFalse(detail.contains(".nativeTableHoverHighlight"), "Agent detail has custom rows, not an NSTableView")
+        for (start, end) in [("private var breakdownModule", "// MARK: - Plugins module"),
+                             ("private func moduleCard", "private var moduleEmpty")] {
+            let lower = try XCTUnwrap(detail.range(of: start)).lowerBound
+            let upper = try XCTUnwrap(detail.range(of: end, range: lower..<detail.endIndex)).lowerBound
+            XCTAssertFalse(detail[lower..<upper].contains(".interactiveHover"), start)
+        }
     }
 
     private func source(at relativePath: String) throws -> String {

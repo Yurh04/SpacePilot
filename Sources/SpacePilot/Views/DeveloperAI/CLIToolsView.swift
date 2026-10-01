@@ -119,7 +119,8 @@ struct CLIToolsView: View {
     }
 
     private var compactTable: some View {
-        Table(filteredCLIs, selection: $selection) {
+        let visibleCLIs = filteredCLIs
+        return Table(visibleCLIs, selection: $selection) {
             TableColumn(L10n.text(.name)) { cliNameCell($0) }
             TableColumn(L10n.text(.aiCLIStatus)) {
                 Text(updateStatusText(for: $0))
@@ -128,11 +129,15 @@ struct CLIToolsView: View {
             }
             .width(min: 96, ideal: 120, max: 140)
         }
+        .nativeTableHoverHighlight { row in
+            visibleCLIs.indices.contains(row)
+        }
         .nativeTableDoubleClickReveal(urlAtRow: urlForRow)
     }
 
     private var regularTable: some View {
-        Table(filteredCLIs, selection: $selection) {
+        let visibleCLIs = filteredCLIs
+        return Table(visibleCLIs, selection: $selection) {
             TableColumn(L10n.text(.name)) { cliNameCell($0) }
             TableColumn(L10n.version()) {
                 Text(currentVersionText(for: $0))
@@ -164,6 +169,9 @@ struct CLIToolsView: View {
                     .truncationMode(.tail)
             }
             .width(min: 96, ideal: 120, max: 150)
+        }
+        .nativeTableHoverHighlight { row in
+            visibleCLIs.indices.contains(row)
         }
         .nativeTableDoubleClickReveal(urlAtRow: urlForRow)
     }

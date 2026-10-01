@@ -62,7 +62,8 @@ struct MCPServersView: View {
     }
 
     private var regularTable: some View {
-        Table(filtered, selection: $selection) {
+        let visibleServers = filtered
+        return Table(visibleServers, selection: $selection) {
             TableColumn(L10n.text(.name)) { server in
                 AIAssetIdentity(name: server.name, subtitle: server.sourceURL.path,
                                 systemImage: "network", tint: .teal)
@@ -92,14 +93,18 @@ struct MCPServersView: View {
             }
             .width(min: 56, ideal: 70, max: 88)
         }
+        .nativeTableHoverHighlight { row in
+            visibleServers.indices.contains(row)
+        }
         .nativeTableDoubleClickReveal { row in
-            guard filtered.indices.contains(row) else { return nil }
-            return filtered[row].sourceURL
+            guard visibleServers.indices.contains(row) else { return nil }
+            return visibleServers[row].sourceURL
         }
     }
 
     private var compactTable: some View {
-        Table(filtered, selection: $selection) {
+        let visibleServers = filtered
+        return Table(visibleServers, selection: $selection) {
             TableColumn(L10n.text(.name)) { server in
                 AIAssetIdentity(name: server.name,
                                 subtitle: "\(displayName(forAgent: server.ownerDefinitionID)) · \(server.sourceURL.path)",
@@ -111,9 +116,12 @@ struct MCPServersView: View {
             }
             .width(min: 72, ideal: 100, max: 130)
         }
+        .nativeTableHoverHighlight { row in
+            visibleServers.indices.contains(row)
+        }
         .nativeTableDoubleClickReveal { row in
-            guard filtered.indices.contains(row) else { return nil }
-            return filtered[row].sourceURL
+            guard visibleServers.indices.contains(row) else { return nil }
+            return visibleServers[row].sourceURL
         }
     }
 }

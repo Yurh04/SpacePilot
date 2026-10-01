@@ -114,7 +114,8 @@ struct OtherAIToolsView: View {
     }
 
     private var regularTable: some View {
-        Table(filtered, selection: $selection) {
+        let visibleTools = filtered
+        return Table(visibleTools, selection: $selection) {
             TableColumn(L10n.text(.name)) { tool in
                 AIAssetIdentity(name: tool.name, subtitle: tool.url.path, url: tool.url)
             }
@@ -139,14 +140,18 @@ struct OtherAIToolsView: View {
             }
             .width(min: 110, ideal: 170, max: 260)
         }
+        .nativeTableHoverHighlight { row in
+            visibleTools.indices.contains(row)
+        }
         .nativeTableDoubleClickReveal { row in
-            guard filtered.indices.contains(row) else { return nil }
-            return filtered[row].url
+            guard visibleTools.indices.contains(row) else { return nil }
+            return visibleTools[row].url
         }
     }
 
     private var compactTable: some View {
-        Table(filtered, selection: $selection) {
+        let visibleTools = filtered
+        return Table(visibleTools, selection: $selection) {
             TableColumn(L10n.text(.name)) { tool in
                 AIAssetIdentity(name: tool.name, subtitle: tool.url.path, url: tool.url)
             }
@@ -157,9 +162,12 @@ struct OtherAIToolsView: View {
             }
             .width(min: 72, ideal: 100, max: 130)
         }
+        .nativeTableHoverHighlight { row in
+            visibleTools.indices.contains(row)
+        }
         .nativeTableDoubleClickReveal { row in
-            guard filtered.indices.contains(row) else { return nil }
-            return filtered[row].url
+            guard visibleTools.indices.contains(row) else { return nil }
+            return visibleTools[row].url
         }
     }
 }

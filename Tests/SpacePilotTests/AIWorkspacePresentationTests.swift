@@ -48,6 +48,35 @@ final class AIWorkspacePresentationTests: XCTestCase {
         }
     }
 
+    func testAgentCardUsesHoverOnItsPlainButtonSurface() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(contentsOf: root.appending(path: "Sources/SpacePilot/Views/DeveloperAI/AIManagementOverviewView.swift"), encoding: .utf8)
+        XCTAssertTrue(source.contains(".buttonStyle(.plain)\n                                .interactiveHover(cornerRadius: 10)"))
+        XCTAssertEqual(source.components(separatedBy: ".interactiveHover").count - 1, 1,
+            "Metric, health, duplication and update summary cards are read-only")
+    }
+
+    func testExpandedSidebarHoverRowsReserveBothHeaderSlots() {
+        XCTAssertEqual(DeveloperAISidebarHoverRows.make(
+            agentCount: 2, agentsExpanded: true, capabilityCount: 3
+        ), [true, false, true, true, false, true, true, true])
+    }
+
+    func testCollapsedSidebarHoverRowsExcludeHiddenAgentsAndCustomToggle() {
+        XCTAssertEqual(DeveloperAISidebarHoverRows.make(
+            agentCount: 2, agentsExpanded: false, capabilityCount: 3
+        ), [true, false, false, true, true, true])
+    }
+
+    func testEmptySidebarOmitsAgentHeaderAndKeepsCapabilitiesHeader() {
+        for expanded in [false, true] {
+            XCTAssertEqual(DeveloperAISidebarHoverRows.make(
+                agentCount: 0, agentsExpanded: expanded, capabilityCount: 3
+            ), [true, false, true, true, true])
+        }
+    }
+
     func testMetricTileIsCompact() {
         let host = NSHostingView(rootView: AIMetricTile(title: "AI Agent", value: "18", systemImage: "sparkles").frame(width: 160))
         XCTAssertLessThanOrEqual(host.fittingSize.height, 64)

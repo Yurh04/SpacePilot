@@ -123,6 +123,7 @@ struct AIManagementOverviewView: View {
                                     .contentShape(RoundedRectangle(cornerRadius: 10))
                                 }
                                 .buttonStyle(.plain)
+                                .interactiveHover(cornerRadius: 10)
                                 .help(agent.displayName)
                             }
                         }

@@ -125,6 +125,9 @@ struct AIApplicationDetailView: View {
                     TableColumn(L10n.risk()) { Text(verbatim: L10n.name(for: $0.risk)) }.width(120)
                     TableColumn(L10n.space()) { Text(ByteCount.string($0.allocatedSize)).monospacedDigit() }.width(100)
                 }
+                .nativeTableHoverHighlight { row in
+                    dataItems.indices.contains(row)
+                }
                 .nativeTableDoubleClickReveal { row in
                     dataItems.indices.contains(row) ? dataItems[row].url : nil
                 }
@@ -158,6 +161,9 @@ struct AIApplicationDetailView: View {
                     TableColumn(L10n.text(.source)) { Text(verbatim: L10n.name(for: $0.scope)) }.width(130)
                     TableColumn(L10n.management()) { Text(verbatim: L10n.name(for: $0.managementStatus)) }.width(120)
                     TableColumn(L10n.space()) { Text(ByteCount.string($0.allocatedSize)).monospacedDigit() }.width(100)
+                }
+                .nativeTableHoverHighlight { row in
+                    skills.indices.contains(row)
                 }
                 .nativeTableDoubleClickReveal { row in
                     skills.indices.contains(row) ? skills[row].url : nil
@@ -244,7 +250,8 @@ struct AIApplicationDetailView: View {
     }
 
     private var compactPluginTable: some View {
-        Table(projection.plugins, selection: $selectedPluginID) {
+        let plugins = projection.plugins
+        return Table(plugins, selection: $selectedPluginID) {
             TableColumn(L10n.text(.plugin)) { plugin in
                 pluginNameCell(plugin)
             }
@@ -255,11 +262,15 @@ struct AIApplicationDetailView: View {
             }
             .width(min: 76, ideal: 92, max: 104)
         }
+        .nativeTableHoverHighlight { row in
+            plugins.indices.contains(row)
+        }
         .nativeTableDoubleClickReveal(urlAtRow: urlForPluginRow)
     }
 
     private var regularPluginTable: some View {
-        Table(projection.plugins, selection: $selectedPluginID) {
+        let plugins = projection.plugins
+        return Table(plugins, selection: $selectedPluginID) {
             TableColumn(L10n.text(.plugin)) { plugin in
                 pluginNameCell(plugin)
             }
@@ -286,6 +297,9 @@ struct AIApplicationDetailView: View {
                     .lineLimit(1)
             }
             .width(min: 76, ideal: 92, max: 104)
+        }
+        .nativeTableHoverHighlight { row in
+            plugins.indices.contains(row)
         }
         .nativeTableDoubleClickReveal(urlAtRow: urlForPluginRow)
     }

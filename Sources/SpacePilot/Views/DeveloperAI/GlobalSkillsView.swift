@@ -115,11 +115,15 @@ struct GlobalSkillsView: View {
     }
 
     private var groupList: some View {
-        List(projection.groups, selection: $selectedGroupID) { group in
+        let groups = projection.groups
+        return List(groups, selection: $selectedGroupID) { group in
             AIAssetGroupRow(group: group, title: groupTitle(group), agents: agents)
             .tag(group.id)
         }
         .listStyle(.sidebar)
+        .nativeTableHoverHighlight { row in
+            groups.indices.contains(row)
+        }
     }
 
     private func groupTitle(_ group: AIAssetGroup) -> String {
@@ -148,7 +152,8 @@ struct GlobalSkillsView: View {
     }
 
     private var compactTable: some View {
-        Table(filteredSkills, selection: $selection) {
+        let visibleSkills = filteredSkills
+        return Table(visibleSkills, selection: $selection) {
             TableColumn(L10n.text(.skill)) { skill in
                 skillNameCell(skill)
             }
@@ -162,11 +167,15 @@ struct GlobalSkillsView: View {
             }
             .width(min: 90, ideal: 110, max: 130)
         }
+        .nativeTableHoverHighlight { row in
+            visibleSkills.indices.contains(row)
+        }
         .nativeTableDoubleClickReveal(urlAtRow: urlForRow)
     }
 
     private var regularTable: some View {
-        Table(filteredSkills, selection: $selection) {
+        let visibleSkills = filteredSkills
+        return Table(visibleSkills, selection: $selection) {
             TableColumn(L10n.text(.skill)) { skill in
                 skillNameCell(skill)
             }
@@ -194,6 +203,9 @@ struct GlobalSkillsView: View {
                     .lineLimit(1)
             }
             .width(min: 76, ideal: 92, max: 104)
+        }
+        .nativeTableHoverHighlight { row in
+            visibleSkills.indices.contains(row)
         }
         .nativeTableDoubleClickReveal(urlAtRow: urlForRow)
     }

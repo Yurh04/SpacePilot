@@ -108,6 +108,7 @@ struct AIAgentDetailView: View {
         HStack(spacing: 10) {
             AgentIcon(descriptor: detail.overview.icon, size: 40)
                 .onDoubleClickRevealInFinder(revealURL)
+                .interactiveHover(isEnabled: revealURL != nil, cornerRadius: 8)
             VStack(alignment: .leading, spacing: 4) {
                 Text(detail.overview.displayName)
                     .font(.title2.weight(.semibold))
@@ -178,7 +179,9 @@ struct AIAgentDetailView: View {
                         FileSystemItemIcon(url: file.url, size: AIWorkspaceLayout.fileIconSize)
                         instructionRow(file)
                     }
+                    .contentShape(Rectangle())
                     .onDoubleClickRevealInFinder(file.url)
+                    .interactiveHover(cornerRadius: 6)
                     .contextMenu {
                         Button(L10n.text(.revealFinder)) { FinderReveal.reveal(file.url) }
                     }
@@ -325,6 +328,7 @@ struct AIAgentDetailView: View {
                 }
                 .contentShape(Rectangle())
                 .onDoubleClickRevealInFinder(server.sourceURL)
+                .interactiveHover(cornerRadius: 6)
                 .contextMenu {
                     Button(L10n.text(.revealFinder)) { FinderReveal.reveal(server.sourceURL) }
                 }
@@ -355,6 +359,7 @@ struct AIAgentDetailView: View {
                 }
                 .contentShape(Rectangle())
                 .onDoubleClickRevealInFinder(hook.sourceURL)
+                .interactiveHover(cornerRadius: 6)
                 .contextMenu {
                     Button(L10n.text(.revealFinder)) { FinderReveal.reveal(hook.sourceURL) }
                 }
@@ -370,7 +375,6 @@ struct AIAgentDetailView: View {
         let url = URL(fileURLWithPath: path)
         return HStack(spacing: 8) {
             AIAssetIdentity(name: label, subtitle: path, url: url)
-                .onDoubleClickRevealInFinder(url)
             Button { FinderReveal.reveal(url) } label: {
                 Image(systemName: "arrow.up.right.square")
             }
@@ -378,6 +382,9 @@ struct AIAgentDetailView: View {
             .accessibilityLabel(L10n.text(.revealFinder))
             .help(L10n.text(.revealFinder))
         }
+        .contentShape(Rectangle())
+        .onDoubleClickRevealInFinder(url)
+        .interactiveHover(cornerRadius: 6)
         .contextMenu {
             Button(L10n.text(.revealFinder)) { FinderReveal.reveal(url) }
         }
@@ -452,6 +459,7 @@ struct AIAgentDetailView: View {
         .padding(.vertical, AIWorkspaceLayout.rowPadding)
         .contentShape(Rectangle())
         .onDoubleClickRevealInFinder(item.url)
+        .interactiveHover(cornerRadius: 6)
         .contextMenu {
             Button(L10n.text(.revealFinder)) { FinderReveal.reveal(item.url) }
         }
@@ -600,6 +608,7 @@ struct AIAgentDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .onDoubleClickRevealInFinder(url)
+        .interactiveHover(cornerRadius: 6)
         .contextMenu {
             Button(L10n.text(.revealFinder)) { FinderReveal.reveal(url) }
         }

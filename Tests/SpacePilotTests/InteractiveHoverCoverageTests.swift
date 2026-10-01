@@ -76,6 +76,21 @@ final class InteractiveHoverCoverageTests: XCTestCase {
             path: "Storage/StorageCapacityOverview.swift")
     }
 
+    func testDeveloperAINativeCollectionsHaveExplicitVisibleRowPredicates() throws {
+        for (file, count) in [("DeveloperAIView", 1), ("AIApplicationDetailView", 4),
+                              ("GlobalSkillsView", 3), ("GlobalPluginsView", 3),
+                              ("MCPServersView", 2), ("CLIToolsView", 2), ("OtherAIToolsView", 2)] {
+            let content = try source("DeveloperAI/\(file).swift")
+            XCTAssertEqual(occurrences(of: ".nativeTableHoverHighlight { row in", in: content), count, file)
+            XCTAssertFalse(content.contains(".nativeTableHoverHighlight()"), file)
+            XCTAssertFalse(content.contains(".onTapGesture"), "\(file): preserve native selection")
+        }
+        let applicationDetail = try source("DeveloperAI/AIApplicationDetailView.swift")
+        let overview = try XCTUnwrap(applicationDetail.range(of: "case .overview:")).lowerBound
+        let storage = try XCTUnwrap(applicationDetail.range(of: "case .dataStorage:")).lowerBound
+        assertNoHover(String(applicationDetail[overview..<storage]), path: "Application read-only overview")
+    }
+
     private func assertNoHover(_ source: String, path: String) {
         XCTAssertFalse(source.contains(".interactiveHover"), path)
         XCTAssertFalse(source.contains(".nativeTableHoverHighlight"), path)

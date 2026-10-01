@@ -1,6 +1,23 @@
 import SpacePilotCore
 import SwiftUI
 
+/// Native row positions include the selection-disabled headers. The Agent
+/// toggle has its own custom hover, so neither header receives native hover.
+enum DeveloperAISidebarHoverRows {
+    static func make(agentCount: Int, agentsExpanded: Bool, capabilityCount: Int) -> [Bool] {
+        var rows = [true] // Overview.
+        if agentCount > 0 {
+            rows.append(false) // Selection-disabled Agent expand/collapse button.
+            if agentsExpanded {
+                rows.append(contentsOf: repeatElement(true, count: agentCount))
+            }
+        }
+        rows.append(false) // Selection-disabled, read-only capabilities label.
+        rows.append(contentsOf: repeatElement(true, count: capabilityCount))
+        return rows
+    }
+}
+
 /// Developer & AI page shell. Presents a stable left-side section list
 /// (Overview / AI Apps / Skills / Plugins / CLI Tools) and routes to the
 /// matching read-only section view. This persistent shell owns the section
@@ -145,6 +162,11 @@ struct DeveloperAIView: View {
     /// identical across all three tiers; the group headers are plain rows that
     /// cannot be selected.
     private func sidebar(_ projection: DeveloperAIProjection) -> some View {
+        let hoverRows = DeveloperAISidebarHoverRows.make(
+            agentCount: allAgents.count,
+            agentsExpanded: agentsExpanded,
+            capabilityCount: DeveloperAISidebarRow.capabilityRows.count
+        )
         let duplicateCount = SkillDuplicationAnalyzer.analyze(
             skills: projection.allSkills + model.projectAIAssetSkills
         ).duplicatedEntityCount
@@ -170,6 +192,7 @@ struct DeveloperAIView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .interactiveHover(cornerRadius: 6)
                 .help(L10n.text(agentsExpanded ? .aiAgentsCollapse : .aiAgentsExpand))
                 .accessibilityLabel(L10n.text(agentsExpanded ? .aiAgentsCollapse : .aiAgentsExpand))
                 .selectionDisabled()
@@ -212,6 +235,9 @@ struct DeveloperAIView: View {
             }
         }
         .listStyle(.sidebar)
+        .nativeTableHoverHighlight { row in
+            hoverRows.indices.contains(row) && hoverRows[row]
+        }
         .environment(\.defaultMinListRowHeight, 42)
     }
 
