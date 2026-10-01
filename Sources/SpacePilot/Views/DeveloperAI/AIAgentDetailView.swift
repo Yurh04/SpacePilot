@@ -375,18 +375,18 @@ struct AIAgentDetailView: View {
         let url = URL(fileURLWithPath: path)
         return HStack(spacing: 8) {
             AIAssetIdentity(name: label, subtitle: path, url: url)
+                .contentShape(Rectangle())
+                .onDoubleClickRevealInFinder(url)
+                .interactiveHover(cornerRadius: 6)
+                .contextMenu {
+                    Button(L10n.text(.revealFinder)) { FinderReveal.reveal(url) }
+                }
             Button { FinderReveal.reveal(url) } label: {
                 Image(systemName: "arrow.up.right.square")
             }
             .buttonStyle(.borderless)
             .accessibilityLabel(L10n.text(.revealFinder))
             .help(L10n.text(.revealFinder))
-        }
-        .contentShape(Rectangle())
-        .onDoubleClickRevealInFinder(url)
-        .interactiveHover(cornerRadius: 6)
-        .contextMenu {
-            Button(L10n.text(.revealFinder)) { FinderReveal.reveal(url) }
         }
     }
 

@@ -71,6 +71,22 @@ final class InteractiveHoverCoverageTests: XCTestCase {
         ))
     }
 
+    func testAgentEvidenceRowScopesRevealAndHoverToIdentity() throws {
+        let detail = try source("DeveloperAI/AIAgentDetailView.swift")
+        let start = try XCTUnwrap(detail.range(of: "private func evidenceRow"))
+        let end = try XCTUnwrap(detail.range(of: "// MARK: - Storage module", range: start.lowerBound..<detail.endIndex))
+        let row = String(detail[start.lowerBound..<end.lowerBound])
+
+        let identity = try XCTUnwrap(row.range(of: "AIAssetIdentity(name: label, subtitle: path, url: url)"))
+        let finderButton = try XCTUnwrap(row.range(of: "Button { FinderReveal.reveal(url) } label:"))
+        XCTAssertLessThan(identity.lowerBound, finderButton.lowerBound)
+        let identitySurface = row[identity.lowerBound..<finderButton.lowerBound]
+        XCTAssertTrue(identitySurface.contains(".onDoubleClickRevealInFinder(url)"))
+        XCTAssertTrue(identitySurface.contains(".interactiveHover(cornerRadius: 6)"))
+        XCTAssertFalse(row[finderButton.lowerBound...].contains(".onDoubleClickRevealInFinder"))
+        XCTAssertFalse(row[finderButton.lowerBound...].contains(".interactiveHover"))
+    }
+
     func testApplicationCollectionsInstallHoverAtBothNativeLists() throws {
         let source = try source("Applications/ApplicationsView.swift")
         XCTAssertEqual(occurrences(of: ".nativeTableHoverHighlight", in: source), 2)
