@@ -170,11 +170,11 @@
 
 本文档应保持简短和最新。已经完成的详细记录写入 Git 提交；长期架构原因写入 `docs/DECISIONS.md`。
 
-## 全局交互悬停：自动化通过，真实界面验收待完成（2026-10-01）
+## 全局交互悬停：自动化通过，已完成解锁后快速界面抽查（2026-10-01）
 
-- 分支 `codex/global-interactive-hover`，悬停代码基线 `75c3510`；验证包含当前保留的既有未提交改动，不代表仅该提交的隔离测试结果。
+- 分支 `codex/global-interactive-hover`，最新悬停代码 `daf215a`；验证包含当前保留的既有未提交改动，不代表仅该提交的隔离测试结果。
 - 已实现共享 `interactiveHover` 与 `nativeTableHoverHighlight`，覆盖自定义可定位面、纯样式按钮、储存/应用列表、开发与 AI 工作区、清理确认及历史普通行；原生控件和只读摘要保留原样。
-- `swift test`：执行 666 项，跳过 1 项，失败 0 项；跳过的是需 `SPACEPILOT_LIVE_AI_CHECK=1` 的本机 AI 清单检查。`./script/test_release.sh` 通过测试、Release 构建、临时启动、资源、签名结构及 ZIP；Gatekeeper 拒绝 ad-hoc 签名仍属预期。
-- 已经通过既有 `./script/build_and_run.sh` 重新启动真实 Debug 应用并确认进程。启动后 Computer Use 返回 `The Mac is locked and automatic unlock could not unlock it.`，因此当前构建的真实视觉与交互验收仍未完成；没有把测试中的 `1200×760` / `806×760` 布局覆盖视为本次真实窗口检查。
-- 解锁后需要在浅色和深色、正常窗口与约 `806×760` 窗口检查概览、储存空间、应用程序、开发与 AI、清理历史：自定义面渐入/渐出且不变尺寸、原生控件没有双重背景、整行高亮、选中颜色优先、标题及禁用控件无误导、滚动/重载无残留，以及单击、双击、右键菜单、键盘导航和 Finder 定位。当前桌面接口没有纯鼠标移动方法，悬停检查需要支持真实指针移动的工具或人工操作。
+- `swift test`：最新记录为执行 667 项，跳过 1 项，失败 0 项；跳过的是需 `SPACEPILOT_LIVE_AI_CHECK=1` 的本机 AI 清单检查。`./script/test_release.sh` 通过测试、Release 构建、临时启动、资源、签名结构及 ZIP；Gatekeeper 拒绝 ad-hoc 签名仍属预期。
+- 已通过既有 `./script/build_and_run.sh` 重新启动真实 Debug 应用。解锁后用当前构建快速抽查五个主页：概览、储存空间、应用程序、开发与 AI、清理历史可正常切换，选中状态与分栏保持稳定；实际拖拽窗口到约 `806×760` 后，概览响应式布局没有横向裁切或文字重叠。
+- 本轮工具可通过点击将指针停留到元素上，但不提供纯指针移动 API，因此不把截图中的停留状态当作完整 hover 渐入/渐出验收。深色模式、原生控件无双重背景、选中颜色优先、标题/禁用行排除、滚动/重载无残留，以及双击、右键、键盘导航和 Finder 定位仍由自动化测试覆盖为主，最终发布前建议做一次人工指针验收。
 - 自动化证据来自 `InteractiveHoverTests`、`NativeTableHoverTests`、`InteractiveHoverCoverageTests` 与现有分组/Finder/页面架构回归；原生适配器共存测试确认 target/action 和单/双击转发，不能据此宣称真实右键菜单、键盘和五页悬停已通过。此功能暂不标为全部验收完成。
