@@ -4,6 +4,66 @@ import XCTest
 
 @MainActor
 final class NativeTableHoverTests: XCTestCase {
+    func testDiscoveryMovesFromTableAToNoTableToTableB() async {
+        let first = HoverTableFixture()
+        let second = HoverTableFixture()
+        defer { first.close(); second.close() }
+        let firstTrackingCount = first.table.trackingAreas.count
+        let secondTrackingCount = second.table.trackingAreas.count
+        let originalFrameNotifications = first.table.postsFrameChangedNotifications
+        let originalBoundsNotifications = first.table.postsBoundsChangedNotifications
+        let originalClipNotifications = first.scroll.contentView.postsBoundsChangedNotifications
+        let coordinator = NativeTableHoverAdapter.Coordinator(isRowInteractive: { _ in true })
+        defer { coordinator.uninstall() }
+
+        coordinator.install(from: first.scroll)
+        await drainMainQueue()
+        XCTAssertEqual(first.table.trackingAreas.count, firstTrackingCount + 1)
+        coordinator.mouseMoved(first.event(row: 1))
+        XCTAssertNotNil(first.decoration(row: 1))
+
+        let detachedAnchor = NSView()
+        coordinator.isRowInteractive = { _ in true }
+        coordinator.install(from: detachedAnchor)
+        await drainMainQueue()
+        XCTAssertEqual(first.table.trackingAreas.count, firstTrackingCount)
+        XCTAssertEqual(first.table.postsFrameChangedNotifications, originalFrameNotifications)
+        XCTAssertEqual(first.table.postsBoundsChangedNotifications, originalBoundsNotifications)
+        XCTAssertEqual(first.scroll.contentView.postsBoundsChangedNotifications, originalClipNotifications)
+        XCTAssertNil(first.decoration(row: 1))
+        coordinator.mouseMoved(first.event(row: 1))
+        XCTAssertNil(first.decoration(row: 1))
+
+        coordinator.install(from: second.scroll)
+        await drainMainQueue()
+        XCTAssertEqual(first.table.trackingAreas.count, firstTrackingCount)
+        XCTAssertEqual(second.table.trackingAreas.count, secondTrackingCount + 1)
+        coordinator.mouseMoved(second.event(row: 1))
+        XCTAssertNotNil(second.decoration(row: 1))
+        XCTAssertNil(first.decoration(row: 1))
+    }
+
+    func testDismantleCancelsQueuedInstallation() async {
+        let fixture = HoverTableFixture()
+        defer { fixture.close() }
+        let originalTrackingCount = fixture.table.trackingAreas.count
+        let coordinator = NativeTableHoverAdapter.Coordinator(isRowInteractive: { _ in true })
+
+        coordinator.install(from: fixture.scroll)
+        NativeTableHoverAdapter.dismantleNSView(fixture.scroll, coordinator: coordinator)
+        await drainMainQueue()
+
+        XCTAssertEqual(fixture.table.trackingAreas.count, originalTrackingCount)
+        coordinator.mouseMoved(fixture.event(row: 1))
+        XCTAssertNil(fixture.decoration(row: 1))
+    }
+
+    private func drainMainQueue() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            DispatchQueue.main.async { continuation.resume() }
+        }
+    }
+
     func testDisabledTableDoesNotHighlight() {
         let fixture = HoverTableFixture()
         defer { fixture.close() }

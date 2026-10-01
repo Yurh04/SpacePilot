@@ -51,8 +51,11 @@ struct NativeTableHoverAdapter: NSViewRepresentable {
             installationGeneration += 1
             let generation = installationGeneration
             DispatchQueue.main.async { [weak self, weak anchor] in
-                guard let self, self.installationGeneration == generation,
-                      let table = anchor?.nearestTableView() else { return }
+                guard let self, self.installationGeneration == generation else { return }
+                guard let table = anchor?.nearestTableView() else {
+                    self.uninstall()
+                    return
+                }
                 self.attach(to: table)
             }
         }
