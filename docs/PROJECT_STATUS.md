@@ -149,3 +149,10 @@ SpacePilot 已进入 0.1.3 内测稳定阶段。核心扫描、持久化索引�
 - 实际已完成代码：Git 历史和通过的测试。
 - 当前工作交接：`docs/CURRENT_WORK.md`。
 - 仅供了解历史设计：`docs/superpowers/specs/` 和 `docs/superpowers/plans/`。
+
+## 全局交互悬停验证检查点（2026-10-01）
+
+- `InteractiveHover.swift` 提供可点击自定义面使用的 `interactiveHover`；`NativeTableHover.swift` 提供普通 List/Table 行使用的 `nativeTableHoverHighlight`，并以可见行映射排除标题、选中与不可交互行。标准原生控件继续使用系统反馈。
+- 在 `codex/global-interactive-hover`、悬停代码基线 `75c3510` 及保留的既有工作树改动上运行 `swift test`：执行 666 项，跳过 1 项，失败 0 项。跳过项为需显式启用的本机 AI 清单检查。
+- `./script/test_release.sh` 通过测试、Release 构建、临时应用启动、资源、签名结构和 ZIP 检查；Gatekeeper 仍拒绝 ad-hoc 开发签名。随后 `./script/build_and_run.sh` 成功启动 Debug 应用，已确认运行进程。
+- 真实界面验收未完成：启动后桌面工具报告 Mac 已锁定且无法自动解锁；浅色/深色、正常窗口和约 `806×760` 窄窗口均未在当前版本完成检查。五个主页面的悬停与输入行为仍待核验，准确清单见 `docs/CURRENT_WORK.md`。
