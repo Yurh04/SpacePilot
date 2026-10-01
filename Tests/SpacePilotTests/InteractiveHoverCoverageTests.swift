@@ -1,5 +1,7 @@
 import Foundation
 import XCTest
+@testable import SpacePilot
+@testable import SpacePilotCore
 
 final class InteractiveHoverCoverageTests: XCTestCase {
     func testApplicationCollectionsInstallHoverAtBothNativeLists() throws {
@@ -13,6 +15,25 @@ final class InteractiveHoverCoverageTests: XCTestCase {
         let source = try source("Applications/ApplicationsView.swift")
         XCTAssertTrue(source.contains(".buttonStyle(.plain)\n                        .interactiveHover(cornerRadius: 6)"))
         XCTAssertEqual(occurrences(of: ".interactiveHover", in: source), 1)
+    }
+
+    func testAssociationVisibleRowMapPreservesHeaderSlotsAndCollapsedSearchExpansion() {
+        let pairs = [
+            associationPair(path: "/tmp/developer", category: .developer),
+            associationPair(path: "/tmp/cache", category: .cache)
+        ]
+        let groups = ApplicationAssociationGroup.grouped(pairs)
+        let collapsedRows = ApplicationAssociationGroup.tableRowURLs(
+            for: groups, collapsedCategories: [.developer], expandAll: false
+        )
+        XCTAssertEqual(collapsedRows, [nil, nil, URL(filePath: "/tmp/cache")])
+
+        let searchingRows = ApplicationAssociationGroup.tableRowURLs(
+            for: groups, collapsedCategories: [.developer], expandAll: true
+        )
+        XCTAssertEqual(searchingRows, [
+            nil, URL(filePath: "/tmp/developer"), nil, URL(filePath: "/tmp/cache")
+        ])
     }
 
     func testStorageInstallsHoverAtCategoryListAndBothTables() throws {
@@ -62,6 +83,20 @@ final class InteractiveHoverCoverageTests: XCTestCase {
 
     private func occurrences(of token: String, in source: String) -> Int {
         source.components(separatedBy: token).count - 1
+    }
+
+    private func associationPair(path: String, category: ItemCategory) -> ApplicationAssociationProjection {
+        let item = ScannedItem(
+            url: URL(filePath: path), logicalSize: 100, allocatedSize: 100,
+            category: category, risk: .rebuildable, explanation: "Hover fixture"
+        )
+        return ApplicationAssociationProjection(
+            association: ArtifactAssociation(
+                itemID: item.id, applicationID: UUID(), evidence: .knownRule,
+                confidence: .high, risk: .rebuildable, ownership: .owned
+            ),
+            item: item
+        )
     }
 
     private func source(_ path: String) throws -> String {

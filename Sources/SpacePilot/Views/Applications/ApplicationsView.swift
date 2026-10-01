@@ -298,6 +298,11 @@ private struct ApplicationDetail: View {
         let associationGroups = ApplicationAssociationGroup.grouped(
             visibleAssociations
         )
+        let rowURLs = ApplicationAssociationGroup.tableRowURLs(
+            for: associationGroups,
+            collapsedCategories: collapsedCategories,
+            expandAll: !searchText.isEmpty
+        )
 
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
@@ -387,22 +392,12 @@ private struct ApplicationDetail: View {
                 }
             }
             .nativeTableDoubleClickReveal { row in
-                let rowURLs = ApplicationAssociationGroup.tableRowURLs(
-                    for: associationGroups,
-                    collapsedCategories: collapsedCategories,
-                    expandAll: !searchText.isEmpty
-                )
                 return rowURLs.indices.contains(row)
                     ? rowURLs[row]
                     : nil
             }
             .nativeTableHoverHighlight { row in
-                let rowURLs = ApplicationAssociationGroup.tableRowURLs(
-                    for: associationGroups,
-                    collapsedCategories: collapsedCategories,
-                    expandAll: !searchText.isEmpty
-                )
-                return rowURLs.indices.contains(row)
+                rowURLs.indices.contains(row) && rowURLs[row] != nil
             }
             .listStyle(.inset)
             .overlay {

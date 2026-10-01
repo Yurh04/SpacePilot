@@ -10,11 +10,20 @@ final class ApplicationCleanupArchitectureTests: XCTestCase {
         }
         let hover = try block(in: applications, following: ".nativeTableHoverHighlight { row in", occurrence: 2)
 
-        XCTAssertTrue(hover.contains("ApplicationAssociationGroup.tableRowURLs("))
-        XCTAssertTrue(hover.contains("for: associationGroups"))
-        XCTAssertTrue(hover.contains("collapsedCategories: collapsedCategories"))
-        XCTAssertTrue(hover.contains("expandAll: !searchText.isEmpty"))
+        XCTAssertFalse(hover.contains("ApplicationAssociationGroup.tableRowURLs("),
+            "Pointer movement must only index the map, never rebuild all visible associations")
         XCTAssertTrue(hover.contains("rowURLs.indices.contains(row)"))
+        XCTAssertTrue(hover.contains("rowURLs[row] != nil"),
+            "Nil disclosure header slots must explicitly reject hover")
+        let detail = try XCTUnwrap(applications.range(of: "private struct ApplicationDetail:"))
+        let list = try XCTUnwrap(applications.range(of: "List(selection: $selectedAssociationID)",
+            range: detail.upperBound..<applications.endIndex))
+        let construction = String(applications[detail.upperBound..<list.lowerBound])
+        XCTAssertTrue(construction.contains("let rowURLs = ApplicationAssociationGroup.tableRowURLs("),
+            "Visible rows must be precomputed during view construction")
+        XCTAssertTrue(construction.contains("for: associationGroups"))
+        XCTAssertTrue(construction.contains("collapsedCategories: collapsedCategories"))
+        XCTAssertTrue(construction.contains("expandAll: !searchText.isEmpty"))
     }
 
     func testApplicationCleanupHandlersUseBoundedProjectionInputs() throws {
