@@ -651,6 +651,7 @@ private struct StorageItemDetail: View {
                 }
             }
             .onDoubleClickRevealInFinder(item.url)
+            .interactiveHover(cornerRadius: 6)
 
             Spacer()
 

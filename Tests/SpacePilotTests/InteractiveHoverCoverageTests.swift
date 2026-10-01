@@ -4,6 +4,73 @@ import XCTest
 @testable import SpacePilotCore
 
 final class InteractiveHoverCoverageTests: XCTestCase {
+    func testEveryClickableViewFileIsInTheAuditInventory() throws {
+        let audited: Set<String> = [
+            "AppRootView.swift", "SidebarView.swift",
+            "Applications/ApplicationsView.swift",
+            "DeveloperAI/AIAgentDetailView.swift", "DeveloperAI/AIApplicationDetailView.swift",
+            "DeveloperAI/AIManagementOverviewView.swift", "DeveloperAI/AIUpdateActionBar.swift",
+            "DeveloperAI/AIUpdateConfirmSheet.swift", "DeveloperAI/CLIToolsView.swift",
+            "DeveloperAI/DeveloperAIView.swift", "DeveloperAI/DiscoveredAIApplicationView.swift",
+            "DeveloperAI/GlobalPluginsView.swift", "DeveloperAI/GlobalSkillsView.swift",
+            "DeveloperAI/MCPServersView.swift", "DeveloperAI/OtherAIToolsView.swift",
+            "DeveloperAI/ProjectApprovalBar.swift", "History/CleanupHistoryView.swift",
+            "Overview/OverviewView.swift", "Settings/SettingsView.swift",
+            "Shared/CleanupConfirmationView.swift", "Shared/FinderReveal.swift",
+            "Shared/InspectorDetailView.swift", "Shared/NativeTableDoubleClick.swift",
+            "Shared/StorageItemRow.swift", "Storage/StorageView.swift"
+        ]
+        let views = repositoryRoot.appending(path: "Sources/SpacePilot/Views")
+        let files = try XCTUnwrap(
+            FileManager.default.enumerator(at: views, includingPropertiesForKeys: nil)
+        ).compactMap { $0 as? URL }.filter { $0.pathExtension == "swift" }
+        let tokens = ["Button", "NavigationLink", "onTapGesture", "simultaneousGesture",
+                      "buttonStyle", "contextMenu", "onDoubleClickRevealInFinder",
+                      "nativeTableDoubleClickReveal", "List(", "List {", "Table(",
+                      "Picker(", "Toggle(", "Menu("]
+        let found = try Set(files.compactMap { file -> String? in
+            let contents = try String(contentsOf: file, encoding: .utf8)
+            guard tokens.contains(where: contents.contains) else { return nil }
+            return String(file.path.dropFirst(views.path.count + 1))
+        })
+        XCTAssertEqual(found, audited, "Review and classify every newly clickable view file")
+    }
+
+    func testTopLevelNativeControlsAndContainersStayUndecorated() throws {
+        for path in ["AppRootView.swift", "SidebarView.swift", "Overview/OverviewView.swift"] {
+            assertNoHover(try source(path), path: path)
+        }
+        let overview = try source("Overview/OverviewView.swift")
+        XCTAssertTrue(overview.contains("HStack(spacing: 0)"))
+        XCTAssertEqual(occurrences(of: "recentChangeMetric(", in: overview), 4)
+        XCTAssertTrue(overview.contains("ViewThatFits(in: .horizontal)"))
+    }
+
+    func testCustomDoubleClickSurfacesShowHoverOnlyWhenRevealIsAvailable() throws {
+        let application = try source("DeveloperAI/AIApplicationDetailView.swift")
+        XCTAssertTrue(application.contains(
+            ".onDoubleClickRevealInFinder(applicationRevealURL)\n                    .interactiveHover(isEnabled: applicationRevealURL != nil"
+        ))
+        let discovered = try source("DeveloperAI/DiscoveredAIApplicationView.swift")
+        XCTAssertTrue(discovered.contains(
+            ".onDoubleClickRevealInFinder(url)\n                    .interactiveHover("
+        ))
+        let recommendation = try source("Shared/StorageItemRow.swift")
+        XCTAssertTrue(recommendation.contains(
+            ".onDoubleClickRevealInFinder(item.url)\n        .interactiveHover("
+        ))
+        let inspector = try source("Shared/InspectorDetailView.swift")
+        XCTAssertEqual(occurrences(of: ".interactiveHover(", in: inspector), 2)
+        let applications = try source("Applications/ApplicationsView.swift")
+        XCTAssertTrue(applications.contains(
+            ".onDoubleClickRevealInFinder(application.url)\n                .interactiveHover("
+        ))
+        let storage = try source("Storage/StorageView.swift")
+        XCTAssertTrue(storage.contains(
+            ".onDoubleClickRevealInFinder(item.url)\n            .interactiveHover("
+        ))
+    }
+
     func testApplicationCollectionsInstallHoverAtBothNativeLists() throws {
         let source = try source("Applications/ApplicationsView.swift")
         XCTAssertEqual(occurrences(of: ".nativeTableHoverHighlight", in: source), 2)
@@ -14,7 +81,7 @@ final class InteractiveHoverCoverageTests: XCTestCase {
     func testApplicationPlainSearchClearButtonHasControlHover() throws {
         let source = try source("Applications/ApplicationsView.swift")
         XCTAssertTrue(source.contains(".buttonStyle(.plain)\n                        .interactiveHover(cornerRadius: 6)"))
-        XCTAssertEqual(occurrences(of: ".interactiveHover", in: source), 1)
+        XCTAssertEqual(occurrences(of: ".interactiveHover", in: source), 2)
     }
 
     func testAssociationVisibleRowMapPreservesHeaderSlotsAndCollapsedSearchExpansion() {
@@ -115,11 +182,14 @@ final class InteractiveHoverCoverageTests: XCTestCase {
     }
 
     private func source(_ path: String) throws -> String {
-        let root = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        return try String(contentsOf: root.appending(path: "Sources/SpacePilot/Views/\(path)"),
+        return try String(contentsOf: repositoryRoot.appending(path: "Sources/SpacePilot/Views/\(path)"),
             encoding: .utf8)
+    }
+
+    private var repositoryRoot: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
     }
 }

@@ -35,6 +35,7 @@ struct AIApplicationDetailView: View {
                 Text(application.name)
                     .font(.title2.weight(.semibold))
                     .onDoubleClickRevealInFinder(applicationRevealURL)
+                    .interactiveHover(isEnabled: applicationRevealURL != nil, cornerRadius: 6)
                     .contextMenu {
                         if let applicationRevealURL {
                             Button(L10n.text(.revealFinder)) {

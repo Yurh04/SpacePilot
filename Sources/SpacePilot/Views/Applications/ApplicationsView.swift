@@ -327,6 +327,7 @@ private struct ApplicationDetail: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .onDoubleClickRevealInFinder(application.url)
+                .interactiveHover(cornerRadius: 8)
 
                 HStack(spacing: 8) {
                     Spacer()

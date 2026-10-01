@@ -36,6 +36,7 @@ struct DiscoveredAIApplicationView: View {
                             .truncationMode(.middle)
                     }
                     .onDoubleClickRevealInFinder(url)
+                    .interactiveHover(cornerRadius: 6)
                     .contextMenu {
                         Button(L10n.text(.revealFinder)) { FinderReveal.reveal(url) }
                     }

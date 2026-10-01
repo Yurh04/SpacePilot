@@ -20,6 +20,7 @@ struct StorageItemRow: View {
                 .foregroundStyle(.secondary)
         }
         .onDoubleClickRevealInFinder(item.url)
+        .interactiveHover(cornerRadius: 6)
         .contextMenu { Button(L10n.text(.revealFinder)) { FinderReveal.reveal(item.url) } }
         .accessibilityLabel("\(item.url.lastPathComponent), \(ByteCount.string(item.allocatedSize)), \(L10n.name(for: item.risk))")
     }
