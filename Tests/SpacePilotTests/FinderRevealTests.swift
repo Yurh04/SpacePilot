@@ -288,6 +288,37 @@ final class FinderRevealArchitectureTests: XCTestCase {
 
 @MainActor
 final class NativeTableDoubleClickCoordinatorTests: XCTestCase {
+    func testSharedDiscoveryUsesContainingTableBeforeSiblingTables() {
+        _ = NSApplication.shared
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 200),
+                              styleMask: [], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        let root = NSView(frame: NSRect(x: 0, y: 0, width: 600, height: 200))
+        let first = NSTableView(frame: NSRect(x: 0, y: 0, width: 200, height: 200))
+        let second = NSTableView(frame: NSRect(x: 300, y: 0, width: 200, height: 200))
+        // Empty NSTableViews shrink to their minimum content size (20 × 15).
+        let anchor = NSView(frame: NSRect(x: 305, y: 2, width: 10, height: 10))
+        root.addSubview(first)
+        root.addSubview(second)
+        root.addSubview(anchor)
+        window.contentView = root
+
+        XCTAssertTrue(anchor.nearestTableView() === second)
+        XCTAssertTrue(first.nearestTableView() === first)
+        XCTAssertNil(NSView().nearestTableView())
+    }
+
+    func testSharedDiscoveryFallsBackToOnlyTableOutsideAnchorBounds() {
+        let root = NSView(frame: NSRect(x: 0, y: 0, width: 600, height: 200))
+        let table = NSTableView(frame: NSRect(x: 0, y: 0, width: 200, height: 200))
+        let anchor = NSView(frame: NSRect(x: 350, y: 50, width: 10, height: 10))
+        root.addSubview(table)
+        root.addSubview(anchor)
+
+        XCTAssertTrue(anchor.nearestTableView() === table)
+    }
+
     func testAttachForwardsActionsRevealsClickedRowAndRestoresLifecycle() {
         _ = NSApplication.shared
         let originalTarget = TableActionTarget()
