@@ -3121,6 +3121,22 @@
         }
       }
     },
+    "category.installer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installers"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安装包"
+          }
+        }
+      }
+    },
     "category.cache": {
       "localizations": {
         "en": {
@@ -4385,6 +4401,22 @@
         }
       }
     },
+    "explanation.installer-for-installed-application": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installer for installed application: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已安装 %@ 的安装包"
+          }
+        }
+      }
+    },
     "explanation.gradle-cache": {
       "localizations": {
         "en": {
@@ -5181,6 +5213,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "查看历史"
+          }
+        }
+      }
+    },
+    "overview.view-installers": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View installers"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查看安装包"
           }
         }
       }

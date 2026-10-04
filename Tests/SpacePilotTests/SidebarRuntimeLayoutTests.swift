@@ -202,6 +202,7 @@ final class SidebarRuntimeLayoutTests: XCTestCase {
             hasSnapshot: true,
             searchText: "",
             mode: .constant(.largest),
+            categorySelection: .constant(.all),
             reviewCleanup: { _ in }
         ))
         hostingView.frame = NSRect(x: 0, y: 0, width: 1_200, height: 760)
@@ -253,6 +254,7 @@ final class SidebarRuntimeLayoutTests: XCTestCase {
                 hasSnapshot: true,
                 searchText: "",
                 mode: .constant(mode),
+                categorySelection: .constant(.all),
                 reviewCleanup: { _ in }
             ))
             hostingView.frame = NSRect(x: 0, y: 0, width: 1_200, height: 760)

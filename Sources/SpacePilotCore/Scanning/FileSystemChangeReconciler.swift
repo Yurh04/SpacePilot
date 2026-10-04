@@ -112,7 +112,8 @@ public enum IncrementalRefreshPlanner {
             home.appending(path: $0).standardizedFileURL.path
         }
         let applicationRoots = (
-            ["Applications"] + ApplicationArtifactRoot.standard.map(\.relativePath)
+            ["Applications"]
+                + ApplicationArtifactRoot.standard.map(\.relativePath)
         ).map {
             home.appending(path: $0).standardizedFileURL.path
         }

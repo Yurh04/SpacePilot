@@ -59,6 +59,13 @@ final class LocalizationTests: XCTestCase {
         XCTAssertEqual(L10n.explanation("Codex conversation history", locale: chinese), "Codex 对话历史")
         XCTAssertEqual(L10n.explanation("Found under Downloads", locale: chinese), "在 Downloads 下发现")
         XCTAssertEqual(
+            L10n.explanation(
+                "Installer for installed application: Google Chrome",
+                locale: chinese
+            ),
+            "已安装 Google Chrome 的安装包"
+        )
+        XCTAssertEqual(
             L10n.explanation("Recognized ChatGPT data root; contents were not indexed", locale: chinese),
             "已识别 ChatGPT 数据根目录；未索引其中内容"
         )
@@ -324,7 +331,7 @@ final class LocalizationTests: XCTestCase {
         let english = try stringsTable(at: resources.appending(path: "en.lproj/Localizable.strings"))
         let chinese = try stringsTable(at: resources.appending(path: "zh-Hans.lproj/Localizable.strings"))
 
-        XCTAssertEqual(L10n.allKeys.count, 407)
+        XCTAssertEqual(L10n.allKeys.count, 410)
         XCTAssertEqual(Set(catalogStrings.keys), L10n.allKeys)
         XCTAssertEqual(Set(english.keys), L10n.allKeys)
         XCTAssertEqual(Set(chinese.keys), L10n.allKeys)
@@ -391,6 +398,18 @@ final class LocalizationTests: XCTestCase {
         )
         XCTAssertNotEqual(ambiguousResult.status, 0)
         XCTAssertTrue(ambiguousResult.output.contains("Expected exactly one"), ambiguousResult.output)
+    }
+
+    func testDebugBuildPrefersStableDevelopmentSigningForPersistentPrivacyPermissions() throws {
+        let script = try String(
+            contentsOf: repositoryRoot.appending(path: "script/build_and_run.sh"),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(script.contains("SPACEPILOT_CODE_SIGN_IDENTITY"))
+        XCTAssertTrue(script.contains("Apple Development:"))
+        XCTAssertTrue(script.contains("\"$BUILD_CONFIGURATION\" == \"debug\""))
+        XCTAssertTrue(script.contains("--sign \"$CODE_SIGN_IDENTITY\""))
     }
 
     private var repositoryRoot: URL {

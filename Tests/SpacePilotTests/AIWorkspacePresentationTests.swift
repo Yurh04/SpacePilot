@@ -11,9 +11,52 @@ final class AIWorkspacePresentationTests: XCTestCase {
         XCTAssertEqual(AIWorkspaceLayout.sectionSpacing, 12)
         XCTAssertEqual(AIWorkspaceLayout.fileIconSize, 24)
         XCTAssertEqual(AIWorkspaceLayout.rowPadding, 3)
-        XCTAssertGreaterThanOrEqual(AIWorkspaceLayout.sidebarMinimum, 200)
-        XCTAssertLessThan(AIWorkspaceLayout.sidebarMinimum, AIWorkspaceLayout.sidebarIdeal)
-        XCTAssertLessThanOrEqual(AIWorkspaceLayout.sidebarMaximum, 280)
+        XCTAssertEqual(AIWorkspaceLayout.sidebarWidth, 232)
+    }
+
+    func testDeveloperAISidebarWidthDoesNotMoveBetweenOverviewAndAgentDetail() throws {
+        let model = AppModel(
+            runtime: nil,
+            homeDirectory: URL(fileURLWithPath: "/Users/test")
+        ) { _, _ in [] }
+        model.aiManagementProjection = AIManagementProjection(records: [
+            AIToolRecord(
+                id: "claude-app",
+                kind: .application,
+                displayName: "Claude",
+                owner: .tool(definitionID: "claude"),
+                evidence: AIToolEvidence(
+                    applicationURL: URL(fileURLWithPath: "/Applications/Claude.app"),
+                    detectedVersion: "1.0"
+                )
+            )
+        ])
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: [],
+            applications: [],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: .complete
+        )
+        let projection = DeveloperAIProjection(snapshot: snapshot)
+
+        let overviewWidth = try renderedSidebarWidth(
+            model: model,
+            projection: projection,
+            selection: .overview
+        )
+        let detailWidth = try renderedSidebarWidth(
+            model: model,
+            projection: projection,
+            selection: .agent(id: "claude")
+        )
+
+        XCTAssertEqual(overviewWidth, AIWorkspaceLayout.sidebarWidth, accuracy: 1)
+        XCTAssertEqual(detailWidth, AIWorkspaceLayout.sidebarWidth, accuracy: 1)
+        XCTAssertEqual(overviewWidth, detailWidth, accuracy: 0.5)
     }
 
     func testNavigationAndCardSymbolsExistOnMacOS() {
@@ -183,5 +226,26 @@ final class AIWorkspacePresentationTests: XCTestCase {
             try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
             try png.write(to: url.appending(path: "\(name)-\(Int(width))-\(appearance).png"))
         }
+    }
+
+    private func renderedSidebarWidth(
+        model: AppModel,
+        projection: DeveloperAIProjection,
+        selection: DeveloperAISidebarRow
+    ) throws -> CGFloat {
+        let host = NSHostingView(rootView: DeveloperAIView(
+            model: model,
+            projection: projection,
+            hasSnapshot: true,
+            initialSidebarRow: selection
+        ))
+        host.frame = NSRect(x: 0, y: 0, width: 1_200, height: 800)
+        host.layoutSubtreeIfNeeded()
+        let split = try XCTUnwrap(allSubviews(in: host).compactMap { $0 as? NSSplitView }.first)
+        return try XCTUnwrap(split.subviews.first).frame.width
+    }
+
+    private func allSubviews(in view: NSView) -> [NSView] {
+        view.subviews + view.subviews.flatMap(allSubviews(in:))
     }
 }

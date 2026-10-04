@@ -198,6 +198,7 @@ enum StorageCategoryAppearance {
     static func color(for category: ItemCategory) -> Color {
         switch category {
         case .application: .red
+        case .installer: .pink
         case .personal: .orange
         case .developer: .green
         case .aiData: .purple
@@ -215,6 +216,7 @@ enum StorageCategoryAppearance {
     static func symbol(for category: ItemCategory) -> String {
         switch category {
         case .application: "app.fill"
+        case .installer: "shippingbox.and.arrow.backward.fill"
         case .personal: "doc.fill"
         case .developer: "hammer.fill"
         case .aiData: "brain.head.profile.fill"

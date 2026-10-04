@@ -111,15 +111,23 @@ struct DeveloperAIView: View {
         )
     }
 
+    init(
+        model: AppModel,
+        projection: DeveloperAIProjection?,
+        hasSnapshot: Bool,
+        initialSidebarRow: DeveloperAISidebarRow = .overview
+    ) {
+        self.model = model
+        self.projection = projection
+        self.hasSnapshot = hasSnapshot
+        _sidebarRow = State(initialValue: initialSidebarRow)
+    }
+
     var body: some View {
         if let projection {
             HSplitView {
                 sidebar(projection)
-                    .frame(
-                        minWidth: AIWorkspaceLayout.sidebarMinimum,
-                        idealWidth: AIWorkspaceLayout.sidebarIdeal,
-                        maxWidth: AIWorkspaceLayout.sidebarMaximum
-                    )
+                    .frame(width: AIWorkspaceLayout.sidebarWidth)
                 rowContent(projection)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }

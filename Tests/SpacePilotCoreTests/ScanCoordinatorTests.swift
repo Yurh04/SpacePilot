@@ -3,6 +3,40 @@ import XCTest
 @testable import SpacePilotCore
 
 final class ScanCoordinatorTests: XCTestCase {
+    func testApplicationsRefreshPublishesMatchedDownloadedInstallerAsSafeCleanupItem() async throws {
+        let home = try TemporaryTree(files: [
+            "Downloads/Focused-1.0-arm64.dmg": 128
+        ])
+        let applicationsDirectory = home.url.appending(
+            path: "Applications",
+            directoryHint: .isDirectory
+        )
+        _ = try TestAppBuilder.make(
+            in: applicationsDirectory,
+            name: "Focused",
+            bundleID: "com.example.focused",
+            version: "1.0",
+            executableBytes: 16
+        )
+        let coordinator = ScanCoordinator(
+            homeDirectory: home.url,
+            store: InMemorySnapshotStore()
+        )
+
+        let snapshot = try await coordinator.collectScan(scope: .applications)
+
+        let installer = try XCTUnwrap(snapshot.items.first {
+            $0.category == .installer
+        })
+        XCTAssertEqual(installer.url.lastPathComponent, "Focused-1.0-arm64.dmg")
+        XCTAssertEqual(installer.risk, .safe)
+        XCTAssertTrue(snapshot.applications.contains { $0.id == installer.ownerID })
+        XCTAssertEqual(
+            snapshot.categoryAggregates?.first { $0.category == .installer }?.itemCount,
+            1
+        )
+    }
+
     func testFocusedScopeIsForwardedToScopedOperation() async throws {
         let recorder = ScanScopeRecorder()
         let snapshot = ScanSnapshot.fixture()
@@ -69,6 +103,23 @@ final class ScanCoordinatorTests: XCTestCase {
     func testPermissionStatusNeverClaimsFullWhenPathsWereDenied() {
         let denied = [URL(fileURLWithPath: "/Users/test/Library/Mail")]
         XCTAssertEqual(PermissionService().coverageStatus(deniedPaths: denied), .limited(deniedPaths: denied))
+    }
+
+    func testPermissionServiceDetectsWhenAPreviouslyDeniedDirectoryBecomesReadable() throws {
+        let tree = try TemporaryTree(files: ["now-readable/item.txt": 8])
+        let readableDirectory = tree.url.appending(
+            path: "now-readable",
+            directoryHint: .isDirectory
+        )
+        let missingDirectory = tree.url.appending(
+            path: "still-unavailable",
+            directoryHint: .isDirectory
+        )
+        let service = PermissionService()
+
+        XCTAssertTrue(service.hasReadableCoverageChange(deniedPaths: [readableDirectory]))
+        XCTAssertFalse(service.hasReadableCoverageChange(deniedPaths: [missingDirectory]))
+        XCTAssertFalse(service.hasReadableCoverageChange(deniedPaths: []))
     }
 
     func testApplicationsScopeDoesNotReadEveryApplicationIdentity()

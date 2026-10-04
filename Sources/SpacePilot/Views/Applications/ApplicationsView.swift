@@ -630,6 +630,7 @@ private extension ItemCategory {
     var systemImage: String {
         switch self {
         case .application: "app"
+        case .installer: "shippingbox.and.arrow.backward"
         case .personal: "person.crop.circle"
         case .developer: "hammer"
         case .aiData: "sparkles.rectangle.stack"

@@ -474,6 +474,7 @@ struct StorageIntelligenceGraph: Sendable {
     private static func role(for category: ItemCategory) -> StorageResourceRole {
         switch category {
         case .application: .application
+        case .installer: .unknown
         case .cache: .cache
         case .log: .log
         case .conversation: .conversation

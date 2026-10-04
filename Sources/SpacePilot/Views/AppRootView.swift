@@ -1,3 +1,4 @@
+import AppKit
 import SpacePilotCore
 import SwiftUI
 
@@ -30,6 +31,9 @@ struct AppRootView: View {
                 ScanStatusView(model: model)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            model.applicationDidBecomeActive()
+        }
         .sheet(isPresented: $model.showingCleanupConfirmation) {
             CleanupConfirmationView(
                 items: model.cleanupCandidates,
@@ -53,16 +57,23 @@ struct AppRootView: View {
                 reviewCleanup: model.prepareCleanup,
                 openStorage: {
                     model.storageItemMode = .largest
+                    model.storageCategorySelection = .all
                     model.selection = .storage
                 },
                 openRecentChanges: {
                     model.storageItemMode = .recent
+                    model.storageCategorySelection = .all
+                    model.selection = .storage
+                },
+                openInstallers: {
+                    model.storageItemMode = .largest
+                    model.storageCategorySelection = .category(.installer)
                     model.selection = .storage
                 },
                 openApplications: { model.selection = .applications },
                 openHistory: { model.selection = .history },
                 openDiskAccessSettings: {
-                    PermissionService().openFullDiskAccessSettings()
+                    model.openFullDiskAccessSettings()
                 }
             )
         case .storage:
@@ -72,6 +83,7 @@ struct AppRootView: View {
                 hasSnapshot: model.latestSnapshot != nil,
                 searchText: model.searchText,
                 mode: $model.storageItemMode,
+                categorySelection: $model.storageCategorySelection,
                 reviewCleanup: model.prepareCleanup
             )
         case .applications:

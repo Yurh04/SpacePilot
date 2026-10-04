@@ -2,22 +2,70 @@ import Foundation
 import XCTest
 
 final class OverviewChartArchitectureTests: XCTestCase {
-    func testOverviewPlacesSpaceDetailsBesideCleanupWithNarrowFallback() throws {
+    func testOverviewSeparatesSummaryAndInsightsWithNarrowFallback() throws {
         let source = try source(at: "Sources/SpacePilot/Views/Overview/OverviewView.swift")
 
         XCTAssertTrue(source.contains("primaryWorkspace("))
-        XCTAssertTrue(source.contains("HStack(alignment: .top, spacing: 12)"))
-        XCTAssertEqual(source.components(separatedBy: ".frame(minWidth: 375").count - 1, 2)
-        XCTAssertTrue(source.contains(".frame(height: 430)"))
-        XCTAssertTrue(source.contains("VStack(alignment: .leading, spacing: 12)"))
+        XCTAssertTrue(source.contains("summaryWorkspace("))
+        XCTAssertTrue(source.contains("insightsWorkspace("))
+        XCTAssertTrue(source.contains("quickLookActions("))
+        XCTAssertTrue(source.contains("HStack(alignment: .top, spacing: 16)"))
+        XCTAssertEqual(
+            source.components(separatedBy: "minWidth: 360,").count - 1,
+            2
+        )
+        XCTAssertTrue(source.contains("VStack(alignment: .leading, spacing: 16)"))
+        let workspaceStart = try XCTUnwrap(source.range(of: "private func primaryWorkspace"))
+        let workspaceEnd = try XCTUnwrap(
+            source.range(of: "private func recentChangesSummary", range: workspaceStart.upperBound..<source.endIndex)
+        )
+        let workspace = String(source[workspaceStart.lowerBound..<workspaceEnd.lowerBound])
+        XCTAssertGreaterThanOrEqual(
+            workspace.components(separatedBy: "maxHeight: .infinity").count - 1,
+            3
+        )
+        XCTAssertTrue(workspace.contains(".fixedSize(horizontal: false, vertical: true)"))
         XCTAssertTrue(source.contains("recentCleanup: state.recentCleanup"))
         XCTAssertTrue(source.contains("if let recentCleanup"))
-        XCTAssertTrue(source.contains("cleanupWorkspace("))
         XCTAssertTrue(source.contains("recentCleanupSummary("))
+        XCTAssertTrue(source.contains("L10n.text(.overviewSpaceDetails)"))
         XCTAssertTrue(source.contains("DiskCapacityChart("))
         XCTAssertTrue(source.contains("AnalyzedCategoryChart("))
         XCTAssertFalse(source.contains("DisclosureGroup"))
         XCTAssertFalse(source.contains("isSpaceDetailsExpanded"))
+    }
+
+    func testOverviewSplitsTheLeftColumnIntoThreeIndependentCards() throws {
+        let source = try source(at: "Sources/SpacePilot/Views/Overview/OverviewView.swift")
+
+        XCTAssertTrue(source.contains("cleanupRecommendationsCard("))
+        XCTAssertTrue(source.contains("recentChangesCard("))
+        XCTAssertTrue(source.contains("recentCleanupCard("))
+        XCTAssertTrue(source.contains("VStack(alignment: .leading, spacing: 12)"))
+    }
+
+    func testQuickActionsShareAResponsiveTopRowWithTheCompactCoverageWarning() throws {
+        let source = try source(at: "Sources/SpacePilot/Views/Overview/OverviewView.swift")
+        let dashboardStart = try XCTUnwrap(source.range(of: "private func dashboard"))
+        let dashboardEnd = try XCTUnwrap(
+            source.range(of: "private func storageStatus", range: dashboardStart.upperBound..<source.endIndex)
+        )
+        let dashboard = String(source[dashboardStart.lowerBound..<dashboardEnd.lowerBound])
+        XCTAssertTrue(dashboard.contains("topActionRow(projection)"))
+
+        let rowStart = try XCTUnwrap(source.range(of: "private func topActionRow"))
+        let rowEnd = try XCTUnwrap(
+            source.range(of: "private func quickLookActions", range: rowStart.upperBound..<source.endIndex)
+        )
+        let row = String(source[rowStart.lowerBound..<rowEnd.lowerBound])
+        XCTAssertTrue(row.contains("HStack(alignment: .center, spacing: 12)"))
+        XCTAssertTrue(row.contains("quickLookActions()"))
+        XCTAssertTrue(row.contains("coverageWarning(projection)"))
+        XCTAssertTrue(row.contains(".frame(minWidth: 620, maxWidth: .infinity)"))
+        XCTAssertTrue(row.contains("VStack(alignment: .leading, spacing: 12)"))
+        XCTAssertTrue(source.contains(".fixedSize(horizontal: true, vertical: false)"))
+        XCTAssertTrue(source.contains(".controlSize(.small)"))
+        XCTAssertTrue(source.contains(".help(L10n.text(.overviewLimitedCoverageDescription))"))
     }
 
     func testOverviewOnlyRendersWholeDiskChartWhenCapacityIsProven() throws {
@@ -102,13 +150,25 @@ final class OverviewChartArchitectureTests: XCTestCase {
     func testOverviewKeepsThePrimaryViewportCompact() throws {
         let source = try source(at: "Sources/SpacePilot/Views/Overview/OverviewView.swift")
 
-        XCTAssertTrue(source.contains("LazyVStack(alignment: .leading, spacing: 12)"))
+        XCTAssertTrue(source.contains("LazyVStack(alignment: .leading, spacing: 16)"))
         XCTAssertTrue(source.contains("recommendationPreviewLimit("))
         XCTAssertTrue(source.contains(".prefix(previewLimit)"))
-        XCTAssertTrue(source.contains("minHeight: 28"))
-        XCTAssertTrue(source.contains("GridItem(.flexible(), spacing: 8)"))
+        XCTAssertTrue(source.contains("GridItem(.flexible(), spacing: 10)"))
         XCTAssertTrue(source.contains("GroupBox"))
         XCTAssertTrue(source.contains(".contentTransition(.numericText())"))
+    }
+
+    func testRecentChangesRemainAHorizontalSummary() throws {
+        let source = try source(at: "Sources/SpacePilot/Views/Overview/OverviewView.swift")
+        let start = try XCTUnwrap(source.range(of: "private func recentChangesSummary"))
+        let end = try XCTUnwrap(
+            source.range(of: "private func recommendationPreviewLimit", range: start.upperBound..<source.endIndex)
+        )
+        let summary = String(source[start.lowerBound..<end.lowerBound])
+
+        XCTAssertTrue(summary.contains("HStack(spacing: 0)"))
+        XCTAssertEqual(summary.components(separatedBy: "recentChangeMetric(").count - 1, 3)
+        XCTAssertFalse(summary.contains("VStack(alignment: .leading, spacing: 12)"))
     }
 
     func testOverviewIncludesARecentChangesQuickAction() throws {
@@ -120,6 +180,18 @@ final class OverviewChartArchitectureTests: XCTestCase {
         XCTAssertTrue(overview.contains("action: openRecentChanges"))
         XCTAssertTrue(root.contains("model.storageItemMode = .recent"))
         XCTAssertTrue(root.contains("mode: $model.storageItemMode"))
+    }
+
+    func testOverviewIncludesAnInstallerQuickAction() throws {
+        let overview = try source(at: "Sources/SpacePilot/Views/Overview/OverviewView.swift")
+        let root = try source(at: "Sources/SpacePilot/Views/AppRootView.swift")
+
+        XCTAssertTrue(overview.contains("overviewViewInstallers"))
+        XCTAssertTrue(overview.contains("shippingbox.and.arrow.backward.fill"))
+        XCTAssertTrue(overview.contains("action: openInstallers"))
+        XCTAssertTrue(root.contains("model.storageItemMode = .largest"))
+        XCTAssertTrue(root.contains("model.storageCategorySelection = .category(.installer)"))
+        XCTAssertTrue(root.contains("categorySelection: $model.storageCategorySelection"))
     }
 
     private func source(at relativePath: String) throws -> String {

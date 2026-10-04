@@ -181,7 +181,7 @@ final class FileSystemChangeMonitorTests: XCTestCase {
             IncrementalRefreshPlanner.scope(
                 for: FileSystemChangeBatch(
                     changedPaths: [
-                        home.appending(path: "Documents/notes.txt")
+                        home.appending(path: "Downloads/Focused-1.0.dmg")
                     ],
                     lastEventID: 3,
                     requiresFullInvalidation: false
@@ -189,6 +189,57 @@ final class FileSystemChangeMonitorTests: XCTestCase {
                 homeDirectory: home
             )
         )
+        XCTAssertNil(
+            IncrementalRefreshPlanner.scope(
+                for: FileSystemChangeBatch(
+                    changedPaths: [
+                        home.appending(path: "Documents/notes.txt")
+                    ],
+                    lastEventID: 4,
+                    requiresFullInvalidation: false
+                ),
+                homeDirectory: home
+            )
+        )
+    }
+
+    func testDownloadedInstallerRefreshPlannerFiltersDownloadsEvents() {
+        let downloads = URL(
+            fileURLWithPath: "/Users/test/Downloads",
+            isDirectory: true
+        )
+        func batch(_ path: String, fullInvalidation: Bool = false) -> FileSystemChangeBatch {
+            FileSystemChangeBatch(
+                changedPaths: [URL(fileURLWithPath: path)],
+                lastEventID: 1,
+                requiresFullInvalidation: fullInvalidation
+            )
+        }
+
+        XCTAssertTrue(DownloadedInstallerRefreshPlanner.shouldRefresh(
+            for: batch("/Users/test/Downloads/Ghostty.dmg"),
+            downloadsDirectory: downloads
+        ))
+        XCTAssertTrue(DownloadedInstallerRefreshPlanner.shouldRefresh(
+            for: batch("/Users/test/Downloads/Ghostty.dmg.part"),
+            downloadsDirectory: downloads
+        ))
+        XCTAssertTrue(DownloadedInstallerRefreshPlanner.shouldRefresh(
+            for: batch(downloads.path),
+            downloadsDirectory: downloads
+        ))
+        XCTAssertTrue(DownloadedInstallerRefreshPlanner.shouldRefresh(
+            for: batch("/Users/test/Downloads/notes.txt", fullInvalidation: true),
+            downloadsDirectory: downloads
+        ))
+        XCTAssertFalse(DownloadedInstallerRefreshPlanner.shouldRefresh(
+            for: batch("/Users/test/Downloads/notes.txt"),
+            downloadsDirectory: downloads
+        ))
+        XCTAssertFalse(DownloadedInstallerRefreshPlanner.shouldRefresh(
+            for: batch("/Users/test/Desktop/Ghostty.dmg"),
+            downloadsDirectory: downloads
+        ))
     }
 }
 

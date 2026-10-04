@@ -17,7 +17,7 @@ final class StorageWorkbenchArchitectureTests: XCTestCase {
     func testStorageViewConnectsCategoryAndTableSelection() throws {
         let source = try storageViewSource()
 
-        XCTAssertTrue(source.contains("@State private var categorySelection"))
+        XCTAssertTrue(source.contains("@Binding var categorySelection"))
         XCTAssertTrue(source.contains("@State private var selectedItemIDs"))
         XCTAssertTrue(source.contains("projection.items("))
         XCTAssertTrue(source.contains("sortOrder: $itemSortOrder"))

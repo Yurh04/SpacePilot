@@ -64,7 +64,27 @@ if [[ "$(xcodebuild -version | awk '/Xcode/ {print int($2)}')" -ge 26 ]]; then
     --output-format human-readable-text
 fi
 chmod +x "$APP_BINARY"
-/usr/bin/codesign --force --deep --options runtime --sign - "$APP_BUNDLE" >/dev/null
+
+# Full Disk Access is attached to the app's signing requirement. An ad-hoc
+# signature uses the binary's CDHash as that requirement, so every rebuild looks
+# like a different app to TCC. Prefer an installed Apple Development identity
+# for Debug builds so local permissions survive rebuilds. Release verification
+# intentionally keeps using ad-hoc signing until Developer ID distribution is
+# configured. SPACEPILOT_CODE_SIGN_IDENTITY can explicitly override either.
+CODE_SIGN_IDENTITY="${SPACEPILOT_CODE_SIGN_IDENTITY:--}"
+if [[ -z "${SPACEPILOT_CODE_SIGN_IDENTITY+x}" && "$BUILD_CONFIGURATION" == "debug" ]]; then
+  DEVELOPMENT_IDENTITY="$(
+    /usr/bin/security find-identity -v -p codesigning 2>/dev/null \
+      | /usr/bin/sed -n 's/.*"\(Apple Development:[^"]*\)".*/\1/p' \
+      | /usr/bin/sed -n '1p'
+  )"
+  if [[ -n "$DEVELOPMENT_IDENTITY" ]]; then
+    CODE_SIGN_IDENTITY="$DEVELOPMENT_IDENTITY"
+  fi
+fi
+
+echo "Signing $APP_NAME with: $CODE_SIGN_IDENTITY"
+/usr/bin/codesign --force --deep --options runtime --sign "$CODE_SIGN_IDENTITY" "$APP_BUNDLE" >/dev/null
 
 open_app() {
   pkill -x "$APP_NAME" >/dev/null 2>&1 || true

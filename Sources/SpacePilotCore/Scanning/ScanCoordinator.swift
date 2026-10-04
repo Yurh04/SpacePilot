@@ -57,15 +57,36 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                 }
             )
             let baseApplications = try await applicationScanner.scan(locations: appLocations)
+            let downloadsDirectory = homeDirectory.appending(
+                path: "Downloads",
+                directoryHint: .isDirectory
+            )
+            let downloadedInstallers: DirectoryScanResult
+            if scope == .developerAI {
+                downloadedInstallers = DirectoryScanResult(
+                    root: downloadsDirectory,
+                    items: previousSnapshot?.items.filter {
+                        $0.category == .installer
+                    } ?? [],
+                    coverage: .complete
+                )
+            } else {
+                downloadedInstallers = try await DownloadedInstallerScanner(
+                    access: LocalFileSystemAccess()
+                ).scan(
+                    downloadsDirectory: downloadsDirectory,
+                    applications: baseApplications
+                )
+            }
             let quickSnapshot = previousSnapshot ?? ScanSnapshot(
                     completedAt: .now,
                     volume: volume,
-                    items: [],
+                    items: downloadedInstallers.items,
                     applications: baseApplications,
                     aiApplications: [],
                     plugins: [],
                     skills: [],
-                    coverage: .complete,
+                    coverage: downloadedInstallers.coverage,
                     pluginDiagnostics: nil
                 )
             emit(ScanEvent(
@@ -126,10 +147,11 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                 )
                 let retainedAssociationItemIDs =
                     retainedApplicationItemIDs.union(retainedAIItemIDs)
-                let preservedItems = previousSnapshot?.items.filter {
-                    !previousAssociationItemIDs.contains($0.id)
-                        || retainedAssociationItemIDs.contains($0.id)
-                } ?? []
+                let preservedItems = (previousSnapshot?.items.filter {
+                    $0.category != .installer
+                        && (!previousAssociationItemIDs.contains($0.id)
+                            || retainedAssociationItemIDs.contains($0.id))
+                } ?? []) + downloadedInstallers.items
                 let canonicalOwnership = try Self.canonicalOwnership(
                     sourceItems: preservedItems,
                     aggregateItems: []
@@ -165,7 +187,10 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                     aiApplications: previousSnapshot?.aiApplications ?? [],
                     plugins: previousSnapshot?.plugins ?? [],
                     skills: previousSnapshot?.skills ?? [],
-                    coverage: previousSnapshot?.coverage ?? .complete,
+                    coverage: Self.mergedCoverage(
+                        previousSnapshot?.coverage ?? .complete,
+                        downloadedInstallers.coverage
+                    ),
                     pluginDiagnostics: previousSnapshot?.pluginDiagnostics,
                     categoryAggregates: Self.categoryAggregates(
                         items: canonicalOwnership.items,
@@ -366,6 +391,7 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                 + claude.items
                 + basicAIScans.flatMap(\.items)
                 + selectedApplicationItems
+                + downloadedInstallers.items
             let canonicalOwnership = try Self.canonicalOwnership(
                 sourceItems: sourceItems,
                 aggregateItems: selectedApplicationItems
@@ -466,7 +492,10 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                 aiApplications: aiApplications,
                 plugins: pluginResult.plugins,
                 skills: indexedSkills,
-                coverage: homeResult.coverage,
+                coverage: Self.mergedCoverage(
+                    homeResult.coverage,
+                    downloadedInstallers.coverage
+                ),
                 pluginDiagnostics: pluginDiscovery.diagnostics.map(\.message) + pluginResult.diagnostics,
                 categoryAggregates: Self.categoryAggregates(
                     items: items,
@@ -505,6 +534,22 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
 
     private static func canonicalPath(for url: URL) -> String {
         url.standardizedFileURL.resolvingSymlinksInPath().path
+    }
+
+    private static func mergedCoverage(
+        _ lhs: ScanCoverage,
+        _ rhs: ScanCoverage
+    ) -> ScanCoverage {
+        let deniedPaths = Dictionary(
+            (lhs.deniedPaths + rhs.deniedPaths).map {
+                ($0.standardizedFileURL.path, $0.standardizedFileURL)
+            },
+            uniquingKeysWith: { first, _ in first }
+        ).values.sorted { $0.path < $1.path }
+        return ScanCoverage(
+            deniedPaths: deniedPaths,
+            notes: Array(Set(lhs.notes + rhs.notes)).sorted()
+        )
     }
 
     private static func retainedApplicationDetails(

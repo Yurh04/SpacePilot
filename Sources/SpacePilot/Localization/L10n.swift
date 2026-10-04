@@ -224,6 +224,7 @@ enum L10n {
         static let overviewTopOpportunities = Self(key: "overview.top-opportunities", english: "Top cleanup opportunities")
         static let overviewViewApplications = Self(key: "overview.view-applications", english: "View application storage")
         static let overviewViewHistory = Self(key: "overview.view-history", english: "View history")
+        static let overviewViewInstallers = Self(key: "overview.view-installers", english: "View installers")
         static let overviewViewLargestItems = Self(key: "overview.view-largest-items", english: "View largest items")
         static let overviewViewRecentChanges = Self(key: "overview.view-recent-changes", english: "View recent changes")
         static let overviewWorksLocally = Self(key: "overview.works-locally", english: "SpacePilot works locally and indexes metadata only.")
@@ -288,7 +289,7 @@ enum L10n {
 
         "category.ai-data", "category.application", "category.cache", "category.conversation",
         "category.developer", "category.log", "category.model", "category.personal",
-        "category.plugin", "category.skill", "category.system", "category.unclassified",
+        "category.installer", "category.plugin", "category.skill", "category.system", "category.unclassified",
         "common.cancel", "common.location", "common.management", "common.risk", "common.scan",
         "common.skills", "common.space", "common.version", "nav.applications",
         "nav.cleanup-history", "nav.developer-ai", "nav.overview", "nav.storage",
@@ -375,7 +376,7 @@ enum L10n {
         "overview.start-scan", "overview.status-attention", "overview.status-critical",
         "overview.status-healthy", "overview.status-unknown", "overview.storage-status", "overview.storage-glance",
         "overview.top-opportunities", "overview.view-applications", "overview.view-history",
-        "overview.view-largest-items", "overview.view-recent-changes",
+        "overview.view-installers", "overview.view-largest-items", "overview.view-recent-changes",
         "overview.works-locally", "plugins.diagnostic-empty-skill", "plugins.diagnostic-generic",
         "plugins.diagnostic-invalid-manifest", "plugins.diagnostic-missing-manifest",
         "plugins.diagnostic-path-inaccessible",
@@ -409,6 +410,7 @@ enum L10n {
         "explanation.claude-settings", "explanation.codex-cache", "explanation.codex-configuration",
         "explanation.codex-conversation", "explanation.codex-logs", "explanation.exact-bundle-match",
         "explanation.found-under", "explanation.gradle-cache", "explanation.homebrew-cache",
+        "explanation.installer-for-installed-application",
         "explanation.npm-cache", "explanation.pip-cache", "explanation.recognized-root",
         "explanation.simulator-data", "explanation.xcode-archives", "explanation.xcode-build",
         "cleanup.message.changed", "cleanup.message.moved", "cleanup.message.outside-volume",
@@ -576,6 +578,10 @@ enum L10n {
         value("category.application", default: "Application Data", locale: locale)
     }
 
+    static func categoryInstaller(locale: Locale? = nil) -> String {
+        value("category.installer", default: "Installers", locale: locale)
+    }
+
     static func categoryPersonal(locale: Locale? = nil) -> String {
         value("category.personal", default: "Personal Files", locale: locale)
     }
@@ -642,6 +648,7 @@ enum L10n {
     static func name(for category: ItemCategory, locale: Locale? = nil) -> String {
         switch category {
         case .application: categoryApplication(locale: locale)
+        case .installer: categoryInstaller(locale: locale)
         case .personal: categoryPersonal(locale: locale)
         case .developer: categoryDeveloper(locale: locale)
         case .aiData: categoryAIData(locale: locale)
@@ -944,6 +951,15 @@ enum L10n {
         }
         if source.hasPrefix("Exact bundle identifier match: ") {
             return format("explanation.exact-bundle-match", default: "Exact bundle identifier match: %@", locale: locale, String(source.dropFirst(31)))
+        }
+        let installerPrefix = "Installer for installed application: "
+        if source.hasPrefix(installerPrefix) {
+            return format(
+                "explanation.installer-for-installed-application",
+                default: "Installer for installed application: %@",
+                locale: locale,
+                String(source.dropFirst(installerPrefix.count))
+            )
         }
         let recognizedPrefix = "Recognized "
         let recognizedSuffix = " data root; contents were not indexed"

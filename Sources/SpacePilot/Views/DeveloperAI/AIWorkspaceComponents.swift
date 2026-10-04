@@ -8,9 +8,9 @@ enum AIWorkspaceLayout {
     static let sectionSpacing: CGFloat = 12
     static let fileIconSize: CGFloat = 24
     static let rowPadding: CGFloat = 3
-    static let sidebarMinimum: CGFloat = 200
-    static let sidebarIdeal: CGFloat = 232
-    static let sidebarMaximum: CGFloat = 280
+    /// The section list must not be renegotiated by `HSplitView` when the
+    /// selected destination changes its intrinsic content width.
+    static let sidebarWidth: CGFloat = 232
 }
 
 struct AIWorkspaceIcon: View {

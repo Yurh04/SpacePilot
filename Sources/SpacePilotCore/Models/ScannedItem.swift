@@ -13,6 +13,7 @@ public enum RiskLevel: String, Codable, CaseIterable, Comparable, Sendable {
 
 public enum ItemCategory: String, Codable, CaseIterable, Sendable {
     case application
+    case installer
     case personal
     case developer
     case aiData

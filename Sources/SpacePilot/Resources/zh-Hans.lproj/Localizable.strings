@@ -1,5 +1,6 @@
 "category.ai-data" = "AI 数据";
 "category.application" = "应用数据";
+"category.installer" = "安装包";
 "category.cache" = "缓存";
 "category.conversation" = "对话";
 "category.developer" = "开发文件";
@@ -248,6 +249,7 @@
 "overview.top-opportunities" = "优先清理建议";
 "overview.view-applications" = "查看应用占用";
 "overview.view-history" = "查看历史";
+"overview.view-installers" = "查看安装包";
 "overview.view-largest-items" = "查看最大项目";
 "overview.view-recent-changes" = "查看最近变化";
 "overview.works-locally" = "SpacePilot 在本地运行，并且只索引元数据。";
@@ -332,6 +334,7 @@
 "explanation.codex-logs" = "Codex 诊断日志";
 "explanation.exact-bundle-match" = "精确匹配 Bundle 标识符：%@";
 "explanation.found-under" = "在 %@ 下发现";
+"explanation.installer-for-installed-application" = "已安装 %@ 的安装包";
 "explanation.gradle-cache" = "Gradle 依赖缓存";
 "explanation.homebrew-cache" = "Homebrew 下载缓存";
 "explanation.npm-cache" = "npm 下载缓存";

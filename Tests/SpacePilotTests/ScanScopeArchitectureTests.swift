@@ -26,6 +26,18 @@ final class ScanScopeArchitectureTests: XCTestCase {
         XCTAssertTrue(source.contains("startScan(scope: scope)"))
     }
 
+    func testFullDiskAccessReturnAndChangedStartupCoverageRequestOneFullRefresh() throws {
+        let modelSource = try read("Sources/SpacePilot/App/AppModel.swift")
+        let rootSource = try read("Sources/SpacePilot/Views/AppRootView.swift")
+
+        XCTAssertTrue(rootSource.contains("NSApplication.didBecomeActiveNotification"))
+        XCTAssertTrue(rootSource.contains("model.applicationDidBecomeActive()"))
+        XCTAssertTrue(rootSource.contains("model.openFullDiskAccessSettings()"))
+        XCTAssertTrue(modelSource.contains("refreshCoverageAfterDiskAccessSettings = true"))
+        XCTAssertTrue(modelSource.contains("requestAutomaticRefresh(scope: .full)"))
+        XCTAssertTrue(modelSource.contains("hasReadableCoverageChange(deniedPaths: deniedPaths)"))
+    }
+
     func testCleanupUpdatesSnapshotWithoutStartingAnotherScan() throws {
         let source = try read("Sources/SpacePilot/App/AppModel.swift")
         let cleanupBody = try block(

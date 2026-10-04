@@ -23,6 +23,7 @@ final class AppModel {
     var projection: AppSnapshotProjection?
     var storageChangeHistory = StorageChangeHistory()
     var storageItemMode: StorageItemMode = .largest
+    var storageCategorySelection: StorageCategorySelection = .all
     var aiQueryProjection: AIApplicationQueryProjection?
     var scanStage: ScanStage?
     var scanProgress = 0.0
@@ -138,8 +139,13 @@ final class AppModel {
     private var aiQueryPublicationTask: Task<Void, Never>?
     private var fileSystemMonitor: FileSystemChangeMonitor?
     private var fileSystemChangeReconciler: FileSystemChangeReconciler?
+    private var downloadsDirectoryMonitor: FileSystemChangeMonitor?
+    private var downloadsDirectoryChangeReconciler: FileSystemChangeReconciler?
+    private var applicationDirectoryMonitor: FileSystemChangeMonitor?
+    private var applicationDirectoryChangeReconciler: FileSystemChangeReconciler?
     private var storageChangeTracker: StorageChangeTracker?
     private var pendingAutomaticRefreshScope: ScanScope?
+    private var refreshCoverageAfterDiskAccessSettings = false
     private let runtime: SpacePilotRuntime?
     private let approvedProjectRootStore: any ApprovedProjectRootStoring
     private let approvedProjectRootValidator = ApprovedProjectRootValidator()
@@ -401,6 +407,17 @@ final class AppModel {
         startScan(scope: scope)
     }
 
+    func openFullDiskAccessSettings() {
+        refreshCoverageAfterDiskAccessSettings = true
+        PermissionService().openFullDiskAccessSettings()
+    }
+
+    func applicationDidBecomeActive() {
+        guard refreshCoverageAfterDiskAccessSettings else { return }
+        refreshCoverageAfterDiskAccessSettings = false
+        requestAutomaticRefresh(scope: .full)
+    }
+
     func prepareCleanup(items: [ScannedItem]) {
         let eligible = items
             .filter { $0.risk != .managed }
@@ -591,6 +608,7 @@ final class AppModel {
                 _ = try await runtime.store.establishStorageChangeBaselineIfNeeded(
                     snapshot: snapshot
                 )
+                await refreshCoverageIfPermissionsChanged(snapshot.coverage)
             }
             cleanupHistory = try await runtime.store.cleanupHistory()
             storageChangeHistory = try await runtime.store.storageChangeHistory()
@@ -604,6 +622,16 @@ final class AppModel {
                 "Could not start storage monitoring: \(error.localizedDescription, privacy: .public)"
             )
         }
+    }
+
+    private func refreshCoverageIfPermissionsChanged(_ coverage: ScanCoverage) async {
+        guard !coverage.deniedPaths.isEmpty else { return }
+        let deniedPaths = coverage.deniedPaths
+        let becameReadable = await Task.detached(priority: .utility) {
+            PermissionService().hasReadableCoverageChange(deniedPaths: deniedPaths)
+        }.value
+        guard becameReadable else { return }
+        requestAutomaticRefresh(scope: .full)
     }
 
     private func loadApprovedProjectRoots() {
@@ -722,6 +750,8 @@ final class AppModel {
         fileSystemMonitor = monitor
         fileSystemChangeReconciler = reconciler
         storageChangeTracker = tracker
+        startDownloadedInstallerMonitoring(homeDirectory: runtime.homeDirectory)
+        startSystemApplicationsMonitoring()
         if cursor == nil {
             let now = Date.now
             let initialCursor = FileSystemEventCursor(
@@ -746,6 +776,72 @@ final class AppModel {
             } else {
                 try await store.save(fileSystemEventCursor: initialCursor)
             }
+        }
+    }
+
+    private func startDownloadedInstallerMonitoring(homeDirectory: URL) {
+        guard downloadsDirectoryMonitor == nil else { return }
+        let downloadsDirectory = homeDirectory.appending(
+            path: "Downloads",
+            directoryHint: .isDirectory
+        )
+        guard FileManager.default.fileExists(atPath: downloadsDirectory.path) else {
+            return
+        }
+
+        let reconciler = FileSystemChangeReconciler(
+            root: downloadsDirectory
+        ) { [weak self] batch in
+            guard DownloadedInstallerRefreshPlanner.shouldRefresh(
+                for: batch,
+                downloadsDirectory: downloadsDirectory
+            ) else { return }
+            await self?.requestAutomaticRefresh(scope: .applications)
+        }
+        let monitor = FileSystemChangeMonitor(root: downloadsDirectory)
+        do {
+            try monitor.start(sinceEventID: nil) { batch in
+                Task {
+                    await reconciler.submit(batch)
+                }
+            }
+            downloadsDirectoryMonitor = monitor
+            downloadsDirectoryChangeReconciler = reconciler
+        } catch {
+            Self.logger.error(
+                "Could not monitor Downloads: \(error.localizedDescription, privacy: .public)"
+            )
+        }
+    }
+
+    private func startSystemApplicationsMonitoring() {
+        guard applicationDirectoryMonitor == nil else { return }
+        let applicationsDirectory = URL(
+            fileURLWithPath: "/Applications",
+            isDirectory: true
+        )
+        guard FileManager.default.fileExists(atPath: applicationsDirectory.path) else {
+            return
+        }
+
+        let reconciler = FileSystemChangeReconciler(
+            root: applicationsDirectory
+        ) { [weak self] _ in
+            await self?.requestAutomaticRefresh(scope: .applications)
+        }
+        let monitor = FileSystemChangeMonitor(root: applicationsDirectory)
+        do {
+            try monitor.start(sinceEventID: nil) { batch in
+                Task {
+                    await reconciler.submit(batch)
+                }
+            }
+            applicationDirectoryMonitor = monitor
+            applicationDirectoryChangeReconciler = reconciler
+        } catch {
+            Self.logger.error(
+                "Could not monitor /Applications: \(error.localizedDescription, privacy: .public)"
+            )
         }
     }
 

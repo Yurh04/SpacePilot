@@ -1,5 +1,6 @@
 "category.ai-data" = "AI Data";
 "category.application" = "Application Data";
+"category.installer" = "Installers";
 "category.cache" = "Caches";
 "category.conversation" = "Conversations";
 "category.developer" = "Developer Files";
@@ -248,6 +249,7 @@
 "overview.top-opportunities" = "Top cleanup opportunities";
 "overview.view-applications" = "View application storage";
 "overview.view-history" = "View history";
+"overview.view-installers" = "View installers";
 "overview.view-largest-items" = "View largest items";
 "overview.view-recent-changes" = "View recent changes";
 "overview.works-locally" = "SpacePilot works locally and indexes metadata only.";
@@ -332,6 +334,7 @@
 "explanation.codex-logs" = "Codex diagnostic logs";
 "explanation.exact-bundle-match" = "Exact bundle identifier match: %@";
 "explanation.found-under" = "Found under %@";
+"explanation.installer-for-installed-application" = "Installer for installed application: %@";
 "explanation.gradle-cache" = "Gradle dependency cache";
 "explanation.homebrew-cache" = "Homebrew download cache";
 "explanation.npm-cache" = "npm download cache";

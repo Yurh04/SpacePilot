@@ -19,6 +19,7 @@
 | 运行时依赖组装 | `Sources/SpacePilotCore/Scanning/SpacePilotRuntime.swift` | `PackageSmokeTests.swift` |
 | 扫描范围和管线 | `Sources/SpacePilotCore/Scanning/ScanCoordinator.swift` | `ScanCoordinatorTests.swift`、`ScanScopeArchitectureTests.swift` |
 | 有数量限制的目录遍历 | `Sources/SpacePilotCore/Scanning/DirectoryScanner.swift` | `DirectoryScannerTests.swift` |
+| 下载目录安装包识别 | `Sources/SpacePilotCore/Scanning/DownloadedInstallerScanner.swift` | `DownloadedInstallerScannerTests.swift`、`ScanCoordinatorTests.swift` |
 | 磁盘和开发工具目录 | `VolumeScanner.swift`、`DeveloperStorageScanner.swift` | 同名扫描器测试 |
 | FSEvents、变化合并和最近空间变化 | `FileSystemChangeMonitor.swift`、`FileSystemChangeReconciler.swift`、`StorageChangeTracker.swift` | `FileSystemChangeMonitorTests.swift`、`StorageChangeTrackerTests.swift` |
 | SQLite 快照、索引和统计 | `Sources/SpacePilotCore/Persistence/SQLiteIndexStore.swift`、`IndexSchema.swift` | `SQLiteIndexStoreTests.swift` |

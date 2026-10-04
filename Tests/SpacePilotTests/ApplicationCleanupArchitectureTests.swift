@@ -142,6 +142,22 @@ final class ApplicationCleanupArchitectureTests: XCTestCase {
         XCTAssertTrue(analyzeApplication.contains("scanTask?.cancel()"))
     }
 
+    func testDownloadedInstallersUseDedicatedDownloadsMonitor() throws {
+        let model = try source(at: "Sources/SpacePilot/App/AppModel.swift")
+        let startMonitoring = try functionBody(
+            in: model,
+            signature: "private func startDownloadedInstallerMonitoring(homeDirectory: URL)"
+        )
+
+        XCTAssertTrue(model.contains("private var downloadsDirectoryMonitor"))
+        XCTAssertTrue(model.contains(
+            "startDownloadedInstallerMonitoring(homeDirectory: runtime.homeDirectory)"
+        ))
+        XCTAssertTrue(startMonitoring.contains("FileSystemChangeMonitor(root: downloadsDirectory)"))
+        XCTAssertTrue(startMonitoring.contains("DownloadedInstallerRefreshPlanner.shouldRefresh"))
+        XCTAssertTrue(startMonitoring.contains("requestAutomaticRefresh(scope: .applications)"))
+    }
+
     func testApplicationScreenUsesHorizontalListAndDetailLayout() throws {
         let source = try source(
             at: "Sources/SpacePilot/Views/Applications/ApplicationsView.swift"

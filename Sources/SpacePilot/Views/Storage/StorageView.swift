@@ -10,8 +10,8 @@ struct StorageView: View {
     let hasSnapshot: Bool
     let searchText: String
     @Binding var mode: StorageItemMode
+    @Binding var categorySelection: StorageCategorySelection
     let reviewCleanup: ([ScannedItem]) -> Void
-    @State private var categorySelection: StorageCategorySelection = .all
     @State private var selectedItemIDs: Set<UUID> = []
     @State private var selectedChangeIDs: Set<UUID> = []
     @State private var changeTimeRange: StorageChangeTimeRange = .week
@@ -675,7 +675,7 @@ private struct StorageItemDetail: View {
     }
 }
 
-private enum StorageCategorySelection: Hashable {
+enum StorageCategorySelection: Hashable {
     case all
     case category(ItemCategory)
 

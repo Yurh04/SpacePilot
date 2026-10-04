@@ -34,6 +34,16 @@ final class DeveloperAIArchitectureTests: XCTestCase {
         XCTAssertFalse(source.contains("NavigationSplitView"))
     }
 
+    func testDeveloperAISidebarKeepsOneWidthAcrossOverviewAndAgentDetail() throws {
+        let source = try source(at: "Sources/SpacePilot/Views/DeveloperAI/DeveloperAIView.swift")
+
+        // HSplitView otherwise renegotiates the allowed min/ideal/max range
+        // whenever the selected destination has a different intrinsic width.
+        XCTAssertTrue(source.contains(".frame(width: AIWorkspaceLayout.sidebarWidth)"))
+        XCTAssertFalse(source.contains("minWidth: AIWorkspaceLayout.sidebarMinimum"))
+        XCTAssertFalse(source.contains("maxWidth: AIWorkspaceLayout.sidebarMaximum"))
+    }
+
     func testDeveloperAIViewRoutesToEveryReadOnlySection() throws {
         let source = try source(at: "Sources/SpacePilot/Views/DeveloperAI/DeveloperAIView.swift")
 
