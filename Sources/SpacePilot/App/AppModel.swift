@@ -33,6 +33,7 @@ final class AppModel {
     var isCleaning = false
     var showingCleanupConfirmation = false
     var cleanupCandidates: [CleanupReviewItem] = []
+    var cleanupInitiallySelectedIDs: Set<UUID> = []
     var latestCleanupTransaction: CleanupTransaction?
     var cleanupHistory: [CleanupTransaction] = []
     var analyzingApplicationID: UUID?
@@ -410,10 +411,29 @@ final class AppModel {
         prepareCleanup(reviewItems: eligible)
     }
 
-    private func prepareCleanup(reviewItems: [CleanupReviewItem]) {
+    func prepareInstallerCleanup() {
+        guard let latestSnapshot else { return }
+        let installers = latestSnapshot.items.filter {
+            $0.category == .installer && $0.risk == .safe
+        }
+        let reviewItems = installers.map {
+            CleanupReviewItem(item: $0, ownership: .owned, evidence: nil)
+        }
+        prepareCleanup(
+            reviewItems: reviewItems,
+            initiallySelectedIDs: Set(installers.map(\.id))
+        )
+    }
+
+    private func prepareCleanup(
+        reviewItems: [CleanupReviewItem],
+        initiallySelectedIDs: Set<UUID> = []
+    ) {
         let eligible = reviewItems.filter { $0.effectiveRisk != .managed }
         guard !eligible.isEmpty else { return }
         cleanupCandidates = eligible
+        let eligibleIDs = Set(eligible.map(\.id))
+        cleanupInitiallySelectedIDs = initiallySelectedIDs.intersection(eligibleIDs)
         latestCleanupTransaction = nil
         showingCleanupConfirmation = true
     }

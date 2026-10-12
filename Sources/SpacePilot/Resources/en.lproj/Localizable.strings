@@ -3,6 +3,7 @@
 "category.cache" = "Caches";
 "category.conversation" = "Conversations";
 "category.developer" = "Developer Files";
+"category.installer" = "Installers";
 "category.log" = "Logs";
 "category.model" = "Models";
 "category.personal" = "Personal Files";
@@ -216,6 +217,7 @@
 "overview.analyzed-categories-description" = "These bars cover locally analyzed data, not the whole disk.";
 "overview.analyzed-categories-empty" = "No locally analyzed categories are available yet.";
 "overview.analyzed-locally" = "Analyzed locally";
+"overview.clean-installers" = "Clean Installers";
 "overview.disk-available" = "Available";
 "overview.disk-capacity-chart" = "Internal disk capacity";
 "overview.disk-capacity-unavailable-description" = "Whole-disk capacity is unavailable. Only locally analyzed data is shown.";
@@ -334,6 +336,7 @@
 "explanation.found-under" = "Found under %@";
 "explanation.gradle-cache" = "Gradle dependency cache";
 "explanation.homebrew-cache" = "Homebrew download cache";
+"explanation.installer-package" = "Application installer; safe to remove after the app is installed";
 "explanation.npm-cache" = "npm download cache";
 "explanation.pip-cache" = "Python pip download cache";
 "explanation.recognized-root" = "Recognized %@ data root; contents were not indexed";

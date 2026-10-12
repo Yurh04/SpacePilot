@@ -122,6 +122,19 @@ final class OverviewChartArchitectureTests: XCTestCase {
         XCTAssertTrue(root.contains("mode: $model.storageItemMode"))
     }
 
+    func testOverviewIncludesInstallerCleanupQuickAction() throws {
+        let overview = try source(at: "Sources/SpacePilot/Views/Overview/OverviewView.swift")
+        let root = try source(at: "Sources/SpacePilot/Views/AppRootView.swift")
+
+        XCTAssertTrue(overview.contains("overviewCleanInstallers"))
+        XCTAssertTrue(overview.contains("disabled: !hasInstallers(in: projection)"))
+        XCTAssertTrue(overview.contains("action: cleanInstallers"))
+        XCTAssertTrue(root.contains("cleanInstallers: model.prepareInstallerCleanup"))
+        XCTAssertTrue(root.contains(
+            "initiallySelectedIDs: model.cleanupInitiallySelectedIDs"
+        ))
+    }
+
     private func source(at relativePath: String) throws -> String {
         try String(
             contentsOf: repositoryRoot.appending(path: relativePath),

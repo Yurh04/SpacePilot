@@ -3,6 +3,7 @@
 "category.cache" = "缓存";
 "category.conversation" = "对话";
 "category.developer" = "开发文件";
+"category.installer" = "安装包";
 "category.log" = "日志";
 "category.model" = "模型";
 "category.personal" = "个人文件";
@@ -216,6 +217,7 @@
 "overview.analyzed-categories-description" = "这些条形图涵盖本地已分析的数据，而不是整个磁盘。";
 "overview.analyzed-categories-empty" = "暂无本地已分析类别。";
 "overview.analyzed-locally" = "本地已分析";
+"overview.clean-installers" = "一键清理安装包";
 "overview.disk-available" = "可用";
 "overview.disk-capacity-chart" = "内置磁盘容量";
 "overview.disk-capacity-unavailable-description" = "无法获取整个磁盘的容量。当前仅显示本地已分析的数据。";
@@ -334,6 +336,7 @@
 "explanation.found-under" = "在 %@ 下发现";
 "explanation.gradle-cache" = "Gradle 依赖缓存";
 "explanation.homebrew-cache" = "Homebrew 下载缓存";
+"explanation.installer-package" = "应用程序安装包；应用安装完成后可安全删除";
 "explanation.npm-cache" = "npm 下载缓存";
 "explanation.pip-cache" = "Python pip 下载缓存";
 "explanation.recognized-root" = "已识别 %@ 数据根目录；未索引其中内容";

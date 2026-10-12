@@ -250,6 +250,49 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                     coverage: previousSnapshot?.coverage ?? .complete
                 )
             }
+            let installerResult: InstallerPackageScanResult
+            if scope == .full {
+                installerResult = try await InstallerPackageScanner(
+                    access: LocalFileSystemAccess()
+                ).scan(roots: [
+                    homeDirectory.appending(path: "Downloads", directoryHint: .isDirectory),
+                    homeDirectory.appending(path: "Desktop", directoryHint: .isDirectory)
+                ])
+            } else {
+                installerResult = .empty
+            }
+            // Focused refreshes keep the previously discovered installers; they
+            // live in Downloads/Desktop and do not depend on AI activity.
+            let retainedInstallerItems = scope == .full
+                ? installerResult.items
+                : (previousSnapshot?.items.filter { $0.category == .installer } ?? [])
+            // Whole-home traversal skips package descendants, so bytes inside
+            // .pkg bundles were never counted as personal files. Add them back
+            // so the installer reclassification subtraction stays balanced in
+            // `categoryAggregates`.
+            let aggregateHomeResult: DirectoryScanResult
+            if scope == .full {
+                var deniedPaths = Set(homeResult.coverage.deniedPaths)
+                deniedPaths.formUnion(installerResult.coverage.deniedPaths)
+                var notes = Set(homeResult.coverage.notes)
+                notes.formUnion(installerResult.coverage.notes)
+                aggregateHomeResult = DirectoryScanResult(
+                    root: homeResult.root,
+                    items: homeResult.items,
+                    coverage: ScanCoverage(
+                        deniedPaths: deniedPaths.sorted { $0.path < $1.path },
+                        notes: notes.sorted()
+                    ),
+                    totalLogicalSize: homeResult.totalLogicalSize
+                        + installerResult.packageContainedLogicalSize,
+                    totalAllocatedSize: homeResult.totalAllocatedSize
+                        + installerResult.packageContainedAllocatedSize,
+                    fileCount: homeResult.fileCount
+                        + installerResult.packageContainedFileCount
+                )
+            } else {
+                aggregateHomeResult = homeResult
+            }
             let (codex, claude, standaloneSkills) = try await (
                 codexScan, claudeScan, standaloneSkillScan
             )
@@ -361,6 +404,7 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
             } + retainedApplicationDetails.items
 
             let sourceItems = homeResult.items
+                + retainedInstallerItems
                 + developer.items
                 + codex.items
                 + claude.items
@@ -466,11 +510,11 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                 aiApplications: aiApplications,
                 plugins: pluginResult.plugins,
                 skills: indexedSkills,
-                coverage: homeResult.coverage,
+                coverage: aggregateHomeResult.coverage,
                 pluginDiagnostics: pluginDiscovery.diagnostics.map(\.message) + pluginResult.diagnostics,
                 categoryAggregates: Self.categoryAggregates(
                     items: items,
-                    homeResult: scope == .full ? homeResult : nil,
+                    homeResult: scope == .full ? aggregateHomeResult : nil,
                     previous: previousSnapshot
                 )
             ).compacted()

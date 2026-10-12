@@ -420,6 +420,88 @@ final class ScanCoordinatorTests: XCTestCase {
                 .allSatisfy { snapshotItemIDs.contains($0) }
         )
     }
+
+    func testFullScanClassifiesDownloadedInstallersAsSafeCleanup() async throws {
+        let home = try TemporaryTree(files: [
+            "Downloads/Foo.dmg": 10_000,
+            "Downloads/Bar.pkg/Payload": 20_000,
+            "Desktop/notes.txt": 500
+        ])
+        func allocated(_ relativePath: String) throws -> Int64 {
+            let values = try home.url.appending(path: relativePath)
+                .resourceValues(forKeys: [.totalFileAllocatedSizeKey])
+            return Int64(values.totalFileAllocatedSize ?? 0)
+        }
+        let dmgAllocated = try allocated("Downloads/Foo.dmg")
+        let pkgAllocated = try allocated("Downloads/Bar.pkg/Payload")
+        let notesAllocated = try allocated("Desktop/notes.txt")
+
+        let coordinator = ScanCoordinator(
+            homeDirectory: home.url,
+            store: InMemorySnapshotStore()
+        )
+
+        let snapshot = try await coordinator.collectScan(scope: .full)
+
+        let installers = snapshot.items.filter { $0.category == .installer }
+        XCTAssertEqual(
+            Set(installers.map(\.url.lastPathComponent)),
+            ["Foo.dmg", "Bar.pkg"]
+        )
+        XCTAssertTrue(installers.allSatisfy { $0.risk == .safe })
+
+        let overview = OverviewProjection(snapshot: snapshot)
+        let recommendedNames = Set(overview.recommendations.map(\.url.lastPathComponent))
+        XCTAssertTrue(recommendedNames.contains("Foo.dmg"))
+        XCTAssertTrue(recommendedNames.contains("Bar.pkg"))
+        XCTAssertEqual(
+            overview.reclaimableBytes,
+            installers.reduce(Int64(0)) { $0 + $1.allocatedSize }
+        )
+
+        let installerAggregate = snapshot.categoryAggregates?.first {
+            $0.category == .installer
+        }
+        XCTAssertEqual(installerAggregate?.allocatedSize, dmgAllocated + pkgAllocated)
+        XCTAssertEqual(installerAggregate?.itemCount, 2)
+        let personalAggregate = snapshot.categoryAggregates?.first {
+            $0.category == .personal
+        }
+        // The DMG bytes move from personal to installers; the .pkg contents
+        // were never counted by the package-skipping home traversal.
+        XCTAssertEqual(personalAggregate?.allocatedSize, notesAllocated)
+    }
+
+    func testFocusedRefreshesPreserveDiscoveredInstallers() async throws {
+        let home = try TemporaryTree(files: [
+            "Downloads/Foo.dmg": 10_000
+        ])
+        let store = InMemorySnapshotStore()
+        let coordinator = ScanCoordinator(
+            homeDirectory: home.url,
+            store: store
+        )
+
+        let full = try await coordinator.collectScan(scope: .full)
+        let fullInstallerPaths = full.items
+            .filter { $0.category == .installer }
+            .map(\.url.path)
+        XCTAssertEqual(fullInstallerPaths.count, 1)
+
+        for scope in [ScanScope.developerAI, .applications] {
+            let focused = try await coordinator.collectScan(scope: scope)
+            let focusedInstallers = focused.items.filter { $0.category == .installer }
+            XCTAssertEqual(
+                focusedInstallers.map(\.url.path),
+                fullInstallerPaths,
+                "Scope \(scope) must retain installer items"
+            )
+            XCTAssertNotNil(
+                focused.categoryAggregates?.first { $0.category == .installer },
+                "Scope \(scope) must retain the installer aggregate"
+            )
+        }
+    }
 }
 
 private final class ScanScopeRecorder: @unchecked Sendable {

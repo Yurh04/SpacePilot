@@ -33,6 +33,7 @@ struct AppRootView: View {
         .sheet(isPresented: $model.showingCleanupConfirmation) {
             CleanupConfirmationView(
                 items: model.cleanupCandidates,
+                initiallySelectedIDs: model.cleanupInitiallySelectedIDs,
                 isExecuting: model.isCleaning,
                 onConfirm: model.executePreparedCleanup,
                 onCancel: { model.showingCleanupConfirmation = false }
@@ -51,6 +52,7 @@ struct AppRootView: View {
                 changeHistory: model.storageChangeHistory,
                 startScan: { model.startScan(scope: .full) },
                 reviewCleanup: model.prepareCleanup,
+                cleanInstallers: model.prepareInstallerCleanup,
                 openStorage: {
                     model.storageItemMode = .largest
                     model.selection = .storage

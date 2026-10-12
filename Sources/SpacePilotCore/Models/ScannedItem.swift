@@ -24,6 +24,9 @@ public enum ItemCategory: String, Codable, CaseIterable, Sendable {
     case skill
     case system
     case unclassified
+    /// Downloaded application installers (disk images and installer packages)
+    /// that can usually be removed after the application is installed.
+    case installer
 }
 
 public struct ScannedItem: Identifiable, Codable, Hashable, Sendable {

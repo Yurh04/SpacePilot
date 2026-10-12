@@ -3169,6 +3169,22 @@
         }
       }
     },
+    "category.installer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installers"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安装包"
+          }
+        }
+      }
+    },
     "category.log": {
       "localizations": {
         "en": {
@@ -4417,6 +4433,22 @@
         }
       }
     },
+    "explanation.installer-package": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Application installer; safe to remove after the app is installed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "应用程序安装包；应用安装完成后可安全删除"
+          }
+        }
+      }
+    },
     "explanation.npm-cache": {
       "localizations": {
         "en": {
@@ -4669,6 +4701,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "本地已分析"
+          }
+        }
+      }
+    },
+    "overview.clean-installers": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clean Installers"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一键清理安装包"
           }
         }
       }

@@ -483,7 +483,7 @@ struct StorageIntelligenceGraph: Sendable {
         case .developer: .developerData
         case .system: .systemData
         case .aiData: .data
-        case .personal, .unclassified: .unknown
+        case .installer, .personal, .unclassified: .unknown
         }
     }
 }

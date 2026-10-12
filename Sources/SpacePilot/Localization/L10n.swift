@@ -195,6 +195,7 @@ enum L10n {
         static let overviewAnalyzedCategoriesDescription = Self(key: "overview.analyzed-categories-description", english: "These bars cover locally analyzed data, not the whole disk.")
         static let overviewAnalyzedCategoriesEmpty = Self(key: "overview.analyzed-categories-empty", english: "No locally analyzed categories are available yet.")
         static let overviewAnalyzedLocally = Self(key: "overview.analyzed-locally", english: "Analyzed locally")
+        static let overviewCleanInstallers = Self(key: "overview.clean-installers", english: "Clean Installers")
         static let overviewDiskAvailable = Self(key: "overview.disk-available", english: "Available")
         static let overviewDiskCapacityChart = Self(key: "overview.disk-capacity-chart", english: "Internal disk capacity")
         static let overviewDiskCapacityUnavailableDescription = Self(key: "overview.disk-capacity-unavailable-description", english: "Whole-disk capacity is unavailable. Only locally analyzed data is shown.")
@@ -287,7 +288,7 @@ enum L10n {
         "ai.update.open-app",
 
         "category.ai-data", "category.application", "category.cache", "category.conversation",
-        "category.developer", "category.log", "category.model", "category.personal",
+        "category.developer", "category.installer", "category.log", "category.model", "category.personal",
         "category.plugin", "category.skill", "category.system", "category.unclassified",
         "common.cancel", "common.location", "common.management", "common.risk", "common.scan",
         "common.skills", "common.space", "common.version", "nav.applications",
@@ -364,7 +365,8 @@ enum L10n {
         "common.skill", "common.source", "confidence.high", "confidence.low", "confidence.medium",
         "error.quit-before-uninstall", "error.reset-unavailable", "overview.analyze-mac",
         "overview.analyzed-categories-chart", "overview.analyzed-categories-description",
-        "overview.analyzed-categories-empty", "overview.analyzed-locally", "overview.disk-available",
+        "overview.analyzed-categories-empty", "overview.analyzed-locally", "overview.clean-installers",
+        "overview.disk-available",
         "overview.disk-capacity-chart", "overview.disk-capacity-unavailable-description",
         "overview.disk-total", "overview.disk-used", "overview.internal-disk-used", "overview.limited-coverage",
         "overview.limited-coverage-description", "overview.no-recommendations", "overview.review-cleanup",
@@ -409,6 +411,7 @@ enum L10n {
         "explanation.claude-settings", "explanation.codex-cache", "explanation.codex-configuration",
         "explanation.codex-conversation", "explanation.codex-logs", "explanation.exact-bundle-match",
         "explanation.found-under", "explanation.gradle-cache", "explanation.homebrew-cache",
+        "explanation.installer-package",
         "explanation.npm-cache", "explanation.pip-cache", "explanation.recognized-root",
         "explanation.simulator-data", "explanation.xcode-archives", "explanation.xcode-build",
         "cleanup.message.changed", "cleanup.message.moved", "cleanup.message.outside-volume",
@@ -620,6 +623,10 @@ enum L10n {
         value("category.unclassified", default: "Unclassified", locale: locale)
     }
 
+    static func categoryInstaller(locale: Locale? = nil) -> String {
+        value("category.installer", default: "Installers", locale: locale)
+    }
+
     static func title(for destination: NavigationDestination, locale: Locale? = nil) -> String {
         switch destination {
         case .overview: overview(locale: locale)
@@ -653,6 +660,7 @@ enum L10n {
         case .skill: categorySkill(locale: locale)
         case .system: categorySystem(locale: locale)
         case .unclassified: categoryUnclassified(locale: locale)
+        case .installer: categoryInstaller(locale: locale)
         }
     }
 
@@ -934,7 +942,9 @@ enum L10n {
             "npm download cache": ("explanation.npm-cache", "npm download cache"),
             "Gradle dependency cache": ("explanation.gradle-cache", "Gradle dependency cache"),
             "Homebrew download cache": ("explanation.homebrew-cache", "Homebrew download cache"),
-            "Python pip download cache": ("explanation.pip-cache", "Python pip download cache")
+            "Python pip download cache": ("explanation.pip-cache", "Python pip download cache"),
+            "Application installer; safe to remove after the app is installed":
+                ("explanation.installer-package", "Application installer; safe to remove after the app is installed")
         ]
         if let translation = exact[source] {
             return value(translation.0, default: translation.1, locale: locale)

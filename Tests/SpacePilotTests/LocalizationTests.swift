@@ -62,6 +62,20 @@ final class LocalizationTests: XCTestCase {
             L10n.explanation("Recognized ChatGPT data root; contents were not indexed", locale: chinese),
             "已识别 ChatGPT 数据根目录；未索引其中内容"
         )
+        XCTAssertEqual(
+            L10n.explanation(
+                "Application installer; safe to remove after the app is installed",
+                locale: chinese
+            ),
+            "应用程序安装包；应用安装完成后可安全删除"
+        )
+        XCTAssertEqual(
+            L10n.explanation(
+                "Application installer; safe to remove after the app is installed",
+                locale: Locale(identifier: "en")
+            ),
+            "Application installer; safe to remove after the app is installed"
+        )
     }
 
     func testCleanupOutcomeReasonsLocalizeKnownMessagesAndPreserveUnknownErrors() {
@@ -235,6 +249,7 @@ final class LocalizationTests: XCTestCase {
             "overview.status-critical": ("Storage is critically low", "储存空间严重不足"),
             "overview.status-unknown": ("Disk status unavailable", "无法判断磁盘状态"),
             "overview.quick-actions": ("Quick actions", "快捷操作"),
+            "overview.clean-installers": ("Clean Installers", "一键清理安装包"),
             "overview.review-safe-cleanup": ("Review safe cleanup", "检查安全清理"),
             "overview.view-largest-items": ("View largest items", "查看最大项目"),
             "overview.view-recent-changes": ("View recent changes", "查看最近变化"),
@@ -324,7 +339,7 @@ final class LocalizationTests: XCTestCase {
         let english = try stringsTable(at: resources.appending(path: "en.lproj/Localizable.strings"))
         let chinese = try stringsTable(at: resources.appending(path: "zh-Hans.lproj/Localizable.strings"))
 
-        XCTAssertEqual(L10n.allKeys.count, 407)
+        XCTAssertEqual(L10n.allKeys.count, 410)
         XCTAssertEqual(Set(catalogStrings.keys), L10n.allKeys)
         XCTAssertEqual(Set(english.keys), L10n.allKeys)
         XCTAssertEqual(Set(chinese.keys), L10n.allKeys)

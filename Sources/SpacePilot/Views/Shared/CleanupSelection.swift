@@ -5,6 +5,21 @@ struct CleanupSelection {
     let items: [CleanupReviewItem]
     private(set) var selectedIDs: Set<UUID> = []
 
+    init(
+        items: [CleanupReviewItem],
+        initiallySelectedIDs: Set<UUID> = []
+    ) {
+        self.items = items
+        selectedIDs = Set(
+            items
+                .filter {
+                    $0.isIncludedBySelectAll
+                        && initiallySelectedIDs.contains($0.id)
+                }
+                .map(\.id)
+        )
+    }
+
     var selectedItems: [CleanupReviewItem] {
         items.filter { selectedIDs.contains($0.id) }
     }

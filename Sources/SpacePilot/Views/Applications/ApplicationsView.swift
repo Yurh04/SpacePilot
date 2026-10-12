@@ -633,6 +633,7 @@ private extension ItemCategory {
         case .skill: "wand.and.stars"
         case .system: "gearshape.2"
         case .unclassified: "questionmark.folder"
+        case .installer: "externaldrive"
         }
     }
 }

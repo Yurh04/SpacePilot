@@ -8,6 +8,7 @@ struct OverviewView: View {
     let changeHistory: StorageChangeHistory
     let startScan: () -> Void
     let reviewCleanup: ([ScannedItem]) -> Void
+    let cleanInstallers: () -> Void
     let openStorage: () -> Void
     let openRecentChanges: () -> Void
     let openApplications: () -> Void
@@ -178,6 +179,12 @@ struct OverviewView: View {
                     reviewCleanup(projection.preselectedRecommendations)
                 }
                 actionButton(
+                    L10n.text(.overviewCleanInstallers),
+                    icon: "trash",
+                    disabled: !hasInstallers(in: projection),
+                    action: cleanInstallers
+                )
+                actionButton(
                     L10n.text(.overviewViewLargestItems),
                     icon: "arrow.down.to.line",
                     action: openStorage
@@ -218,6 +225,12 @@ struct OverviewView: View {
                         reviewCleanup(projection.preselectedRecommendations)
                     }
                     actionButton(
+                        L10n.text(.overviewCleanInstallers),
+                        icon: "trash",
+                        disabled: !hasInstallers(in: projection),
+                        action: cleanInstallers
+                    )
+                    actionButton(
                         L10n.text(.overviewViewLargestItems),
                         icon: "arrow.down.to.line",
                         action: openStorage
@@ -239,6 +252,12 @@ struct OverviewView: View {
                     )
                 }
             }
+        }
+    }
+
+    private func hasInstallers(in projection: OverviewProjection) -> Bool {
+        projection.categories.contains {
+            $0.category == .installer && $0.itemCount > 0
         }
     }
 

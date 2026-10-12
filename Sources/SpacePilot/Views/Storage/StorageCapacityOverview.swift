@@ -209,6 +209,7 @@ enum StorageCategoryAppearance {
         case .skill: .teal
         case .system: .gray
         case .unclassified: .blue.opacity(0.55)
+        case .installer: .pink
         }
     }
 
@@ -226,6 +227,7 @@ enum StorageCategoryAppearance {
         case .skill: "wand.and.stars"
         case .system: "gearshape.fill"
         case .unclassified: "questionmark.folder.fill"
+        case .installer: "externaldrive.fill"
         }
     }
 }

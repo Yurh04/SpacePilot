@@ -12,6 +12,7 @@ struct CleanupConfirmationView: View {
 
     init(
         items: [CleanupReviewItem],
+        initiallySelectedIDs: Set<UUID> = [],
         isExecuting: Bool,
         onConfirm: @escaping (Set<UUID>, Bool) -> Void,
         onCancel: @escaping () -> Void
@@ -20,7 +21,10 @@ struct CleanupConfirmationView: View {
         self.isExecuting = isExecuting
         self.onConfirm = onConfirm
         self.onCancel = onCancel
-        _selection = State(initialValue: CleanupSelection(items: items))
+        _selection = State(initialValue: CleanupSelection(
+            items: items,
+            initiallySelectedIDs: initiallySelectedIDs
+        ))
     }
 
     var body: some View {

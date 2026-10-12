@@ -1,5 +1,14 @@
 # 当前工作与交接
 
+## 安装包检测与清理推荐（2026-10-12）
+
+- 新增 `ItemCategory.installer` 分类与 `InstallerPackageScanner`：有界浅扫描（默认 3 层、保留上限 1000 项）`~/Downloads` 和 `~/Desktop`，识别 `.dmg`（单文件，大小写不敏感）与 `.pkg`/`.mpkg`（目录包，递归计算内部大小），跳过隐藏文件、符号链接和其他 bundle 后代；不可读目录记录到覆盖范围。
+- `ScanCoordinator`：仅完整扫描执行安装包扫描；应用程序/开发与 AI 聚焦刷新从前一快照保留安装包项。完整扫描把 pkg 内部字节加回 home 聚合总量，个人文件分类再统一扣减全部安装包项，避免与整盘包跳过逻辑重复计数；同路径的个人文件项经 canonical ownership 去重后以安装包分类为准。
+- 安装包标记为 `.safe`，概览清理建议自动纳入；概览快捷操作新增“一键清理安装包”，点击后只收集当前快照中的安全安装包并默认全部勾选，仍须确认移到废纸篓，规划器会在执行前重新校验路径和文件身份。普通清理、应用重置/卸载与敏感项的默认选择行为不变。
+- 储存空间分类增加粉色和磁盘图标，应用分组增加图标；解释文案支持中英文。本地化新增 `category.installer`、`explanation.installer-package` 与 `overview.clean-installers`，allKeys 计数 407 → 410，三套资源已同步。
+- `swift test`：631 项通过（1 项跳过），0 失败；新增 8 项扫描器测试、2 项协调器集成测试，以及安装包快捷清理选择与概览入口测试。
+- `./script/test_release.sh`：631 项测试、Release 构建、临时启动、签名结构与 ZIP 生成通过；Gatekeeper 仍按预期拒绝 ad-hoc 签名。
+
 ## Dock 图标尺寸修正（2026-09-25）
 
 - 用户截图显示运行时图标明显偏大：Icon Composer 的紧边 PNG 被直接传给 `applicationIconImage`，没有系统图标画布留白。
@@ -28,7 +37,7 @@
 - `./script/test_release.sh` 通过：571 项测试、Release 构建、应用启动、签名结构校验和 ZIP 生成。Gatekeeper 仍拒绝现有 ad-hoc 开发签名。
 - 图标显示跟进：Dock 固定项指向当前 `dist/SpacePilot.app`，包内 ICNS 与源码哈希一致，`NSWorkspace.icon(forFile:)` 返回新版。已 touch 应用包、强制重新注册 Launch Services、重启 Dock 并重新打开应用。Computer Use 检查 Dock 时超时，尚未确认用户屏幕上的最终显示；若仍显示旧图标，需先确认具体显示位置。
 
-最后更新：2026-09-25
+最后更新：2026-10-12
 
 ## 仓库检查点
 

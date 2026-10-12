@@ -27,6 +27,54 @@ final class CleanupSelectionTests: XCTestCase {
         XCTAssertTrue(selection.hasSelectedSensitiveItems)
     }
 
+    func testInitialSelectionKeepsOnlyOwnedCleanupCandidates() {
+        let owned = reviewItem(item(path: "/tmp/owned"))
+        let shared = reviewItem(
+            item(path: "/tmp/shared"),
+            ownership: .shared
+        )
+        let selection = CleanupSelection(
+            items: [owned, shared],
+            initiallySelectedIDs: [owned.id, shared.id, UUID()]
+        )
+
+        XCTAssertEqual(selection.selectedIDs, [owned.id])
+    }
+
+    @MainActor
+    func testInstallerCleanupPreparesAndSelectsOnlySafeInstallers() {
+        let safeInstaller = item(
+            path: "/Users/test/Downloads/Foo.dmg",
+            category: .installer
+        )
+        let sensitiveInstaller = item(
+            path: "/Users/test/Downloads/Keep.pkg",
+            category: .installer,
+            risk: .sensitive
+        )
+        let cache = item(path: "/Users/test/Library/Caches/example")
+        let model = AppModel(
+            runtime: nil,
+            homeDirectory: URL(fileURLWithPath: "/Users/test")
+        ) { _, _ in [] }
+        model.latestSnapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: [safeInstaller, sensitiveInstaller, cache],
+            applications: [],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: .complete
+        )
+
+        model.prepareInstallerCleanup()
+
+        XCTAssertEqual(model.cleanupCandidates.map(\.id), [safeInstaller.id])
+        XCTAssertEqual(model.cleanupInitiallySelectedIDs, [safeInstaller.id])
+        XCTAssertTrue(model.showingCleanupConfirmation)
+    }
+
     func testSelectAllAndClearStayWithinCandidates() {
         let items = [
             item(path: "/tmp/one"),
@@ -115,6 +163,7 @@ final class CleanupSelectionTests: XCTestCase {
 
     private func item(
         path: String,
+        category: ItemCategory = .cache,
         risk: RiskLevel = .safe,
         allocatedSize: Int64 = 0
     ) -> ScannedItem {
@@ -122,7 +171,7 @@ final class CleanupSelectionTests: XCTestCase {
             url: URL(fileURLWithPath: path),
             logicalSize: allocatedSize,
             allocatedSize: allocatedSize,
-            category: .cache,
+            category: category,
             risk: risk,
             explanation: "Fixture"
         )
