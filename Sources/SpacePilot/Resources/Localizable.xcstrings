@@ -1,6 +1,132 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "cache.empty-description": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No recognized application caches are currently available." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "当前没有可识别的应用缓存。" } }
+      }
+    },
+    "cache.empty-title": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No Application Caches" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "没有应用缓存" } }
+      }
+    },
+    "cache.filter-all": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "All %lld" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "全部 %lld" } }
+      }
+    },
+    "cache.filter-check": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Check First %lld" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "先检查 %lld" } }
+      }
+    },
+    "cache.filter-safe": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Safe %lld" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "可安全清理 %lld" } }
+      }
+    },
+    "cache.limited-coverage": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Some cache locations could not be read" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "部分缓存位置无法读取" } }
+      }
+    },
+    "cache.no-matching": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No Matching Caches" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "没有匹配的缓存" } }
+      }
+    },
+    "cache.no-matching-description": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Choose another safety filter or search term." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请选择其他安全筛选或搜索关键词。" } }
+      }
+    },
+    "cache.review-selected": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Review Selected" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "检查所选项目" } }
+      }
+    },
+    "cache.row-description": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%lld recognized cache locations" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "%lld 个已识别缓存位置" } }
+      }
+    },
+    "cache.safety-filter": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Cache safety" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "缓存安全性" } }
+      }
+    },
+    "cache.scan": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Scan Caches" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "扫描缓存" } }
+      }
+    },
+    "cache.select-safe": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Select Safe" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "选择安全项" } }
+      }
+    },
+    "cache.sort": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Sort caches" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "缓存排序" } }
+      }
+    },
+    "cache.sort-largest": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Largest First" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "容量优先" } }
+      }
+    },
+    "cache.sort-name": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Name" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "名称" } }
+      }
+    },
+    "cache.summary": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%lld apps · %@ reclaimable" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "%lld 个应用 · %@ 可释放" } }
+      }
+    },
+    "cache.title": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Application Caches" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "应用缓存" } }
+      }
+    },
+    "error.quit-before-cache-cleanup": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Quit %@ before cleaning its cache." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "清理缓存前请先退出 %@。" } }
+      }
+    },
+    "explanation.application-cache": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Application cache that can be regenerated" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "应用自动重新生成的缓存数据" } }
+      }
+    },
+    "nav.application-caches": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Application Caches" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "应用缓存" } }
+      }
+    },
     "ai.agent.form-factors": {
       "localizations": {
         "en": {
@@ -623,6 +749,66 @@
             "value": "开发工具储存空间"
           }
         }
+      }
+    },
+    "developer-tools.check-first": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Review before cleaning; tools may need to download or rebuild these files again." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "清理前请检查；工具下次使用时可能需要重新下载或重新构建这些文件。" } }
+      }
+    },
+    "developer-tools.cache-name": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%@ Cache" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "%@ 缓存" } }
+      }
+    },
+    "developer-tools.device-support-name": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Xcode %@ Device Support" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Xcode %@ 设备支持" } }
+      }
+    },
+    "developer-tools.empty": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No Developer Tool Caches Found" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "未发现开发工具缓存" } }
+      }
+    },
+    "developer-tools.empty-description": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Run a scan to check supported Xcode, package-manager, browser-test, and compiler caches." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "运行扫描以检查支持的 Xcode、包管理器、浏览器测试和编译器缓存。" } }
+      }
+    },
+    "developer-tools.review": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Review Selected" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "检查所选项目" } }
+      }
+    },
+    "developer-tools.scan": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Scan Developer Tools" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "扫描开发工具" } }
+      }
+    },
+    "developer-tools.subtitle": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Rebuildable caches and downloaded toolchain components" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "可重新生成的缓存与已下载工具链组件" } }
+      }
+    },
+    "developer-tools.title": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Developer Tools" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "开发工具" } }
+      }
+    },
+    "developer-tools.xcode-derived-data": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Xcode Derived Data" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "Xcode 构建数据" } }
       }
     },
     "ai.duplicate.copies": {
@@ -4413,6 +4599,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "已安装 %@ 的安装包"
+          }
+        }
+      }
+    },
+    "explanation.stale-diagnostic": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnostic log or crash report older than 30 days"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 天以上的诊断日志或崩溃报告"
           }
         }
       }

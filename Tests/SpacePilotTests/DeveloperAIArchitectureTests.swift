@@ -54,6 +54,19 @@ final class DeveloperAIArchitectureTests: XCTestCase {
         XCTAssertTrue(source.contains("GlobalSkillsView("))
         XCTAssertTrue(source.contains("GlobalPluginsView("))
         XCTAssertTrue(source.contains("CLIToolsView("))
+        XCTAssertTrue(source.contains("DeveloperStorageView("))
+    }
+
+    func testDeveloperToolsAreAStableCapabilityAndDefaultToNoSelection() throws {
+        let rowSource = try source(at: "Sources/SpacePilot/Views/DeveloperAI/DeveloperAISidebarRow.swift")
+        let viewSource = try source(at: "Sources/SpacePilot/Views/DeveloperAI/DeveloperStorageView.swift")
+
+        XCTAssertTrue(rowSource.contains("case developerTools"))
+        XCTAssertTrue(rowSource.contains(".plugins, .developerTools, .cli"))
+        XCTAssertTrue(viewSource.contains("@State private var selectedItemIDs: Set<UUID> = []"))
+        XCTAssertTrue(viewSource.contains("reviewCleanup(selected)"))
+        XCTAssertTrue(viewSource.contains(".onDoubleClickRevealInFinder(item.url)"))
+        XCTAssertFalse(viewSource.contains("onAppear"))
     }
 
     func testDeveloperAIViewBuildsAgentProjectionByDefinitionNotDisplayName() throws {

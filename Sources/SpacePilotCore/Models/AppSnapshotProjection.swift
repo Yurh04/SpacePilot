@@ -3,18 +3,22 @@ import Foundation
 public struct AppSnapshotProjection: Sendable {
     public let snapshotID: UUID
     public let overview: OverviewProjection
+    public let applicationCaches: ApplicationCacheProjection
     public let storage: StorageProjection
     public let applications: ApplicationListProjection
     public let developerAI: DeveloperAIProjection
+    public let developerStorage: DeveloperStorageProjection
 
     public init(snapshot: ScanSnapshot) {
         let snapshot = snapshot.mergingAIProductFamilies()
         self.init(
             snapshotID: snapshot.id,
             overview: OverviewProjection(snapshot: snapshot),
+            applicationCaches: ApplicationCacheProjection(snapshot: snapshot),
             storage: StorageProjection(snapshot: snapshot),
             applications: ApplicationListProjection(snapshot: snapshot, searchText: ""),
-            developerAI: DeveloperAIProjection(snapshot: snapshot)
+            developerAI: DeveloperAIProjection(snapshot: snapshot),
+            developerStorage: DeveloperStorageProjection(snapshot: snapshot)
         )
     }
 
@@ -36,6 +40,11 @@ public struct AppSnapshotProjection: Sendable {
             checkCancellation: checkCancellation
         )
         try checkCancellation()
+        let applicationCaches = try ApplicationCacheProjection(
+            snapshot: snapshot,
+            checkCancellation: checkCancellation
+        )
+        try checkCancellation()
         let storage = try StorageProjection(
             snapshot: snapshot,
             checkCancellation: checkCancellation
@@ -51,27 +60,72 @@ public struct AppSnapshotProjection: Sendable {
             checkCancellation: checkCancellation
         )
         try checkCancellation()
+        let developerStorage = try DeveloperStorageProjection(
+            snapshot: snapshot,
+            checkCancellation: checkCancellation
+        )
+        try checkCancellation()
         return Self(
             snapshotID: snapshot.id,
             overview: overview,
+            applicationCaches: applicationCaches,
             storage: storage,
             applications: applications,
-            developerAI: developerAI
+            developerAI: developerAI,
+            developerStorage: developerStorage
         )
     }
 
     private init(
         snapshotID: UUID,
         overview: OverviewProjection,
+        applicationCaches: ApplicationCacheProjection,
         storage: StorageProjection,
         applications: ApplicationListProjection,
-        developerAI: DeveloperAIProjection
+        developerAI: DeveloperAIProjection,
+        developerStorage: DeveloperStorageProjection
     ) {
         self.snapshotID = snapshotID
         self.overview = overview
+        self.applicationCaches = applicationCaches
         self.storage = storage
         self.applications = applications
         self.developerAI = developerAI
+        self.developerStorage = developerStorage
+    }
+}
+
+public struct DeveloperStorageProjection: Sendable {
+    public let items: [ScannedItem]
+    public let totalBytes: Int64
+
+    public init(snapshot: ScanSnapshot) {
+        self = try! Self(snapshot: snapshot, checkCancellation: {})
+    }
+
+    init(
+        snapshot: ScanSnapshot,
+        checkCancellation: @escaping @Sendable () throws -> Void
+    ) throws {
+        var selected: [ScannedItem] = []
+        var total: Int64 = 0
+        var checkpoint = ProjectionCancellationCheckpoint(
+            checkCancellation: checkCancellation
+        )
+        for item in snapshot.items
+        where item.cleanupPolicyScope == .developerStorage {
+            try checkpoint.checkPeriodically()
+            selected.append(item)
+            total += item.allocatedSize
+        }
+        items = selected.sorted {
+            if $0.allocatedSize != $1.allocatedSize {
+                return $0.allocatedSize > $1.allocatedSize
+            }
+            return $0.url.path < $1.url.path
+        }
+        totalBytes = total
+        try checkCancellation()
     }
 }
 

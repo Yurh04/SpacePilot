@@ -5,6 +5,7 @@ final class PackageSmokeTests: XCTestCase {
     func testNavigationDestinationsHaveStableRawValues() {
         XCTAssertEqual(NavigationDestination.allCases.map(\.rawValue), [
             "overview",
+            "applicationCaches",
             "storage",
             "applications",
             "developerAI",

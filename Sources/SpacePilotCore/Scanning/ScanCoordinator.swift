@@ -6,6 +6,7 @@ public typealias ScopedScanOperation = @Sendable (ScanScope, ScanEventEmitter) a
 
 public enum ScanScope: String, Codable, Sendable {
     case applications
+    case applicationCaches
     case developerAI
     case full
 }
@@ -62,7 +63,7 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                 directoryHint: .isDirectory
             )
             let downloadedInstallers: DirectoryScanResult
-            if scope == .developerAI {
+            if scope == .developerAI || scope == .applicationCaches {
                 downloadedInstallers = DirectoryScanResult(
                     root: downloadsDirectory,
                     items: previousSnapshot?.items.filter {
@@ -97,6 +98,118 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
             ))
 
             try Task.checkCancellation()
+            if scope == .applicationCaches {
+                let previousApplicationsByPath = Dictionary(
+                    (previousSnapshot?.applications ?? []).map {
+                        ($0.url.standardizedFileURL.path, $0)
+                    },
+                    uniquingKeysWith: { first, _ in first }
+                )
+                let previousApplicationsByBundleID = Dictionary(
+                    (previousSnapshot?.applications ?? []).compactMap {
+                        application -> (String, ApplicationRecord)? in
+                        guard let identifier = application.bundleIdentifier else {
+                            return nil
+                        }
+                        return (identifier, application)
+                    },
+                    uniquingKeysWith: { first, _ in first }
+                )
+                let applications = baseApplications.map { application in
+                    let previous = previousApplicationsByPath[
+                        application.url.standardizedFileURL.path
+                    ] ?? application.bundleIdentifier.flatMap {
+                        previousApplicationsByBundleID[$0]
+                    }
+                    guard let previous,
+                          previous.bundleIdentifier == application.bundleIdentifier else {
+                        return application
+                    }
+                    return ApplicationRecord(
+                        id: previous.id,
+                        name: application.name,
+                        bundleIdentifier: application.bundleIdentifier,
+                        version: application.version,
+                        url: application.url,
+                        executableURL: application.executableURL,
+                        allocatedSize: application.allocatedSize,
+                        logicalSize: application.logicalSize,
+                        lastUsedDate: application.lastUsedDate,
+                        associations: previous.associations
+                    )
+                }
+                emit(ScanEvent(
+                    stage: .targetedAnalysis,
+                    progress: 0.5,
+                    message: "Scanning application caches"
+                ))
+                let applicationCaches = try await ApplicationCacheScanner(
+                    access: LocalFileSystemAccess(),
+                    directoryStats: directoryStats
+                ).scan(
+                    homeDirectory: homeDirectory,
+                    applications: applications
+                )
+                let preservedItems = previousSnapshot?.items.filter {
+                    $0.cleanupPolicyScope != .applicationCache
+                } ?? []
+                let canonicalOwnership = try Self.canonicalOwnership(
+                    sourceItems: preservedItems + applicationCaches.items,
+                    aggregateItems: applicationCaches.items
+                )
+                let remappedApplications = applications.map { application in
+                    ApplicationRecord(
+                        id: application.id,
+                        name: application.name,
+                        bundleIdentifier: application.bundleIdentifier,
+                        version: application.version,
+                        url: application.url,
+                        executableURL: application.executableURL,
+                        allocatedSize: application.allocatedSize,
+                        logicalSize: application.logicalSize,
+                        lastUsedDate: application.lastUsedDate,
+                        associations: application.associations.map {
+                            Self.remap(
+                                association: $0,
+                                itemIDs: canonicalOwnership.itemIDBySourceItemID
+                            )
+                        }
+                    )
+                }
+                let snapshot = ScanSnapshot(
+                    completedAt: .now,
+                    volume: volume,
+                    items: canonicalOwnership.items,
+                    applications: remappedApplications,
+                    aiApplications: previousSnapshot?.aiApplications ?? [],
+                    plugins: previousSnapshot?.plugins ?? [],
+                    skills: previousSnapshot?.skills ?? [],
+                    coverage: Self.mergedCoverage(
+                        previousSnapshot?.coverage ?? .complete,
+                        applicationCaches.coverage
+                    ),
+                    pluginDiagnostics: previousSnapshot?.pluginDiagnostics,
+                    categoryAggregates: Self.categoryAggregates(
+                        items: canonicalOwnership.items,
+                        homeResult: nil,
+                        previous: previousSnapshot
+                    )
+                ).compacted()
+                emit(ScanEvent(
+                    stage: .indexing,
+                    progress: 0.9,
+                    message: "Saving application cache metadata"
+                ))
+                try await store.save(snapshot: snapshot)
+                emit(ScanEvent(
+                    stage: .completed,
+                    progress: 1,
+                    message: "Application cache refresh complete",
+                    snapshot: snapshot
+                ))
+                return snapshot
+            }
+
             if scope == .applications {
                 let previousApplicationsByPath = Dictionary(
                     (previousSnapshot?.applications ?? []).map {
@@ -275,6 +388,40 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                     coverage: previousSnapshot?.coverage ?? .complete
                 )
             }
+            let staleDiagnostics: StaleDiagnosticScanResult
+            if scope == .full {
+                staleDiagnostics = try await StaleDiagnosticScanner(
+                    access: LocalFileSystemAccess()
+                ).scan(homeDirectory: homeDirectory)
+            } else {
+                staleDiagnostics = StaleDiagnosticScanResult(
+                    items: previousSnapshot?.items.filter {
+                        $0.category == .log
+                            && $0.risk == .safe
+                            && $0.explanation
+                                == StaleDiagnosticScanner<LocalFileSystemAccess>
+                                    .explanation
+                    } ?? [],
+                    coverage: .complete
+                )
+            }
+            let applicationCaches: ApplicationCacheScanResult
+            if scope == .full {
+                applicationCaches = try await ApplicationCacheScanner(
+                    access: LocalFileSystemAccess(),
+                    directoryStats: directoryStats
+                ).scan(
+                    homeDirectory: homeDirectory,
+                    applications: baseApplications
+                )
+            } else {
+                applicationCaches = ApplicationCacheScanResult(
+                    items: previousSnapshot?.items.filter {
+                        $0.cleanupPolicyScope == .applicationCache
+                    } ?? [],
+                    coverage: .complete
+                )
+            }
             let (codex, claude, standaloneSkills) = try await (
                 codexScan, claudeScan, standaloneSkillScan
             )
@@ -384,6 +531,14 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
             let selectedApplicationItems = applicationResolution.items.filter {
                 selectedFreshItemIDs.contains($0.id)
             } + retainedApplicationDetails.items
+            let staleDiagnosticItems = Self.unshadowedDiagnostics(
+                staleDiagnostics.items,
+                claimedBy: developer.items
+                    + codex.items
+                    + claude.items
+                    + basicAIScans.flatMap(\.items)
+                    + selectedApplicationItems
+            )
 
             let sourceItems = homeResult.items
                 + developer.items
@@ -392,9 +547,11 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                 + basicAIScans.flatMap(\.items)
                 + selectedApplicationItems
                 + downloadedInstallers.items
+                + applicationCaches.items
+                + staleDiagnosticItems
             let canonicalOwnership = try Self.canonicalOwnership(
                 sourceItems: sourceItems,
-                aggregateItems: selectedApplicationItems
+                aggregateItems: selectedApplicationItems + applicationCaches.items
             )
             let items = canonicalOwnership.items
             let canonicalItemIDBySourceItemID =
@@ -493,8 +650,14 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                 plugins: pluginResult.plugins,
                 skills: indexedSkills,
                 coverage: Self.mergedCoverage(
-                    homeResult.coverage,
-                    downloadedInstallers.coverage
+                    Self.mergedCoverage(
+                        Self.mergedCoverage(
+                            homeResult.coverage,
+                            downloadedInstallers.coverage
+                        ),
+                        staleDiagnostics.coverage
+                    ),
+                    applicationCaches.coverage
                 ),
                 pluginDiagnostics: pluginDiscovery.diagnostics.map(\.message) + pluginResult.diagnostics,
                 categoryAggregates: Self.categoryAggregates(
@@ -534,6 +697,30 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
 
     private static func canonicalPath(for url: URL) -> String {
         url.standardizedFileURL.resolvingSymlinksInPath().path
+    }
+
+    private static func unshadowedDiagnostics(
+        _ diagnostics: [ScannedItem],
+        claimedBy items: [ScannedItem]
+    ) -> [ScannedItem] {
+        let claimedDirectories = Dictionary(
+            items.compactMap { item -> (String, ScannedItem)? in
+                guard let values = try? item.url.resourceValues(
+                    forKeys: [.isDirectoryKey]
+                ), values.isDirectory == true else {
+                    return nil
+                }
+                return (canonicalPath(for: item.url), item)
+            },
+            uniquingKeysWith: { first, _ in first }
+        )
+        guard !claimedDirectories.isEmpty else { return diagnostics }
+        return diagnostics.filter { diagnostic in
+            nearestAncestorItem(
+                of: canonicalPath(for: diagnostic.url),
+                in: claimedDirectories
+            ) == nil
+        }
     }
 
     private static func mergedCoverage(
@@ -604,7 +791,10 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                     ownerID: previousItem.ownerID.map {
                         currentApplicationIDByPreviousID[$0] ?? $0
                     },
-                    explanation: previousItem.explanation
+                    explanation: previousItem.explanation,
+                    cleanupPolicyScope: previousItem.cleanupPolicyScope,
+                    cleanupOwnerIdentifier: previousItem.cleanupOwnerIdentifier,
+                    cleanupPolicyRelativePath: previousItem.cleanupPolicyRelativePath
                 )
                 itemsByID[item.id] = item
                 return ArtifactAssociation(

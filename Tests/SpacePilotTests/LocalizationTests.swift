@@ -10,8 +10,12 @@ final class LocalizationTests: XCTestCase {
 
         XCTAssertEqual(L10n.title(for: NavigationDestination.storage, locale: english), "Storage")
         XCTAssertEqual(L10n.title(for: NavigationDestination.storage, locale: chinese), "储存空间")
+        XCTAssertEqual(L10n.title(for: NavigationDestination.applicationCaches, locale: english), "Application Caches")
+        XCTAssertEqual(L10n.title(for: NavigationDestination.applicationCaches, locale: chinese), "应用缓存")
         XCTAssertEqual(L10n.title(for: AIApplicationTab.plugins, locale: english), "Plugins")
         XCTAssertEqual(L10n.title(for: AIApplicationTab.plugins, locale: chinese), "插件")
+        XCTAssertEqual(L10n.text(.developerToolsTitle, locale: english), "Developer Tools")
+        XCTAssertEqual(L10n.text(.developerToolsTitle, locale: chinese), "开发工具")
     }
 
     func testScanStagesUseEnglishAndSimplifiedChinese() {
@@ -57,6 +61,20 @@ final class LocalizationTests: XCTestCase {
     func testKnownScannerExplanationsAreLocalizedAtPresentationTime() {
         let chinese = Locale(identifier: "zh-Hans")
         XCTAssertEqual(L10n.explanation("Codex conversation history", locale: chinese), "Codex 对话历史")
+        XCTAssertEqual(
+            L10n.explanation(
+                "Diagnostic log or crash report older than 30 days",
+                locale: chinese
+            ),
+            "30 天以上的诊断日志或崩溃报告"
+        )
+        XCTAssertEqual(
+            L10n.explanation(
+                "Application cache that can be regenerated",
+                locale: chinese
+            ),
+            "应用自动重新生成的缓存数据"
+        )
         XCTAssertEqual(L10n.explanation("Found under Downloads", locale: chinese), "在 Downloads 下发现")
         XCTAssertEqual(
             L10n.explanation(
@@ -331,7 +349,7 @@ final class LocalizationTests: XCTestCase {
         let english = try stringsTable(at: resources.appending(path: "en.lproj/Localizable.strings"))
         let chinese = try stringsTable(at: resources.appending(path: "zh-Hans.lproj/Localizable.strings"))
 
-        XCTAssertEqual(L10n.allKeys.count, 410)
+        XCTAssertEqual(L10n.allKeys.count, 442)
         XCTAssertEqual(Set(catalogStrings.keys), L10n.allKeys)
         XCTAssertEqual(Set(english.keys), L10n.allKeys)
         XCTAssertEqual(Set(chinese.keys), L10n.allKeys)

@@ -20,12 +20,15 @@
 | 扫描范围和管线 | `Sources/SpacePilotCore/Scanning/ScanCoordinator.swift` | `ScanCoordinatorTests.swift`、`ScanScopeArchitectureTests.swift` |
 | 有数量限制的目录遍历 | `Sources/SpacePilotCore/Scanning/DirectoryScanner.swift` | `DirectoryScannerTests.swift` |
 | 下载目录安装包识别 | `Sources/SpacePilotCore/Scanning/DownloadedInstallerScanner.swift` | `DownloadedInstallerScannerTests.swift`、`ScanCoordinatorTests.swift` |
-| 磁盘和开发工具目录 | `VolumeScanner.swift`、`DeveloperStorageScanner.swift` | 同名扫描器测试 |
+| 过期诊断日志与崩溃报告 | `Sources/SpacePilotCore/Scanning/StaleDiagnosticScanner.swift` | `StaleDiagnosticScannerTests.swift`、`ScanCoordinatorTests.swift` |
+| 已安装应用缓存扫描 | `Sources/SpacePilotCore/Scanning/ApplicationCacheScanner.swift` | `ApplicationCacheScannerTests.swift` |
+| 磁盘和开发工具目录 | `VolumeScanner.swift`、`DeveloperStorageScanner.swift` | 同名扫描器测试、`DeveloperStorageCleanupPolicyTests.swift` |
 | FSEvents、变化合并和最近空间变化 | `FileSystemChangeMonitor.swift`、`FileSystemChangeReconciler.swift`、`StorageChangeTracker.swift` | `FileSystemChangeMonitorTests.swift`、`StorageChangeTrackerTests.swift` |
 | SQLite 快照、索引和统计 | `Sources/SpacePilotCore/Persistence/SQLiteIndexStore.swift`、`IndexSchema.swift` | `SQLiteIndexStoreTests.swift` |
 | 快照、所有权和变化历史模型 | `Models/ScanSnapshot.swift`、`ScannedItem.swift`、`StorageIntelligence.swift`、`StorageChangeHistory.swift` | `ModelAggregationTests.swift`、`StorageChangeHistoryTests.swift` |
-| 界面投影和数量限制 | `Models/AppSnapshotProjection.swift`、`ViewProjections.swift` | `ViewProjectionTests.swift` |
+| 界面投影和数量限制 | `Models/AppSnapshotProjection.swift`、`ApplicationCacheProjection.swift`、`ViewProjections.swift` | `ViewProjectionTests.swift` |
 | 概览和储存界面 | `Views/Overview/`、`Views/Storage/StorageView.swift`、`StorageCapacityOverview.swift` | `OverviewDashboardStateTests.swift`、`OverviewChartArchitectureTests.swift`、`StorageWorkbenchArchitectureTests.swift` |
+| 应用缓存界面 | `Views/Cleanup/ApplicationCacheView.swift` | `ApplicationCacheArchitectureTests.swift` |
 
 ## 应用程序
 
@@ -55,13 +58,15 @@
 | 版本检查、选择计划和受控更新 | `AIUpdateChecking.swift`、`AIUpdateSelectionPlan.swift`、`AIUpdateExecutor.swift` | `AIUpdateCheckingTests.swift`、`AIUpdateExecutionTests.swift` |
 | Plugin 目录、清单和组件 | `Sources/SpacePilotCore/Plugins/` | `PluginRootDiscoveryTests.swift`、`PluginScannerTests.swift` |
 | Skill 目录、清单和冲突 | `Sources/SpacePilotCore/Skills/` | `SkillScannerTests.swift`、`SkillConflictDetectorTests.swift` |
-| 开发与 AI 界面 | `Sources/SpacePilot/Views/DeveloperAI/` | `DeveloperAIArchitectureTests.swift`、AI 管理测试 |
+| 开发与 AI 界面 | `Sources/SpacePilot/Views/DeveloperAI/`（开发缓存入口为 `DeveloperStorageView.swift`） | `DeveloperAIArchitectureTests.swift`、AI 管理测试 |
 
 ## 清理与安全
 
 | 用途 | 主要文件 | 对应测试 |
 | --- | --- | --- |
 | 路径安全策略 | `SpacePilotCore/Cleanup/PathSafetyPolicy.swift` | `PathSafetyPolicyTests.swift` |
+| 应用缓存专用安全门 | `SpacePilotCore/Cleanup/ApplicationCacheCleanupPolicy.swift` | `ApplicationCacheCleanupPolicyTests.swift`、`CleanupExecutorTests.swift` |
+| 开发工具缓存安全门 | `SpacePilotCore/Cleanup/DeveloperStorageCleanupPolicy.swift` | `DeveloperStorageCleanupPolicyTests.swift`、`CleanupExecutorTests.swift` |
 | 从选择生成不可变计划 | `CleanupPlanner.swift`、`CleanupModels.swift` | `CleanupPlannerTests.swift` |
 | 身份复核和移到废纸篓 | `CleanupExecutor.swift`、`TrashMoving.swift`、`CleanupVerifier.swift` | `CleanupExecutorTests.swift` |
 | 清理确认界面 | `Views/Shared/CleanupConfirmationView.swift`、`CleanupSelection.swift` | 清理选择测试 |

@@ -325,7 +325,14 @@ final class AppModel {
         scope: ScanScope = .applications,
         background: Bool = false
     ) {
-        guard !isScanning, let coordinator = runtime?.coordinator else { return }
+        guard let coordinator = runtime?.coordinator else { return }
+        if isScanning {
+            if isBackgroundRefreshing && !background {
+                pendingAutomaticRefreshScope = scope
+                scanTask?.cancel()
+            }
+            return
+        }
         if !background {
             errorMessage = nil
         }
@@ -392,6 +399,8 @@ final class AppModel {
         let scope: ScanScope = switch selection ?? .overview {
         case .overview, .storage:
             .full
+        case .applicationCaches:
+            .applicationCaches
         case .applications:
             .applications
         case .developerAI:
@@ -425,6 +434,15 @@ final class AppModel {
                 CleanupReviewItem(item: $0, ownership: .owned, evidence: nil)
             }
         prepareCleanup(reviewItems: eligible)
+    }
+
+    func prepareApplicationCacheCleanup(items: [ScannedItem]) {
+        let running = runningApplicationNames(for: items)
+        guard running.isEmpty else {
+            errorMessage = L10n.quitBeforeCacheCleanup(running.joined(separator: ", "))
+            return
+        }
+        prepareCleanup(items: items)
     }
 
     private func prepareCleanup(reviewItems: [CleanupReviewItem]) {
@@ -524,6 +542,14 @@ final class AppModel {
         let candidateItems = cleanupCandidates.map(\.item)
         let candidateIDs = Set(candidateItems.map(\.id))
         let eligibleSelectedIDs = selectedIDs.intersection(candidateIDs)
+        let selectedItems = candidateItems.filter {
+            eligibleSelectedIDs.contains($0.id)
+        }
+        let running = runningApplicationNames(for: selectedItems)
+        guard running.isEmpty else {
+            errorMessage = L10n.quitBeforeCacheCleanup(running.joined(separator: ", "))
+            return
+        }
         let sensitiveCandidateIDs = Set(cleanupCandidates.filter {
             $0.effectiveRisk == .sensitive
         }.map(\.id))
@@ -596,6 +622,23 @@ final class AppModel {
                 startPendingAutomaticRefreshIfNeeded()
             }
         }
+    }
+
+    private func runningApplicationNames(for items: [ScannedItem]) -> [String] {
+        guard let snapshot = latestSnapshot else { return [] }
+        let applicationIDs = Set(items.compactMap { item in
+            item.category == .cache ? item.ownerID : nil
+        })
+        return snapshot.applications.compactMap { application in
+            guard applicationIDs.contains(application.id),
+                  let bundleIdentifier = application.bundleIdentifier,
+                  !NSRunningApplication.runningApplications(
+                    withBundleIdentifier: bundleIdentifier
+                  ).isEmpty else {
+                return nil
+            }
+            return application.name
+        }.sorted()
     }
 
     private func loadSavedState() async {
@@ -907,6 +950,9 @@ final class AppModel {
         guard let current else { return incoming }
         if current == .full || incoming == .full {
             return .full
+        }
+        if current == .applicationCaches || incoming == .applicationCaches {
+            return current == incoming ? .applicationCaches : .full
         }
         if current == .developerAI || incoming == .developerAI {
             return .developerAI

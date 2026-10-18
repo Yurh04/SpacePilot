@@ -31,6 +31,9 @@ public struct CleanupCandidate: Identifiable, Codable, Hashable, Sendable {
     public let expectedResourceIdentifier: String?
     public let expectedModificationDate: Date?
     public let explanation: String
+    public let cleanupPolicyScope: CleanupPolicyScope?
+    public let cleanupOwnerIdentifier: String?
+    public let cleanupPolicyRelativePath: String?
 
     public init(
         id: UUID = UUID(),
@@ -41,7 +44,10 @@ public struct CleanupCandidate: Identifiable, Codable, Hashable, Sendable {
         itemKind: CleanupItemKind = .regularFile,
         expectedResourceIdentifier: String?,
         expectedModificationDate: Date?,
-        explanation: String
+        explanation: String,
+        cleanupPolicyScope: CleanupPolicyScope? = nil,
+        cleanupOwnerIdentifier: String? = nil,
+        cleanupPolicyRelativePath: String? = nil
     ) {
         self.id = id
         self.itemID = itemID
@@ -52,6 +58,9 @@ public struct CleanupCandidate: Identifiable, Codable, Hashable, Sendable {
         self.expectedResourceIdentifier = expectedResourceIdentifier
         self.expectedModificationDate = expectedModificationDate
         self.explanation = explanation
+        self.cleanupPolicyScope = cleanupPolicyScope
+        self.cleanupOwnerIdentifier = cleanupOwnerIdentifier
+        self.cleanupPolicyRelativePath = cleanupPolicyRelativePath
     }
 }
 

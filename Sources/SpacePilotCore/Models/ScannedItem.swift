@@ -27,6 +27,11 @@ public enum ItemCategory: String, Codable, CaseIterable, Sendable {
     case unclassified
 }
 
+public enum CleanupPolicyScope: String, Codable, Sendable {
+    case applicationCache
+    case developerStorage
+}
+
 public struct ScannedItem: Identifiable, Codable, Hashable, Sendable {
     public let id: UUID
     public let url: URL
@@ -39,6 +44,12 @@ public struct ScannedItem: Identifiable, Codable, Hashable, Sendable {
     public let risk: RiskLevel
     public let ownerID: UUID?
     public let explanation: String
+    public let cleanupPolicyScope: CleanupPolicyScope?
+    public let cleanupOwnerIdentifier: String?
+    /// Exact path relative to the current user's home directory that was
+    /// approved by the capability-specific scanner. Cleanup policies compare
+    /// this value again immediately before planning and execution.
+    public let cleanupPolicyRelativePath: String?
 
     public init(
         id: UUID = UUID(),
@@ -51,7 +62,10 @@ public struct ScannedItem: Identifiable, Codable, Hashable, Sendable {
         category: ItemCategory,
         risk: RiskLevel,
         ownerID: UUID? = nil,
-        explanation: String
+        explanation: String,
+        cleanupPolicyScope: CleanupPolicyScope? = nil,
+        cleanupOwnerIdentifier: String? = nil,
+        cleanupPolicyRelativePath: String? = nil
     ) {
         self.id = id
         self.url = url
@@ -64,5 +78,8 @@ public struct ScannedItem: Identifiable, Codable, Hashable, Sendable {
         self.risk = risk
         self.ownerID = ownerID
         self.explanation = explanation
+        self.cleanupPolicyScope = cleanupPolicyScope
+        self.cleanupOwnerIdentifier = cleanupOwnerIdentifier
+        self.cleanupPolicyRelativePath = cleanupPolicyRelativePath
     }
 }

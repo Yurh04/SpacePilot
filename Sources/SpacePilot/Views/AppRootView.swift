@@ -76,6 +76,14 @@ struct AppRootView: View {
                     model.openFullDiskAccessSettings()
                 }
             )
+        case .applicationCaches:
+            ApplicationCacheView(
+                projection: model.projection?.applicationCaches,
+                hasSnapshot: model.latestSnapshot != nil,
+                searchText: model.searchText,
+                scan: { model.startScan(scope: .applicationCaches) },
+                reviewCleanup: model.prepareApplicationCacheCleanup
+            )
         case .storage:
             StorageView(
                 projection: model.projection?.storage,

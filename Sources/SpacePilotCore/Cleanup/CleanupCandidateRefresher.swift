@@ -6,6 +6,20 @@ public struct CleanupCandidateRefresher: Sendable {
     public func refresh(item: ScannedItem, policy: PathSafetyPolicy) throws -> CleanupCandidate {
         try Task.checkCancellation()
         let url = try policy.validate(item.url)
+        if item.cleanupPolicyScope == .applicationCache {
+            try ApplicationCacheCleanupPolicy.validate(
+                url,
+                homeDirectory: policy.homeDirectory,
+                bundleIdentifier: item.cleanupOwnerIdentifier,
+                approvedRelativePath: item.cleanupPolicyRelativePath
+            )
+        } else if item.cleanupPolicyScope == .developerStorage {
+            try DeveloperStorageCleanupPolicy.validate(
+                url,
+                homeDirectory: policy.homeDirectory,
+                approvedRelativePath: item.cleanupPolicyRelativePath
+            )
+        }
         try Task.checkCancellation()
         let values = try url.resourceValues(forKeys: [
             .isDirectoryKey,
@@ -36,7 +50,10 @@ public struct CleanupCandidateRefresher: Sendable {
             itemKind: kind,
             expectedResourceIdentifier: String(describing: resourceIdentifier),
             expectedModificationDate: values.contentModificationDate,
-            explanation: item.explanation
+            explanation: item.explanation,
+            cleanupPolicyScope: item.cleanupPolicyScope,
+            cleanupOwnerIdentifier: item.cleanupOwnerIdentifier,
+            cleanupPolicyRelativePath: item.cleanupPolicyRelativePath
         )
     }
 

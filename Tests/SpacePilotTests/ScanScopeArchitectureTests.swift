@@ -20,10 +20,24 @@ final class ScanScopeArchitectureTests: XCTestCase {
         let source = try read("Sources/SpacePilot/App/AppModel.swift")
 
         XCTAssertTrue(source.contains("case .overview, .storage:"))
+        XCTAssertTrue(source.contains("case .applicationCaches:"))
+        XCTAssertTrue(source.contains(".applicationCaches"))
         XCTAssertTrue(source.contains("case .applications:"))
         XCTAssertTrue(source.contains("case .developerAI:"))
         XCTAssertTrue(source.contains("case .history:"))
         XCTAssertTrue(source.contains("startScan(scope: scope)"))
+    }
+
+    func testExplicitCacheScanSupersedesBackgroundRefresh() throws {
+        let source = try read("Sources/SpacePilot/App/AppModel.swift")
+        let startScan = try block(
+            in: source,
+            following: "func startScan("
+        )
+
+        XCTAssertTrue(startScan.contains("isBackgroundRefreshing && !background"))
+        XCTAssertTrue(startScan.contains("pendingAutomaticRefreshScope = scope"))
+        XCTAssertTrue(startScan.contains("scanTask?.cancel()"))
     }
 
     func testFullDiskAccessReturnAndChangedStartupCoverageRequestOneFullRefresh() throws {

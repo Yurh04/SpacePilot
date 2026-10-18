@@ -259,6 +259,8 @@ struct DeveloperAIView: View {
             return model.aiCapabilities.mcpServers.count
         case .plugins:
             return (projection.allPlugins + model.projectAIAssetPlugins).count
+        case .developerTools:
+            return model.projection?.developerStorage.items.count ?? 0
         case .cli:
             return cliClassification.commandLineTools.count
         case .otherTools:
@@ -296,6 +298,13 @@ struct DeveloperAIView: View {
             )
         case .plugins:
             pluginsSection(projection)
+        case .developerTools:
+            DeveloperStorageView(
+                projection: model.projection?.developerStorage,
+                searchText: model.searchText,
+                scan: { model.startScan(scope: .developerAI) },
+                reviewCleanup: model.prepareCleanup
+            )
         case .cli:
             cliSection
         case .otherTools:

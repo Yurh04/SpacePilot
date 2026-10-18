@@ -10,6 +10,13 @@ enum L10n {
         static let aiDataItems = Self(key: "ai.data-items", english: "Data items")
         static let aiDeepAnalysis = Self(key: "ai.deep-analysis", english: "Deep analysis")
         static let aiDeveloperStorage = Self(key: "ai.developer-storage", english: "Developer storage")
+        static let developerToolsTitle = Self(key: "developer-tools.title", english: "Developer Tools")
+        static let developerToolsSubtitle = Self(key: "developer-tools.subtitle", english: "Rebuildable caches and downloaded toolchain components")
+        static let developerToolsCheckFirst = Self(key: "developer-tools.check-first", english: "Review before cleaning; tools may need to download or rebuild these files again.")
+        static let developerToolsScan = Self(key: "developer-tools.scan", english: "Scan Developer Tools")
+        static let developerToolsEmpty = Self(key: "developer-tools.empty", english: "No Developer Tool Caches Found")
+        static let developerToolsEmptyDescription = Self(key: "developer-tools.empty-description", english: "Run a scan to check supported Xcode, package-manager, browser-test, and compiler caches.")
+        static let developerToolsReview = Self(key: "developer-tools.review", english: "Review Selected")
         static let aiLocalFootprint = Self(key: "ai.local-footprint", english: "Local footprint")
         static let aiNoContentIndexed = Self(key: "ai.no-content-indexed", english: "Conversation and log contents are not indexed.")
         static let aiPluginsManaged = Self(key: "ai.plugins-managed", english: "Plugin packages are managed by their owning application.")
@@ -171,6 +178,19 @@ enum L10n {
         static let applicationTotalSpace = Self(key: "app.total-space", english: "Total size")
         static let applicationBundleSize = Self(key: "app.bundle-size", english: "App size (Finder)")
         static let applicationUninstall = Self(key: "app.uninstall", english: "Uninstall…")
+        static let cacheEmptyDescription = Self(key: "cache.empty-description", english: "No recognized application caches are currently available.")
+        static let cacheEmptyTitle = Self(key: "cache.empty-title", english: "No Application Caches")
+        static let cacheLimitedCoverage = Self(key: "cache.limited-coverage", english: "Some cache locations could not be read")
+        static let cacheNoMatching = Self(key: "cache.no-matching", english: "No Matching Caches")
+        static let cacheNoMatchingDescription = Self(key: "cache.no-matching-description", english: "Choose another safety filter or search term.")
+        static let cacheReviewSelected = Self(key: "cache.review-selected", english: "Review Selected")
+        static let cacheSafetyFilter = Self(key: "cache.safety-filter", english: "Cache safety")
+        static let cacheScan = Self(key: "cache.scan", english: "Scan Caches")
+        static let cacheSelectSafe = Self(key: "cache.select-safe", english: "Select Safe")
+        static let cacheSort = Self(key: "cache.sort", english: "Sort caches")
+        static let cacheSortLargest = Self(key: "cache.sort-largest", english: "Largest First")
+        static let cacheSortName = Self(key: "cache.sort-name", english: "Name")
+        static let cacheTitle = Self(key: "cache.title", english: "Application Caches")
         static let cleanupConfirmSensitive = Self(key: "cleanup.confirm-sensitive", english: "Also move the sensitive conversation, project, or settings data listed above")
         static let cleanupConfirmTrash = Self(key: "cleanup.confirm-trash", english: "I understand these items will be moved to the Trash")
         static let cleanupClearSelection = Self(key: "cleanup.clear-selection", english: "Clear")
@@ -297,6 +317,11 @@ enum L10n {
         "risk.managed", "risk.rebuildable", "risk.safe", "risk.sensitive", "state.no-data",
         "state.preparing-summary",
         "ai.basic-footprint", "ai.data-items", "ai.deep-analysis", "ai.developer-storage",
+        "developer-tools.title", "developer-tools.subtitle", "developer-tools.check-first",
+        "developer-tools.scan", "developer-tools.empty", "developer-tools.empty-description",
+        "developer-tools.review",
+        "developer-tools.cache-name", "developer-tools.device-support-name",
+        "developer-tools.xcode-derived-data",
         "ai.local-footprint", "ai.manage-in", "ai.no-content-indexed", "ai.plugins-managed",
         "ai.privacy", "ai.searching", "ai.section", "ai.select-application",
         "ai.skills-visible", "ai.skills.global-note", "ai.skills.scope-agent",
@@ -354,7 +379,12 @@ enum L10n {
         "app.ownership.owned", "app.ownership.possible", "app.ownership.shared",
         "app.bundle-size", "app.disk-usage", "app.related", "app.reset", "app.review-reset", "app.review-uninstall",
         "app.search-applications", "app.sort", "app.total-space",
-        "app.uninstall", "cleanup.clear-selection", "cleanup.confirm-sensitive", "cleanup.confirm-trash",
+        "app.uninstall", "cache.empty-description", "cache.empty-title", "cache.filter-all",
+        "cache.filter-check", "cache.filter-safe", "cache.limited-coverage", "cache.no-matching",
+        "cache.no-matching-description", "cache.review-selected", "cache.row-description",
+        "cache.safety-filter", "cache.scan", "cache.select-safe", "cache.sort",
+        "cache.sort-largest", "cache.sort-name", "cache.summary", "cache.title",
+        "cleanup.clear-selection", "cleanup.confirm-sensitive", "cleanup.confirm-trash",
         "cleanup.history-empty", "cleanup.history-empty-description", "cleanup.move-selected-trash",
         "cleanup.move-trash", "cleanup.moved-count", "cleanup.moving", "cleanup.review",
         "cleanup.review-description", "cleanup.select-all", "cleanup.selected-summary", "cleanup.summary.failed",
@@ -363,7 +393,7 @@ enum L10n {
         "common.items", "common.name",
         "common.plugin", "common.related", "common.reveal-finder", "common.search-current",
         "common.skill", "common.source", "confidence.high", "confidence.low", "confidence.medium",
-        "error.quit-before-uninstall", "error.reset-unavailable", "overview.analyze-mac",
+        "error.quit-before-cache-cleanup", "error.quit-before-uninstall", "error.reset-unavailable", "overview.analyze-mac",
         "overview.analyzed-categories-chart", "overview.analyzed-categories-description",
         "overview.analyzed-categories-empty", "overview.analyzed-locally", "overview.disk-available",
         "overview.disk-capacity-chart", "overview.disk-capacity-unavailable-description",
@@ -380,7 +410,7 @@ enum L10n {
         "overview.works-locally", "plugins.diagnostic-empty-skill", "plugins.diagnostic-generic",
         "plugins.diagnostic-invalid-manifest", "plugins.diagnostic-missing-manifest",
         "plugins.diagnostic-path-inaccessible",
-        "scan.cancelled", "scan.completed", "scan.indexing", "scan.quick-inventory", "scan.ready",
+        "nav.application-caches", "scan.cancelled", "scan.completed", "scan.indexing", "scan.quick-inventory", "scan.ready",
         "scan.targeted-analysis", "settings.diagnostics", "settings.diagnostics-description",
         "settings.disk-access", "settings.disk-access-description", "settings.export-diagnostics",
         "settings.open-disk-access", "settings.privacy", "settings.privacy-description",
@@ -405,12 +435,13 @@ enum L10n {
         "cleanup.reason.changed-identity", "cleanup.reason.missing-source",
         "cleanup.reason.move-failed", "cleanup.reason.permission-denied",
         "cleanup.reason.protected-path", "cleanup.source-path",
-        "explanation.application-bundle", "explanation.application-name-match",
+        "explanation.application-bundle", "explanation.application-cache", "explanation.application-name-match",
         "explanation.claude-cache", "explanation.claude-conversation", "explanation.claude-logs",
         "explanation.claude-settings", "explanation.codex-cache", "explanation.codex-configuration",
         "explanation.codex-conversation", "explanation.codex-logs", "explanation.exact-bundle-match",
         "explanation.found-under", "explanation.gradle-cache", "explanation.homebrew-cache",
         "explanation.installer-for-installed-application",
+        "explanation.stale-diagnostic",
         "explanation.npm-cache", "explanation.pip-cache", "explanation.recognized-root",
         "explanation.simulator-data", "explanation.xcode-archives", "explanation.xcode-build",
         "cleanup.message.changed", "cleanup.message.moved", "cleanup.message.outside-volume",
@@ -492,6 +523,10 @@ enum L10n {
 
     static func applications(locale: Locale? = nil) -> String {
         value("nav.applications", default: "Applications", locale: locale)
+    }
+
+    static func applicationCaches(locale: Locale? = nil) -> String {
+        value("nav.application-caches", default: "Application Caches", locale: locale)
     }
 
     static func developerAI(locale: Locale? = nil) -> String {
@@ -629,6 +664,7 @@ enum L10n {
     static func title(for destination: NavigationDestination, locale: Locale? = nil) -> String {
         switch destination {
         case .overview: overview(locale: locale)
+        case .applicationCaches: applicationCaches(locale: locale)
         case .storage: storage(locale: locale)
         case .applications: applications(locale: locale)
         case .developerAI: developerAI(locale: locale)
@@ -895,6 +931,70 @@ enum L10n {
         )
     }
 
+    static func developerToolName(
+        relativePath: String?,
+        fallback: String,
+        locale: Locale? = nil
+    ) -> String {
+        guard let relativePath else { return explanation(fallback, locale: locale) }
+        if relativePath == "Library/Developer/Xcode/DerivedData" {
+            return value(
+                "developer-tools.xcode-derived-data",
+                default: "Xcode Derived Data",
+                locale: locale
+            )
+        }
+        if relativePath.contains("DeviceSupport") {
+            let platform = relativePath
+                .split(separator: "/").last.map(String.init)?
+                .replacingOccurrences(of: " DeviceSupport", with: "") ?? "Xcode"
+            return format(
+                "developer-tools.device-support-name",
+                default: "Xcode %@ Device Support",
+                locale: locale,
+                platform
+            )
+        }
+        let brands: [(String, String)] = [
+            ("Xcode", "Xcode"), ("Homebrew", "Homebrew"),
+            (".npm", "npm"), ("pnpm", "pnpm"), ("Yarn", "Yarn"),
+            ("yarn", "Yarn"), (".gradle", "Gradle"), (".m2", "Maven"),
+            ("pip", "pip"), ("playwright", "Playwright"),
+            ("puppeteer", "Puppeteer"), ("CocoaPods", "CocoaPods"),
+            ("cocoapods", "CocoaPods"), ("swiftpm", "Swift Package Manager"),
+            (".cargo", "Cargo"), ("go-build", "Go"), ("go/pkg", "Go modules"),
+            ("deno", "Deno"), (".bun", "Bun")
+        ]
+        let brand = brands.first { relativePath.localizedCaseInsensitiveContains($0.0) }?.1
+        guard let brand else { return explanation(fallback, locale: locale) }
+        return format(
+            "developer-tools.cache-name",
+            default: "%@ Cache",
+            locale: locale,
+            brand
+        )
+    }
+
+    static func cacheSummary(_ count: Int, space: String, locale: Locale? = nil) -> String {
+        format("cache.summary", default: "%lld apps · %@ reclaimable", locale: locale, Int64(count), space)
+    }
+
+    static func cacheFilterAll(_ count: Int, locale: Locale? = nil) -> String {
+        format("cache.filter-all", default: "All %lld", locale: locale, Int64(count))
+    }
+
+    static func cacheFilterSafe(_ count: Int, locale: Locale? = nil) -> String {
+        format("cache.filter-safe", default: "Safe %lld", locale: locale, Int64(count))
+    }
+
+    static func cacheFilterCheck(_ count: Int, locale: Locale? = nil) -> String {
+        format("cache.filter-check", default: "Check First %lld", locale: locale, Int64(count))
+    }
+
+    static func cacheRowDescription(_ count: Int, locale: Locale? = nil) -> String {
+        format("cache.row-description", default: "%lld recognized cache locations", locale: locale, Int64(count))
+    }
+
     static func visibleItems(_ count: Int, locale: Locale? = nil) -> String {
         format("storage.visible-items", default: "%lld visible items", locale: locale, Int64(count))
     }
@@ -905,6 +1005,15 @@ enum L10n {
 
     static func quitBeforeUninstall(_ application: String, locale: Locale? = nil) -> String {
         format("error.quit-before-uninstall", default: "Quit %@ before uninstalling it.", locale: locale, application)
+    }
+
+    static func quitBeforeCacheCleanup(_ applications: String, locale: Locale? = nil) -> String {
+        format(
+            "error.quit-before-cache-cleanup",
+            default: "Quit %@ before cleaning its cache.",
+            locale: locale,
+            applications
+        )
     }
 
     static func resetUnavailable(_ application: String, locale: Locale? = nil) -> String {
@@ -926,6 +1035,7 @@ enum L10n {
     static func explanation(_ source: String, locale: Locale? = nil) -> String {
         let exact: [String: (String, String)] = [
             "Application bundle": ("explanation.application-bundle", "Application bundle"),
+            "Application cache that can be regenerated": ("explanation.application-cache", "Application cache that can be regenerated"),
             "Application name match in a known service directory": ("explanation.application-name-match", "Application name match in a known service directory"),
             "Claude project conversation data": ("explanation.claude-conversation", "Claude project conversation data"),
             "Claude diagnostic logs": ("explanation.claude-logs", "Claude diagnostic logs"),
@@ -935,6 +1045,7 @@ enum L10n {
             "Codex diagnostic logs": ("explanation.codex-logs", "Codex diagnostic logs"),
             "Codex rebuildable cache": ("explanation.codex-cache", "Codex rebuildable cache"),
             "Codex configuration": ("explanation.codex-configuration", "Codex configuration"),
+            "Diagnostic log or crash report older than 30 days": ("explanation.stale-diagnostic", "Diagnostic log or crash report older than 30 days"),
             "Xcode build products and indexes": ("explanation.xcode-build", "Xcode build products and indexes"),
             "Xcode release archives": ("explanation.xcode-archives", "Xcode release archives"),
             "Simulator runtimes and device data": ("explanation.simulator-data", "Simulator runtimes and device data"),

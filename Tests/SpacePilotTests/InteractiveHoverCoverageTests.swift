@@ -11,10 +11,12 @@ final class InteractiveHoverCoverageTests: XCTestCase {
             "DeveloperAI/AIAgentDetailView.swift", "DeveloperAI/AIApplicationDetailView.swift",
             "DeveloperAI/AIManagementOverviewView.swift", "DeveloperAI/AIUpdateActionBar.swift",
             "DeveloperAI/AIUpdateConfirmSheet.swift", "DeveloperAI/CLIToolsView.swift",
-            "DeveloperAI/DeveloperAIView.swift", "DeveloperAI/DiscoveredAIApplicationView.swift",
+            "DeveloperAI/DeveloperAIView.swift", "DeveloperAI/DeveloperStorageView.swift",
+            "DeveloperAI/DiscoveredAIApplicationView.swift",
             "DeveloperAI/GlobalPluginsView.swift", "DeveloperAI/GlobalSkillsView.swift",
             "DeveloperAI/MCPServersView.swift", "DeveloperAI/OtherAIToolsView.swift",
-            "DeveloperAI/ProjectApprovalBar.swift", "History/CleanupHistoryView.swift",
+            "DeveloperAI/ProjectApprovalBar.swift", "Cleanup/ApplicationCacheView.swift",
+            "History/CleanupHistoryView.swift",
             "Overview/OverviewView.swift", "Settings/SettingsView.swift",
             "Shared/CleanupConfirmationView.swift", "Shared/FinderReveal.swift",
             "Shared/InspectorDetailView.swift", "Shared/NativeTableDoubleClick.swift",
@@ -92,6 +94,13 @@ final class InteractiveHoverCoverageTests: XCTestCase {
         XCTAssertEqual(occurrences(of: ".nativeTableHoverHighlight", in: source), 2)
         XCTAssertTrue(source.contains("applications.indices.contains(row)"))
         XCTAssertTrue(source.contains("rowURLs.indices.contains(row)"))
+    }
+
+    func testApplicationCacheListUsesItsVisibleSortedRowsForHover() throws {
+        let source = try source("Cleanup/ApplicationCacheView.swift")
+        XCTAssertEqual(occurrences(of: ".nativeTableHoverHighlight", in: source), 1)
+        XCTAssertTrue(source.contains("rows.indices.contains($0)"))
+        XCTAssertTrue(source.contains(".onDoubleClickRevealInFinder(row.items[0].url)"))
     }
 
     func testApplicationPlainSearchClearButtonHasControlHover() throws {

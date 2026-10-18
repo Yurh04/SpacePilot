@@ -3,6 +3,173 @@ import XCTest
 @testable import SpacePilotCore
 
 final class ScanCoordinatorTests: XCTestCase {
+    func testFullScanKeepsApplicationCachePolicyWhenAssociationFindsSameRoot()
+        async throws
+    {
+        let home = try TemporaryTree(files: [
+            "Library/Caches/com.example.focused/cache.bin": 128
+        ])
+        let applicationsDirectory = home.url.appending(
+            path: "Applications",
+            directoryHint: .isDirectory
+        )
+        _ = try TestAppBuilder.make(
+            in: applicationsDirectory,
+            name: "Focused",
+            bundleID: "com.example.focused",
+            version: "1.0",
+            executableBytes: 16
+        )
+        let coordinator = ScanCoordinator(
+            homeDirectory: home.url,
+            store: InMemorySnapshotStore()
+        )
+
+        let snapshot = try await coordinator.collectScan(scope: .full)
+
+        let cacheRoot = home.url.appending(
+            path: "Library/Caches/com.example.focused",
+            directoryHint: .isDirectory
+        ).standardizedFileURL
+        let item = try XCTUnwrap(snapshot.items.first {
+            $0.url.standardizedFileURL == cacheRoot
+        })
+        XCTAssertEqual(item.cleanupPolicyScope, .applicationCache)
+        XCTAssertEqual(item.cleanupOwnerIdentifier, "com.example.focused")
+        XCTAssertTrue(snapshot.applications.contains { $0.id == item.ownerID })
+        XCTAssertEqual(ApplicationCacheProjection(snapshot: snapshot).groups.count, 1)
+    }
+
+    func testApplicationCacheScopePreservesUnrelatedSnapshotItems() async throws {
+        let home = try TemporaryTree(files: [
+            "Documents/keep.dat": 64,
+            "Library/Caches/com.example.focused/cache.bin": 128
+        ])
+        let applicationsDirectory = home.url.appending(
+            path: "Applications",
+            directoryHint: .isDirectory
+        )
+        let applicationFixture = try TestAppBuilder.make(
+            in: applicationsDirectory,
+            name: "Focused",
+            bundleID: "com.example.focused",
+            version: "1.0",
+            executableBytes: 16
+        )
+        let applicationID = UUID()
+        let application = ApplicationRecord(
+            id: applicationID,
+            name: "Focused",
+            bundleIdentifier: "com.example.focused",
+            version: "1.0",
+            url: home.url.appending(path: "Legacy/Focused.app"),
+            executableURL: nil,
+            allocatedSize: 16
+        )
+        let unrelated = ScannedItem(
+            url: home.url.appending(path: "Documents/keep.dat"),
+            logicalSize: 64,
+            allocatedSize: 64,
+            category: .personal,
+            risk: .sensitive,
+            explanation: "Preserved fixture"
+        )
+        let previous = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: [unrelated],
+            applications: [application],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: .complete,
+            pluginDiagnostics: nil
+        )
+        let coordinator = ScanCoordinator(
+            homeDirectory: home.url,
+            store: InMemorySnapshotStore(latest: previous)
+        )
+
+        let snapshot = try await coordinator.collectScan(scope: .applicationCaches)
+
+        XCTAssertTrue(snapshot.items.contains { $0.id == unrelated.id })
+        let cache = try XCTUnwrap(snapshot.items.first {
+            $0.cleanupPolicyScope == .applicationCache
+        })
+        XCTAssertEqual(cache.ownerID, applicationID)
+        let refreshedApplication = try XCTUnwrap(snapshot.applications.first {
+            $0.id == applicationID
+        })
+        XCTAssertEqual(
+            refreshedApplication.url.standardizedFileURL,
+            applicationFixture.appURL.standardizedFileURL
+        )
+        XCTAssertEqual(
+            ApplicationCacheProjection(snapshot: snapshot).groups.first?.name,
+            "Focused"
+        )
+    }
+
+    func testFullScanPublishesStaleDiagnosticAsSafeCleanupItem() async throws {
+        let home = try TemporaryTree(files: [
+            "Library/Logs/DiagnosticReports/Example.ips": 128
+        ])
+        let report = home.url.appending(
+            path: "Library/Logs/DiagnosticReports/Example.ips"
+        )
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date.now.addingTimeInterval(-31 * 24 * 60 * 60)],
+            ofItemAtPath: report.path
+        )
+        let coordinator = ScanCoordinator(
+            homeDirectory: home.url,
+            store: InMemorySnapshotStore()
+        )
+
+        let snapshot = try await coordinator.collectScan(scope: .full)
+
+        let item = try XCTUnwrap(snapshot.items.first {
+            $0.url.standardizedFileURL == report.standardizedFileURL
+        })
+        XCTAssertEqual(item.category, .log)
+        XCTAssertEqual(item.risk, .safe)
+        XCTAssertEqual(
+            item.explanation,
+            StaleDiagnosticScanner<LocalFileSystemAccess>.explanation
+        )
+        XCTAssertTrue(OverviewProjection(snapshot: snapshot)
+            .preselectedRecommendations.contains { $0.id == item.id })
+    }
+
+    func testFullScanDoesNotDoubleCountStaleFileInsideAggregatedAILogDirectory()
+        async throws
+    {
+        let home = try TemporaryTree(files: [
+            ".codex/logs/old.log": 128
+        ])
+        let log = home.url.appending(path: ".codex/logs/old.log")
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date.now.addingTimeInterval(-31 * 24 * 60 * 60)],
+            ofItemAtPath: log.path
+        )
+        let coordinator = ScanCoordinator(
+            homeDirectory: home.url,
+            store: InMemorySnapshotStore()
+        )
+
+        let snapshot = try await coordinator.collectScan(scope: .full)
+
+        XCTAssertFalse(snapshot.items.contains {
+            $0.url.standardizedFileURL == log.standardizedFileURL
+                && $0.risk == .safe
+        })
+        XCTAssertEqual(snapshot.items.filter {
+            $0.url.standardizedFileURL.path.hasPrefix(
+                home.url.appending(path: ".codex/logs").standardizedFileURL.path
+            ) && $0.category == .log
+        }.count, 1)
+    }
+
     func testApplicationsRefreshPublishesMatchedDownloadedInstallerAsSafeCleanupItem() async throws {
         let home = try TemporaryTree(files: [
             "Downloads/Focused-1.0-arm64.dmg": 128

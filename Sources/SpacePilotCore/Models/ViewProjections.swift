@@ -122,6 +122,7 @@ public struct OverviewProjection: Sendable {
             limit: Self.recommendationDisplayLimit,
             prefers: { $0.allocatedSize > $1.allocatedSize }
         )
+        var largestSafeItemByCategory: [ItemCategory: ScannedItem] = [:]
         for item in snapshot.items {
             try checkpoint.checkPeriodically()
             if !usesAggregates {
@@ -131,6 +132,13 @@ public struct OverviewProjection: Sendable {
             if item.risk == .safe {
                 safeItemBytes += item.allocatedSize
                 recommendationSelection.insert(item)
+                if let current = largestSafeItemByCategory[item.category] {
+                    if item.allocatedSize > current.allocatedSize {
+                        largestSafeItemByCategory[item.category] = item
+                    }
+                } else {
+                    largestSafeItemByCategory[item.category] = item
+                }
             }
         }
 
@@ -180,7 +188,30 @@ public struct OverviewProjection: Sendable {
             checkCancellation: checkCancellation
         )
         // The heap is strictly bounded by recommendationDisplayLimit (8).
-        recommendations = recommendationSelection.sortedItems
+        var selectedRecommendations = largestSafeItemByCategory.values.sorted {
+            if $0.allocatedSize != $1.allocatedSize {
+                return $0.allocatedSize > $1.allocatedSize
+            }
+            return $0.url.path < $1.url.path
+        }
+        if selectedRecommendations.count > Self.recommendationDisplayLimit {
+            selectedRecommendations.removeSubrange(
+                Self.recommendationDisplayLimit..<selectedRecommendations.count
+            )
+        }
+        var selectedRecommendationIDs = Set(selectedRecommendations.map(\.id))
+        for item in recommendationSelection.sortedItems
+            where selectedRecommendations.count < Self.recommendationDisplayLimit {
+            if selectedRecommendationIDs.insert(item.id).inserted {
+                selectedRecommendations.append(item)
+            }
+        }
+        recommendations = selectedRecommendations.sorted {
+            if $0.allocatedSize != $1.allocatedSize {
+                return $0.allocatedSize > $1.allocatedSize
+            }
+            return $0.url.path < $1.url.path
+        }
         coverage = snapshot.coverage
         try checkCancellation()
     }

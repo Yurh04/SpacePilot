@@ -101,6 +101,65 @@ final class CleanupExecutorTests: XCTestCase {
         XCTAssertTrue(mover.movedURLs.isEmpty)
     }
 
+    func testApplicationCacheScopeIsRevalidatedBeforeTrashMove() async throws {
+        let tree = try TemporaryTree(files: [
+            "Library/Caches/com.example.Editor/nested/cache.bin": 8
+        ])
+        let nested = tree.url.appending(
+            path: "Library/Caches/com.example.Editor/nested"
+        )
+        let mover = RecordingTrashMover()
+        let candidate = CleanupCandidate(
+            itemID: UUID(),
+            url: nested,
+            allocatedSize: 8,
+            risk: .safe,
+            itemKind: .directory,
+            expectedResourceIdentifier: nil,
+            expectedModificationDate: nil,
+            explanation: "Invalid nested cache",
+            cleanupPolicyScope: .applicationCache,
+            cleanupOwnerIdentifier: "com.example.Editor"
+        )
+
+        let result = try await CleanupExecutor(
+            policy: PathSafetyPolicy(
+                homeDirectory: tree.url,
+                allowedVolumeRoot: tree.url
+            ),
+            mover: mover
+        ).execute(plan: CleanupPlan(snapshotID: UUID(), candidates: [candidate]))
+
+        XCTAssertEqual(result.outcomes.first?.status, .skippedProtected)
+        XCTAssertTrue(mover.movedURLs.isEmpty)
+    }
+
+    func testDeveloperStorageScopeIsRevalidatedBeforeTrashMove() async throws {
+        let tree = try TemporaryTree(files: [".m2/repository/artifact": 8])
+        let repository = tree.url.appending(path: ".m2/repository")
+        let mover = RecordingTrashMover()
+        let candidate = CleanupCandidate(
+            itemID: UUID(),
+            url: repository,
+            allocatedSize: 8,
+            risk: .rebuildable,
+            itemKind: .directory,
+            expectedResourceIdentifier: nil,
+            expectedModificationDate: nil,
+            explanation: "Maven dependency cache",
+            cleanupPolicyScope: .developerStorage,
+            cleanupPolicyRelativePath: ".m2/not-repository"
+        )
+
+        let result = try await CleanupExecutor(
+            policy: PathSafetyPolicy(homeDirectory: tree.url, allowedVolumeRoot: tree.url),
+            mover: mover
+        ).execute(plan: CleanupPlan(snapshotID: UUID(), candidates: [candidate]))
+
+        XCTAssertEqual(result.outcomes.first?.status, .skippedProtected)
+        XCTAssertTrue(mover.movedURLs.isEmpty)
+    }
+
     func testVerifiedBytesCountOnlySourcesThatActuallyMoved() async throws {
         let tree = try TemporaryTree(files: ["Library/Caches/app/cache.bin": 32])
         let file = tree.url.appending(path: "Library/Caches/app/cache.bin")

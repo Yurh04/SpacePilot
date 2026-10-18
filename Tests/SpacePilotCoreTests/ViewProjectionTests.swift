@@ -47,6 +47,68 @@ final class ViewProjectionTests: XCTestCase {
         XCTAssertLessThanOrEqual(projection.storage.largestItems.count, StorageProjection.itemDisplayLimit)
     }
 
+    func testApplicationCacheProjectionGroupsLocationsByOwningApplication() {
+        let application = ApplicationRecord(
+            name: "Editor",
+            bundleIdentifier: "com.example.Editor",
+            version: "1",
+            url: URL(fileURLWithPath: "/Applications/Editor.app"),
+            executableURL: nil,
+            allocatedSize: 10
+        )
+        let items = [
+            ScannedItem(
+                url: URL(fileURLWithPath: "/Users/test/Library/Caches/com.example.Editor"),
+                logicalSize: 100,
+                allocatedSize: 100,
+                category: .cache,
+                risk: .safe,
+                ownerID: application.id,
+                explanation: "Application cache that can be regenerated",
+                cleanupPolicyScope: .applicationCache,
+                cleanupOwnerIdentifier: "com.example.Editor"
+            ),
+            ScannedItem(
+                url: URL(fileURLWithPath: "/Users/test/Library/Containers/com.example.Editor/Data/Library/Caches"),
+                logicalSize: 200,
+                allocatedSize: 200,
+                category: .cache,
+                risk: .safe,
+                ownerID: application.id,
+                explanation: "Application cache that can be regenerated",
+                cleanupPolicyScope: .applicationCache,
+                cleanupOwnerIdentifier: "com.example.Editor"
+            ),
+            ScannedItem(
+                url: URL(fileURLWithPath: "/Users/test/Library/Caches/legacy-associated-cache"),
+                logicalSize: 400,
+                allocatedSize: 400,
+                category: .cache,
+                risk: .safe,
+                ownerID: application.id,
+                explanation: "Legacy association without the dedicated cleanup policy"
+            )
+        ]
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: items,
+            applications: [application],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: .complete
+        )
+
+        let projection = ApplicationCacheProjection(snapshot: snapshot)
+
+        XCTAssertEqual(projection.groups.count, 1)
+        XCTAssertEqual(projection.groups.first?.name, "Editor")
+        XCTAssertEqual(projection.groups.first?.items.count, 2)
+        XCTAssertEqual(projection.totalBytes, 300)
+        XCTAssertEqual(projection.safeItemCount, 2)
+    }
+
     func testOverviewAndStorageOutputsStayBounded() {
         let items = (0..<500).map { ScannedItem.fixture(allocatedSize: Int64($0)) }
         let snapshot = ScanSnapshot(
@@ -590,6 +652,40 @@ final class ViewProjectionTests: XCTestCase {
 
         XCTAssertTrue(projection.preselectedRecommendations.allSatisfy { $0.risk == .safe })
         XCTAssertEqual(projection.preselectedRecommendations.count, 1)
+    }
+
+    func testOverviewRecommendationsReserveSpaceForEachSafeContentType() {
+        let caches = (0..<8).map {
+            ScannedItem.fixture(
+                path: "/Users/test/Library/Caches/cache-\($0)",
+                allocatedSize: Int64(1_000 - $0)
+            )
+        }
+        let oldLog = ScannedItem(
+            url: URL(fileURLWithPath: "/Users/test/Library/Logs/old.log"),
+            logicalSize: 10,
+            allocatedSize: 10,
+            category: .log,
+            risk: .safe,
+            explanation: "Diagnostic log or crash report older than 30 days"
+        )
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: caches + [oldLog],
+            applications: [],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: .complete
+        )
+
+        let recommendations = OverviewProjection(snapshot: snapshot)
+            .preselectedRecommendations
+
+        XCTAssertEqual(recommendations.count, 8)
+        XCTAssertTrue(recommendations.contains { $0.id == oldLog.id })
+        XCTAssertEqual(recommendations.filter { $0.category == .cache }.count, 7)
     }
 
     func testCategoryTotalsDoNotDoubleCountItems() {
@@ -1232,6 +1328,42 @@ final class ViewProjectionTests: XCTestCase {
         }.value
 
         XCTAssertTrue(observedCancellation)
+    }
+
+    func testDeveloperStorageProjectionIncludesOnlyDedicatedCleanupItems() {
+        let offered = ScannedItem(
+            url: URL(fileURLWithPath: "/Users/test/.m2/repository"),
+            logicalSize: 90,
+            allocatedSize: 100,
+            category: .developer,
+            risk: .rebuildable,
+            explanation: "Maven dependency cache",
+            cleanupPolicyScope: .developerStorage,
+            cleanupPolicyRelativePath: ".m2/repository"
+        )
+        let sensitive = ScannedItem(
+            url: URL(fileURLWithPath: "/Users/test/Library/Developer/Xcode/Archives"),
+            logicalSize: 190,
+            allocatedSize: 200,
+            category: .developer,
+            risk: .sensitive,
+            explanation: "Xcode release archives"
+        )
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: [sensitive, offered],
+            applications: [],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: .complete
+        )
+
+        let projection = AppSnapshotProjection(snapshot: snapshot).developerStorage
+
+        XCTAssertEqual(projection.items.map(\.id), [offered.id])
+        XCTAssertEqual(projection.totalBytes, 100)
     }
 
     func testCancellationAwareOrderingThrowsAtPeriodicMergeCheckpoint() {

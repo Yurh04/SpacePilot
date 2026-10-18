@@ -38,6 +38,20 @@ public struct CleanupExecutor<Mover: TrashMoving>: CleanupExecuting {
             let canonicalURL: URL
             do {
                 canonicalURL = try policy.validate(candidate.url)
+                if candidate.cleanupPolicyScope == .applicationCache {
+                    try ApplicationCacheCleanupPolicy.validate(
+                        canonicalURL,
+                        homeDirectory: policy.homeDirectory,
+                        bundleIdentifier: candidate.cleanupOwnerIdentifier,
+                        approvedRelativePath: candidate.cleanupPolicyRelativePath
+                    )
+                } else if candidate.cleanupPolicyScope == .developerStorage {
+                    try DeveloperStorageCleanupPolicy.validate(
+                        canonicalURL,
+                        homeDirectory: policy.homeDirectory,
+                        approvedRelativePath: candidate.cleanupPolicyRelativePath
+                    )
+                }
             } catch {
                 outcomes.append(outcome(
                     for: candidate,

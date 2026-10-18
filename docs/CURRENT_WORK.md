@@ -1,5 +1,30 @@
 # 当前工作与交接
 
+## 应用缓存清理中心（2026-10-18）
+
+- 新增独立“应用缓存”主页，支持全部/可安全清理/先检查筛选、容量或名称排序、按应用聚合普通与沙盒缓存、系统应用图标、默认选择安全项、Finder 定位和既有清理确认流程。
+- `ApplicationCacheScanner` 扫描 `~/Library/Caches/<bundle-id>`、沙盒容器缓存，以及与已安装应用名称或少量精确 Bundle ID 规则匹配的 `Application Support` 根；后者只接受 `Cache`、`Code Cache`、`GPUCache`、`ShaderCache`、Crashpad completed 和 Chromium profile cache 等固定叶子。未知应用根、普通支持数据、软链接和受保护身份不进入结果。
+- 候选项保存 `.applicationCache` 清理策略、Bundle ID 和扫描时批准的精确相对路径。`CleanupCandidateRefresher` 与 `CleanupExecutor` 都会再次校验固定缓存形态、准确路径和文件身份；关联应用仍在运行时，界面拒绝开始清理。
+- 缓存目录大小优先复用 SQLite 目录统计，缺失时才在后台遍历；“扫描缓存”使用独立 `.applicationCaches` 范围，只刷新应用清单和有界缓存根，不递归用户目录，也不重跑开发与 AI 扫描。
+- 已新增扫描边界、权限、软链接、保护身份、清理二次校验、同路径聚合优先级、按应用聚合、导航、页面架构、悬停审计、中英文资源，以及 806 pt / 1200 pt AppKit 运行时边界测试。
+- 真实 Debug 应用重新扫描后显示 49 个应用、111 个带专用策略的精确缓存位置、7.13 GB；相比扩展前同一界面的 42 个应用、43 个位置、3.28 GB，已覆盖 Chrome/Edge/VS Code 等 Chromium profile 缓存和精确应用支持根。安全项默认选中，新增的可重建项默认不选中；受限位置在页面明确提示。验证期间未执行清理。
+- 2026-10-18 验证：完整 `swift test` 执行 701 项（1 项跳过、0 项失败）；`./script/test_release.sh` 的测试、Release 构建、临时应用启动、资源、签名结构和 ZIP 生成通过。Gatekeeper 仍按预期拒绝 ad-hoc 开发签名。
+
+## 开发工具清理入口（2026-10-18）
+
+- “开发与 AI”能力侧栏在 Plugin 与 CLI 之间新增“开发工具”，集中展示 Xcode DerivedData/Device Support/文档缓存，以及 Homebrew、npm/npx、pnpm、Yarn、Gradle、Maven、pip、Playwright、Puppeteer、CocoaPods、SwiftPM、Cargo、Go、Deno 和 Bun 的固定缓存位置。
+- 所有开发工具候选均标为“可重新生成/先检查”且默认不选中；Xcode Archives 和 CoreSimulator 设备数据继续参与空间统计，但不进入该清理入口。
+- 每项保存 `.developerStorage` 策略与批准的相对路径；计划生成和真正移入废纸篓前会两次复核目录仍是清单中的准确位置。没有增加永久删除、`simctl` 或包管理器清理命令。
+- 真实 Debug 扫描显示 11 个可重建的开发工具项，合计约 9.8 GB，默认 0 项选中；正常窗口与 806×760 窄窗口已验证，未见横向裁切。定向扫描、安全策略、投影、默认选择、侧栏路由与中英文资源均有回归覆盖，并经上述 701 项全量测试和发布检查验证。
+
+## 非缓存安全清理：过期诊断日志（2026-10-08）
+
+- 新增 `StaleDiagnosticScanner`，仅扫描当前用户的 `Library/Logs`、`.npm/_logs`、`.codex/logs` 和 `.claude/debug`；只读文件元数据，将超过 30 天未修改、占用空间大于 0 的普通文件标记为 `.log / .safe`。软链接、package、活跃日志、空文件和范围外路径不进入候选。
+- 完整扫描刷新过期诊断项；频繁的“开发与 AI”刷新复用最近结果，不重复递归日志目录。如果日志已被应用或 AI 数据目录聚合项覆盖，保留聚合项而不另行加入安全文件，避免空间重复计算。
+- 概览仍最多保留 8 个清理建议，但会先为每种安全内容类型保留一个最大项，使非缓存日志不会因为单文件较小而被 8 个缓存全部挤出。
+- 新增扫描边界、时间阈值、软链接、权限缺口、扫描协调、去重、概览类型多样性和中英文说明回归。
+- 2026-10-08 验证：完整 `swift test` 执行 677 项（1 项跳过、0 项失败）；`./script/test_release.sh` 的测试、Release 构建、临时应用启动、资源、签名结构和 ZIP 生成通过。Gatekeeper 仍按预期拒绝 ad-hoc 开发签名。
+
 ## 概览信息层级重构（2026-10-04）
 
 - 概览顶部使用独立储存状态卡，重新扫描收进状态区；最大项目、最近变化、安装包和应用占用组成状态卡下方的全宽快捷操作条，宽窗口单行展示、窄窗口回落为 2×2。

@@ -171,6 +171,100 @@ final class SidebarRuntimeLayoutTests: XCTestCase {
         }
     }
 
+    func testApplicationCachePageStaysInsideDefaultAndNarrowWidths() {
+        let application = ApplicationRecord(
+            name: "Example Editor",
+            bundleIdentifier: "com.example.Editor",
+            version: "1",
+            url: URL(fileURLWithPath: "/Applications/Example Editor.app"),
+            executableURL: nil,
+            allocatedSize: 10
+        )
+        let cache = ScannedItem(
+            url: URL(fileURLWithPath: "/Users/test/Library/Caches/com.example.Editor"),
+            logicalSize: 100,
+            allocatedSize: 100,
+            category: .cache,
+            risk: .safe,
+            ownerID: application.id,
+            explanation: "Fixture",
+            cleanupPolicyScope: .applicationCache,
+            cleanupOwnerIdentifier: "com.example.Editor"
+        )
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: [cache],
+            applications: [application],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: .complete
+        )
+
+        for width in [CGFloat(806), CGFloat(1_200)] {
+            let hostingView = NSHostingView(rootView: ApplicationCacheView(
+                projection: ApplicationCacheProjection(snapshot: snapshot),
+                hasSnapshot: true,
+                searchText: "",
+                scan: {},
+                reviewCleanup: { _ in }
+            ))
+            hostingView.frame = NSRect(x: 0, y: 0, width: width, height: 760)
+            hostingView.layoutSubtreeIfNeeded()
+
+            let scrollViews = allSubviews(in: hostingView).compactMap { $0 as? NSScrollView }
+            XCTAssertFalse(scrollViews.isEmpty)
+            for scrollView in scrollViews {
+                let frame = scrollView.convert(scrollView.bounds, to: hostingView)
+                XCTAssertGreaterThanOrEqual(frame.minX, hostingView.bounds.minX - 1)
+                XCTAssertLessThanOrEqual(frame.maxX, hostingView.bounds.maxX + 1)
+            }
+        }
+    }
+
+    func testDeveloperStoragePageStaysInsideDefaultAndNarrowWidths() {
+        let item = ScannedItem(
+            url: URL(fileURLWithPath: "/Users/test/.m2/repository"),
+            logicalSize: 100,
+            allocatedSize: 100,
+            category: .developer,
+            risk: .rebuildable,
+            explanation: "Maven dependency cache",
+            cleanupPolicyScope: .developerStorage,
+            cleanupPolicyRelativePath: ".m2/repository"
+        )
+        let snapshot = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: [item],
+            applications: [],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: .complete
+        )
+
+        for width in [CGFloat(806), CGFloat(1_200)] {
+            let hostingView = NSHostingView(rootView: DeveloperStorageView(
+                projection: DeveloperStorageProjection(snapshot: snapshot),
+                searchText: "",
+                scan: {},
+                reviewCleanup: { _ in }
+            ))
+            hostingView.frame = NSRect(x: 0, y: 0, width: width, height: 760)
+            hostingView.layoutSubtreeIfNeeded()
+
+            let scrollViews = allSubviews(in: hostingView).compactMap { $0 as? NSScrollView }
+            XCTAssertFalse(scrollViews.isEmpty)
+            for scrollView in scrollViews {
+                let frame = scrollView.convert(scrollView.bounds, to: hostingView)
+                XCTAssertGreaterThanOrEqual(frame.minX, hostingView.bounds.minX - 1)
+                XCTAssertLessThanOrEqual(frame.maxX, hostingView.bounds.maxX + 1)
+            }
+        }
+    }
+
     func testStorageCategoryColumnUsesStableWidth() throws {
         let snapshot = ScanSnapshot(
             completedAt: .now,
