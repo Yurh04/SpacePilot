@@ -84,6 +84,13 @@ struct AppRootView: View {
                 scan: { model.startScan(scope: .applicationCaches) },
                 reviewCleanup: model.prepareApplicationCacheCleanup
             )
+        case .developerTools:
+            DeveloperStorageView(
+                projection: model.projection?.developerStorage,
+                searchText: model.searchText,
+                scan: { model.startScan(scope: .developerTools) },
+                reviewCleanup: model.prepareCleanup
+            )
         case .storage:
             StorageView(
                 projection: model.projection?.storage,

@@ -17,6 +17,12 @@ enum L10n {
         static let developerToolsEmpty = Self(key: "developer-tools.empty", english: "No Developer Tool Caches Found")
         static let developerToolsEmptyDescription = Self(key: "developer-tools.empty-description", english: "Run a scan to check supported Xcode, package-manager, browser-test, and compiler caches.")
         static let developerToolsReview = Self(key: "developer-tools.review", english: "Review Selected")
+        static let developerToolsSectionCaches = Self(key: "developer-tools.section-caches", english: "Caches & Components")
+        static let developerToolsSectionDevices = Self(key: "developer-tools.section-devices", english: "Simulator Devices")
+        static let developerToolsSectionRuntimes = Self(key: "developer-tools.section-runtimes", english: "Simulator Runtimes")
+        static let developerToolsManagedInXcode = Self(key: "developer-tools.managed-in-xcode", english: "Manage in Xcode")
+        static let developerSimulatorInUse = Self(key: "developer-tools.simulator-in-use", english: "In use")
+        static let developerSimulatorGeneric = Self(key: "developer-tools.simulator-generic", english: "Simulator")
         static let aiLocalFootprint = Self(key: "ai.local-footprint", english: "Local footprint")
         static let aiNoContentIndexed = Self(key: "ai.no-content-indexed", english: "Conversation and log contents are not indexed.")
         static let aiPluginsManaged = Self(key: "ai.plugins-managed", english: "Plugin packages are managed by their owning application.")
@@ -256,6 +262,18 @@ enum L10n {
         static let scanCancelled = Self(key: "scan.cancelled", english: "Scan cancelled")
         static let settingsDiagnostics = Self(key: "settings.diagnostics", english: "Diagnostics")
         static let settingsDiagnosticsDescription = Self(key: "settings.diagnostics-description", english: "Exported diagnostics contain counts and status metadata, not file paths, conversations, or log contents.")
+        static let settingsAppearance = Self(key: "settings.appearance", english: "Appearance")
+        static let settingsPresentationMode = Self(key: "settings.presentation-mode", english: "Display style")
+        static let settingsPresentationWindow = Self(key: "settings.presentation-window", english: "Full Window")
+        static let settingsPresentationDynamicIsland = Self(key: "settings.presentation-dynamic-island", english: "Dynamic Island")
+        static let settingsPresentationWindowDescription = Self(key: "settings.presentation-window-description", english: "Show SpacePilot in its standard resizable window.")
+        static let settingsPresentationDynamicIslandDescription = Self(key: "settings.presentation-dynamic-island-description", english: "Keep a compact storage status panel at the top of the screen. Click it to expand quick actions.")
+        static let dynamicIslandTitle = Self(key: "dynamic-island.title", english: "SpacePilot")
+        static let dynamicIslandExpand = Self(key: "dynamic-island.expand", english: "Expand SpacePilot Dynamic Island")
+        static let dynamicIslandCollapse = Self(key: "dynamic-island.collapse", english: "Collapse SpacePilot Dynamic Island")
+        static let dynamicIslandNoData = Self(key: "dynamic-island.no-data", english: "Ready to analyze storage")
+        static let dynamicIslandNoDataDescription = Self(key: "dynamic-island.no-data-description", english: "Run a scan to show available and safely reclaimable space.")
+        static let dynamicIslandShowWindow = Self(key: "dynamic-island.show-window", english: "Full Window")
         static let settingsDiskAccess = Self(key: "settings.disk-access", english: "Disk access")
         static let settingsDiskAccessDescription = Self(key: "settings.disk-access-description", english: "Grant Full Disk Access only if you want broader coverage. SpacePilot reports inaccessible folders instead of guessing.")
         static let settingsExportDiagnostics = Self(key: "settings.export-diagnostics", english: "Export Diagnostics…")
@@ -321,7 +339,13 @@ enum L10n {
         "developer-tools.scan", "developer-tools.empty", "developer-tools.empty-description",
         "developer-tools.review",
         "developer-tools.cache-name", "developer-tools.device-support-name",
-        "developer-tools.xcode-derived-data",
+        "developer-tools.xcode-derived-data", "developer-tools.section-caches",
+        "developer-tools.section-devices", "developer-tools.section-runtimes",
+        "developer-tools.managed-in-xcode", "developer-tools.simulator-runtime-name",
+        "developer-tools.simulator-build", "developer-tools.simulator-last-used",
+        "developer-tools.simulator-in-use", "developer-tools.simulator-generic",
+        "developer-tools.simulator-state-booted", "developer-tools.simulator-state-shutdown",
+        "developer-tools.simulator-state-ready",
         "ai.local-footprint", "ai.manage-in", "ai.no-content-indexed", "ai.plugins-managed",
         "ai.privacy", "ai.searching", "ai.section", "ai.select-application",
         "ai.skills-visible", "ai.skills.global-note", "ai.skills.scope-agent",
@@ -411,7 +435,12 @@ enum L10n {
         "plugins.diagnostic-invalid-manifest", "plugins.diagnostic-missing-manifest",
         "plugins.diagnostic-path-inaccessible",
         "nav.application-caches", "scan.cancelled", "scan.completed", "scan.indexing", "scan.quick-inventory", "scan.ready",
-        "scan.targeted-analysis", "settings.diagnostics", "settings.diagnostics-description",
+        "scan.targeted-analysis", "settings.appearance", "settings.presentation-mode",
+        "settings.presentation-window", "settings.presentation-dynamic-island",
+        "settings.presentation-window-description", "settings.presentation-dynamic-island-description",
+        "dynamic-island.title", "dynamic-island.expand", "dynamic-island.collapse",
+        "dynamic-island.no-data", "dynamic-island.no-data-description", "dynamic-island.show-window",
+        "settings.diagnostics", "settings.diagnostics-description",
         "settings.disk-access", "settings.disk-access-description", "settings.export-diagnostics",
         "settings.open-disk-access", "settings.privacy", "settings.privacy-description",
         "skill.scope.plugin", "skill.scope.shared", "skill.scope.system", "skill.status.parent-managed",
@@ -665,6 +694,7 @@ enum L10n {
         switch destination {
         case .overview: overview(locale: locale)
         case .applicationCaches: applicationCaches(locale: locale)
+        case .developerTools: text(.developerToolsTitle, locale: locale)
         case .storage: storage(locale: locale)
         case .applications: applications(locale: locale)
         case .developerAI: developerAI(locale: locale)
@@ -973,6 +1003,63 @@ enum L10n {
             locale: locale,
             brand
         )
+    }
+
+    static func developerSimulatorRuntimeName(
+        platform: String,
+        version: String,
+        locale: Locale? = nil
+    ) -> String {
+        format(
+            "developer-tools.simulator-runtime-name",
+            default: "%@ %@ Runtime",
+            locale: locale,
+            platform,
+            version
+        )
+    }
+
+    static func developerSimulatorBuild(_ build: String, locale: Locale? = nil) -> String {
+        format(
+            "developer-tools.simulator-build",
+            default: "Build %@",
+            locale: locale,
+            build
+        )
+    }
+
+    static func developerSimulatorLastUsed(_ relative: String, locale: Locale? = nil) -> String {
+        format(
+            "developer-tools.simulator-last-used",
+            default: "Last used %@",
+            locale: locale,
+            relative
+        )
+    }
+
+    static func developerSimulatorState(_ state: String, locale: Locale? = nil) -> String {
+        switch state.lowercased() {
+        case "booted":
+            return value(
+                "developer-tools.simulator-state-booted",
+                default: "Booted",
+                locale: locale
+            )
+        case "shutdown":
+            return value(
+                "developer-tools.simulator-state-shutdown",
+                default: "Shut down",
+                locale: locale
+            )
+        case "ready":
+            return value(
+                "developer-tools.simulator-state-ready",
+                default: "Ready",
+                locale: locale
+            )
+        default:
+            return state
+        }
     }
 
     static func cacheSummary(_ count: Int, space: String, locale: Locale? = nil) -> String {

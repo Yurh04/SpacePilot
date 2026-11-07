@@ -110,6 +110,47 @@ final class ScanCoordinatorTests: XCTestCase {
         )
     }
 
+    func testDeveloperToolsScopeRefreshesOnlyDeveloperInventory() async throws {
+        let home = try TemporaryTree(files: [
+            "Documents/keep.dat": 64,
+            ".npm/_cacache/index": 128
+        ])
+        let unrelated = ScannedItem(
+            url: home.url.appending(path: "Documents/keep.dat"),
+            logicalSize: 64,
+            allocatedSize: 64,
+            category: .personal,
+            risk: .sensitive,
+            explanation: "Preserved fixture"
+        )
+        let previous = ScanSnapshot(
+            completedAt: .now,
+            volume: nil,
+            items: [unrelated],
+            applications: [],
+            aiApplications: [],
+            plugins: [],
+            skills: [],
+            coverage: .complete
+        )
+        let coordinator = ScanCoordinator(
+            homeDirectory: home.url,
+            store: InMemorySnapshotStore(latest: previous)
+        )
+
+        let snapshot = try await coordinator.collectScan(scope: .developerTools)
+
+        XCTAssertTrue(snapshot.items.contains { $0.id == unrelated.id })
+        let developer = try XCTUnwrap(snapshot.items.first {
+            $0.developerStorageMetadata?.kind == .toolCache
+        })
+        XCTAssertEqual(developer.cleanupPolicyScope, .developerStorage)
+        XCTAssertEqual(developer.cleanupPolicyRelativePath, ".npm/_cacache")
+        XCTAssertEqual(snapshot.aiApplications, previous.aiApplications)
+        XCTAssertEqual(snapshot.plugins, previous.plugins)
+        XCTAssertEqual(snapshot.skills, previous.skills)
+    }
+
     func testFullScanPublishesStaleDiagnosticAsSafeCleanupItem() async throws {
         let home = try TemporaryTree(files: [
             "Library/Logs/DiagnosticReports/Example.ips": 128

@@ -401,6 +401,8 @@ final class AppModel {
             .full
         case .applicationCaches:
             .applicationCaches
+        case .developerTools:
+            .developerTools
         case .applications:
             .applications
         case .developerAI:
@@ -953,6 +955,9 @@ final class AppModel {
         }
         if current == .applicationCaches || incoming == .applicationCaches {
             return current == incoming ? .applicationCaches : .full
+        }
+        if current == .developerTools || incoming == .developerTools {
+            return current == incoming ? .developerTools : .full
         }
         if current == .developerAI || incoming == .developerAI {
             return .developerAI

@@ -15,7 +15,6 @@ enum DeveloperAISidebarRow: Hashable, Identifiable {
     case skills
     case mcp
     case plugins
-    case developerTools
     case cli
     case otherTools
 
@@ -26,7 +25,6 @@ enum DeveloperAISidebarRow: Hashable, Identifiable {
         case .skills: "skills"
         case .mcp: "mcp"
         case .plugins: "plugins"
-        case .developerTools: "developer-tools"
         case .cli: "cli"
         case .otherTools: "other"
         }
@@ -34,7 +32,7 @@ enum DeveloperAISidebarRow: Hashable, Identifiable {
 
     /// The capability rows, in the order they appear beneath the Agent rows.
     static let capabilityRows: [DeveloperAISidebarRow] = [
-        .skills, .mcp, .plugins, .developerTools, .cli, .otherTools
+        .skills, .mcp, .plugins, .cli, .otherTools
     ]
 
     /// SF Symbol for the non-Agent rows. Agent rows use the real application
@@ -45,7 +43,6 @@ enum DeveloperAISidebarRow: Hashable, Identifiable {
         case .skills: "sparkles"
         case .mcp: "arrow.left.arrow.right"
         case .plugins: "puzzlepiece.extension"
-        case .developerTools: "hammer"
         case .cli: "terminal"
         case .otherTools: "wrench.and.screwdriver"
         case .agent: "brain.head.profile"
@@ -58,7 +55,6 @@ enum DeveloperAISidebarRow: Hashable, Identifiable {
         case .skills: L10n.skills()
         case .mcp: L10n.text(.aiSectionMCP)
         case .plugins: L10n.plugins()
-        case .developerTools: L10n.text(.developerToolsTitle)
         case .cli: L10n.text(.aiSectionCLI)
         case .otherTools: L10n.text(.aiSectionOtherTools)
         case .agent: ""

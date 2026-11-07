@@ -113,7 +113,7 @@ public struct DeveloperStorageProjection: Sendable {
             checkCancellation: checkCancellation
         )
         for item in snapshot.items
-        where item.cleanupPolicyScope == .developerStorage {
+        where item.developerStorageMetadata != nil {
             try checkpoint.checkPeriodically()
             selected.append(item)
             total += item.allocatedSize

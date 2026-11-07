@@ -1330,7 +1330,7 @@ final class ViewProjectionTests: XCTestCase {
         XCTAssertTrue(observedCancellation)
     }
 
-    func testDeveloperStorageProjectionIncludesOnlyDedicatedCleanupItems() {
+    func testDeveloperStorageProjectionIncludesCachesAndSimulatorInventory() {
         let offered = ScannedItem(
             url: URL(fileURLWithPath: "/Users/test/.m2/repository"),
             logicalSize: 90,
@@ -1339,7 +1339,11 @@ final class ViewProjectionTests: XCTestCase {
             risk: .rebuildable,
             explanation: "Maven dependency cache",
             cleanupPolicyScope: .developerStorage,
-            cleanupPolicyRelativePath: ".m2/repository"
+            cleanupPolicyRelativePath: ".m2/repository",
+            developerStorageMetadata: DeveloperStorageMetadata(
+                kind: .toolCache,
+                name: "Maven dependency cache"
+            )
         )
         let sensitive = ScannedItem(
             url: URL(fileURLWithPath: "/Users/test/Library/Developer/Xcode/Archives"),
@@ -1347,12 +1351,28 @@ final class ViewProjectionTests: XCTestCase {
             allocatedSize: 200,
             category: .developer,
             risk: .sensitive,
-            explanation: "Xcode release archives"
+            explanation: "Xcode release archives",
+            developerStorageMetadata: DeveloperStorageMetadata(
+                kind: .toolCache,
+                name: "Xcode release archives"
+            )
+        )
+        let simulator = ScannedItem(
+            url: URL(fileURLWithPath: "/Users/test/Library/Developer/CoreSimulator/Devices/device"),
+            logicalSize: 290,
+            allocatedSize: 300,
+            category: .developer,
+            risk: .sensitive,
+            explanation: "Simulator device",
+            developerStorageMetadata: DeveloperStorageMetadata(
+                kind: .simulatorDevice,
+                name: "iPhone 17"
+            )
         )
         let snapshot = ScanSnapshot(
             completedAt: .now,
             volume: nil,
-            items: [sensitive, offered],
+            items: [sensitive, offered, simulator],
             applications: [],
             aiApplications: [],
             plugins: [],
@@ -1362,8 +1382,8 @@ final class ViewProjectionTests: XCTestCase {
 
         let projection = AppSnapshotProjection(snapshot: snapshot).developerStorage
 
-        XCTAssertEqual(projection.items.map(\.id), [offered.id])
-        XCTAssertEqual(projection.totalBytes, 100)
+        XCTAssertEqual(projection.items.map(\.id), [simulator.id, sensitive.id, offered.id])
+        XCTAssertEqual(projection.totalBytes, 600)
     }
 
     func testCancellationAwareOrderingThrowsAtPeriodicMergeCheckpoint() {

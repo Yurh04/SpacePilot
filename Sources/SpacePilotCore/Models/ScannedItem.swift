@@ -50,6 +50,7 @@ public struct ScannedItem: Identifiable, Codable, Hashable, Sendable {
     /// approved by the capability-specific scanner. Cleanup policies compare
     /// this value again immediately before planning and execution.
     public let cleanupPolicyRelativePath: String?
+    public let developerStorageMetadata: DeveloperStorageMetadata?
 
     public init(
         id: UUID = UUID(),
@@ -65,7 +66,8 @@ public struct ScannedItem: Identifiable, Codable, Hashable, Sendable {
         explanation: String,
         cleanupPolicyScope: CleanupPolicyScope? = nil,
         cleanupOwnerIdentifier: String? = nil,
-        cleanupPolicyRelativePath: String? = nil
+        cleanupPolicyRelativePath: String? = nil,
+        developerStorageMetadata: DeveloperStorageMetadata? = nil
     ) {
         self.id = id
         self.url = url
@@ -81,5 +83,6 @@ public struct ScannedItem: Identifiable, Codable, Hashable, Sendable {
         self.cleanupPolicyScope = cleanupPolicyScope
         self.cleanupOwnerIdentifier = cleanupOwnerIdentifier
         self.cleanupPolicyRelativePath = cleanupPolicyRelativePath
+        self.developerStorageMetadata = developerStorageMetadata
     }
 }

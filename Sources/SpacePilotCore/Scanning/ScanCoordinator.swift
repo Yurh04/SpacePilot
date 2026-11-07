@@ -7,6 +7,7 @@ public typealias ScopedScanOperation = @Sendable (ScanScope, ScanEventEmitter) a
 public enum ScanScope: String, Codable, Sendable {
     case applications
     case applicationCaches
+    case developerTools
     case developerAI
     case full
 }
@@ -63,7 +64,8 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                 directoryHint: .isDirectory
             )
             let downloadedInstallers: DirectoryScanResult
-            if scope == .developerAI || scope == .applicationCaches {
+            if scope == .developerAI || scope == .developerTools
+                || scope == .applicationCaches {
                 downloadedInstallers = DirectoryScanResult(
                     root: downloadsDirectory,
                     items: previousSnapshot?.items.filter {
@@ -205,6 +207,81 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                     stage: .completed,
                     progress: 1,
                     message: "Application cache refresh complete",
+                    snapshot: snapshot
+                ))
+                return snapshot
+            }
+
+            if scope == .developerTools {
+                emit(ScanEvent(
+                    stage: .targetedAnalysis,
+                    progress: 0.5,
+                    message: "Scanning developer storage"
+                ))
+                let developer = try await DeveloperStorageScanner(
+                    directoryStats: directoryStats
+                ).scan(homeDirectory: homeDirectory)
+                let previousItems = previousSnapshot?.items.filter {
+                    let oldAggregate = $0.category == .developer
+                        && $0.explanation == "Simulator runtimes and device data"
+                    return !oldAggregate
+                } ?? []
+                let canonicalOwnership = try Self.canonicalOwnership(
+                    sourceItems: previousItems + developer.items,
+                    aggregateItems: developer.items
+                )
+                let applications = (previousSnapshot?.applications ?? baseApplications).map {
+                    application in
+                    ApplicationRecord(
+                        id: application.id,
+                        name: application.name,
+                        bundleIdentifier: application.bundleIdentifier,
+                        version: application.version,
+                        url: application.url,
+                        executableURL: application.executableURL,
+                        allocatedSize: application.allocatedSize,
+                        logicalSize: application.logicalSize,
+                        lastUsedDate: application.lastUsedDate,
+                        associations: application.associations.map {
+                            Self.remap(
+                                association: $0,
+                                itemIDs: canonicalOwnership.itemIDBySourceItemID
+                            )
+                        }
+                    )
+                }
+                let aiApplications = (previousSnapshot?.aiApplications ?? []).map {
+                    Self.remap(
+                        application: $0,
+                        itemIDs: canonicalOwnership.itemIDBySourceItemID
+                    )
+                }
+                let snapshot = ScanSnapshot(
+                    completedAt: .now,
+                    volume: volume,
+                    items: canonicalOwnership.items,
+                    applications: applications,
+                    aiApplications: aiApplications,
+                    plugins: previousSnapshot?.plugins ?? [],
+                    skills: previousSnapshot?.skills ?? [],
+                    coverage: previousSnapshot?.coverage ?? .complete,
+                    pluginDiagnostics: previousSnapshot?.pluginDiagnostics,
+                    categoryAggregates: Self.categoryAggregates(
+                        items: canonicalOwnership.items,
+                        homeResult: nil,
+                        previous: previousSnapshot
+                    )
+                ).compacted()
+                emit(ScanEvent(
+                    stage: .indexing,
+                    progress: 0.9,
+                    message: "Saving developer storage metadata"
+                ))
+                try await store.save(snapshot: snapshot)
+                emit(ScanEvent(
+                    stage: .completed,
+                    progress: 1,
+                    message: "Developer storage refresh complete",
                     snapshot: snapshot
                 ))
                 return snapshot
@@ -425,9 +502,21 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
             let (codex, claude, standaloneSkills) = try await (
                 codexScan, claudeScan, standaloneSkillScan
             )
-            let developer = try await DeveloperStorageScanner(
-                directoryStats: directoryStats
-            ).scan(homeDirectory: homeDirectory)
+            let developer: DeveloperStorageScanResult
+            if scope == .developerAI {
+                developer = DeveloperStorageScanResult(
+                    items: previousSnapshot?.items.filter {
+                        DeveloperStorageScanner.owns(
+                            $0,
+                            homeDirectory: homeDirectory
+                        )
+                    } ?? []
+                )
+            } else {
+                developer = try await DeveloperStorageScanner(
+                    directoryStats: directoryStats
+                ).scan(homeDirectory: homeDirectory)
+            }
             var basicAIScans: [AIApplicationScanResult] = []
             for definition in BasicAIApplicationDefinition.standard {
                 let matchedApplication = baseApplications.first {
@@ -794,7 +883,8 @@ public struct ScanCoordinator: ScanCoordinating, Sendable {
                     explanation: previousItem.explanation,
                     cleanupPolicyScope: previousItem.cleanupPolicyScope,
                     cleanupOwnerIdentifier: previousItem.cleanupOwnerIdentifier,
-                    cleanupPolicyRelativePath: previousItem.cleanupPolicyRelativePath
+                    cleanupPolicyRelativePath: previousItem.cleanupPolicyRelativePath,
+                    developerStorageMetadata: previousItem.developerStorageMetadata
                 )
                 itemsByID[item.id] = item
                 return ArtifactAssociation(

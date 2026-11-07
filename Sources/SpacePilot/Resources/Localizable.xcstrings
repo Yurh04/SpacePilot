@@ -805,6 +805,78 @@
         "zh-Hans": { "stringUnit": { "state": "translated", "value": "开发工具" } }
       }
     },
+    "developer-tools.section-caches": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Caches & Components" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "缓存与组件" } }
+      }
+    },
+    "developer-tools.section-devices": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Simulator Devices" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "模拟器设备" } }
+      }
+    },
+    "developer-tools.section-runtimes": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Simulator Runtimes" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "模拟器运行时" } }
+      }
+    },
+    "developer-tools.managed-in-xcode": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Manage in Xcode" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "在 Xcode 中管理" } }
+      }
+    },
+    "developer-tools.simulator-runtime-name": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%@ %@ Runtime" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "%@ %@ 运行时" } }
+      }
+    },
+    "developer-tools.simulator-build": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Build %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "构建版本 %@" } }
+      }
+    },
+    "developer-tools.simulator-last-used": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Last used %@" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "上次使用于 %@" } }
+      }
+    },
+    "developer-tools.simulator-in-use": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "In use" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在使用" } }
+      }
+    },
+    "developer-tools.simulator-generic": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Simulator" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "模拟器" } }
+      }
+    },
+    "developer-tools.simulator-state-booted": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Booted" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已启动" } }
+      }
+    },
+    "developer-tools.simulator-state-shutdown": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Shut down" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已关机" } }
+      }
+    },
+    "developer-tools.simulator-state-ready": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Ready" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "已就绪" } }
+      }
+    },
     "developer-tools.xcode-derived-data": {
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Xcode Derived Data" } },
@@ -5783,6 +5855,198 @@
           "stringUnit": {
             "state": "translated",
             "value": "正在分析储存空间和 AI 数据…"
+          }
+        }
+      }
+    },
+    "dynamic-island.collapse": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Collapse SpacePilot Dynamic Island"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "收起 SpacePilot 灵动岛"
+          }
+        }
+      }
+    },
+    "dynamic-island.expand": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Expand SpacePilot Dynamic Island"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "展开 SpacePilot 灵动岛"
+          }
+        }
+      }
+    },
+    "dynamic-island.no-data": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready to analyze storage"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可以开始分析储存空间"
+          }
+        }
+      }
+    },
+    "dynamic-island.no-data-description": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run a scan to show available and safely reclaimable space."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "运行扫描后即可查看可用空间和可安全清理空间。"
+          }
+        }
+      }
+    },
+    "dynamic-island.show-window": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Full Window"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完整窗口"
+          }
+        }
+      }
+    },
+    "dynamic-island.title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SpacePilot"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "SpacePilot"
+          }
+        }
+      }
+    },
+    "settings.appearance": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Appearance"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "外观"
+          }
+        }
+      }
+    },
+    "settings.presentation-dynamic-island": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dynamic Island"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "灵动岛"
+          }
+        }
+      }
+    },
+    "settings.presentation-dynamic-island-description": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep a compact storage status panel at the top of the screen. Click it to expand quick actions."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在屏幕顶部保留紧凑的储存状态面板，点击可展开快捷操作。"
+          }
+        }
+      }
+    },
+    "settings.presentation-mode": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Display style"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示方式"
+          }
+        }
+      }
+    },
+    "settings.presentation-window": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Full Window"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完整窗口"
+          }
+        }
+      }
+    },
+    "settings.presentation-window-description": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show SpacePilot in its standard resizable window."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在可调整大小的标准窗口中显示 SpacePilot。"
           }
         }
       }

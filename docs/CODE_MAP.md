@@ -6,7 +6,7 @@
 
 | 用途 | 主要文件 |
 | --- | --- |
-| 应用入口和窗口 | `Sources/SpacePilot/App/SpacePilotApp.swift` |
+| 应用入口和窗口 | `Sources/SpacePilot/App/SpacePilotApp.swift`、`AppPresentationMode.swift`、`DynamicIslandController.swift` |
 | 全局可观察状态和任务协调 | `Sources/SpacePilot/App/AppModel.swift` |
 | 导航、全局工具栏和搜索 | `Sources/SpacePilot/Views/AppRootView.swift`、`SidebarView.swift` |
 | 导航模型 | `Sources/SpacePilotCore/Models/NavigationDestination.swift` |
@@ -22,7 +22,7 @@
 | 下载目录安装包识别 | `Sources/SpacePilotCore/Scanning/DownloadedInstallerScanner.swift` | `DownloadedInstallerScannerTests.swift`、`ScanCoordinatorTests.swift` |
 | 过期诊断日志与崩溃报告 | `Sources/SpacePilotCore/Scanning/StaleDiagnosticScanner.swift` | `StaleDiagnosticScannerTests.swift`、`ScanCoordinatorTests.swift` |
 | 已安装应用缓存扫描 | `Sources/SpacePilotCore/Scanning/ApplicationCacheScanner.swift` | `ApplicationCacheScannerTests.swift` |
-| 磁盘和开发工具目录 | `VolumeScanner.swift`、`DeveloperStorageScanner.swift` | 同名扫描器测试、`DeveloperStorageCleanupPolicyTests.swift` |
+| 磁盘、开发工具缓存与模拟器清单 | `VolumeScanner.swift`、`DeveloperStorageScanner.swift`、`Models/DeveloperStorageMetadata.swift` | 同名扫描器测试、`DeveloperStorageCleanupPolicyTests.swift` |
 | FSEvents、变化合并和最近空间变化 | `FileSystemChangeMonitor.swift`、`FileSystemChangeReconciler.swift`、`StorageChangeTracker.swift` | `FileSystemChangeMonitorTests.swift`、`StorageChangeTrackerTests.swift` |
 | SQLite 快照、索引和统计 | `Sources/SpacePilotCore/Persistence/SQLiteIndexStore.swift`、`IndexSchema.swift` | `SQLiteIndexStoreTests.swift` |
 | 快照、所有权和变化历史模型 | `Models/ScanSnapshot.swift`、`ScannedItem.swift`、`StorageIntelligence.swift`、`StorageChangeHistory.swift` | `ModelAggregationTests.swift`、`StorageChangeHistoryTests.swift` |
@@ -58,7 +58,8 @@
 | 版本检查、选择计划和受控更新 | `AIUpdateChecking.swift`、`AIUpdateSelectionPlan.swift`、`AIUpdateExecutor.swift` | `AIUpdateCheckingTests.swift`、`AIUpdateExecutionTests.swift` |
 | Plugin 目录、清单和组件 | `Sources/SpacePilotCore/Plugins/` | `PluginRootDiscoveryTests.swift`、`PluginScannerTests.swift` |
 | Skill 目录、清单和冲突 | `Sources/SpacePilotCore/Skills/` | `SkillScannerTests.swift`、`SkillConflictDetectorTests.swift` |
-| 开发与 AI 界面 | `Sources/SpacePilot/Views/DeveloperAI/`（开发缓存入口为 `DeveloperStorageView.swift`） | `DeveloperAIArchitectureTests.swift`、AI 管理测试 |
+| 开发与 AI 界面 | `Sources/SpacePilot/Views/DeveloperAI/` | `DeveloperAIArchitectureTests.swift`、AI 管理测试 |
+| 顶层开发工具界面与模拟器分组 | `Sources/SpacePilot/Views/DeveloperAI/DeveloperStorageView.swift`、`AppRootView.swift`、`NavigationDestination.swift` | `DeveloperAIArchitectureTests.swift`、`SidebarRuntimeLayoutTests.swift`、`ScanScopeArchitectureTests.swift` |
 
 ## 清理与安全
 

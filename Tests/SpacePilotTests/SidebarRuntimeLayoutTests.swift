@@ -232,7 +232,11 @@ final class SidebarRuntimeLayoutTests: XCTestCase {
             risk: .rebuildable,
             explanation: "Maven dependency cache",
             cleanupPolicyScope: .developerStorage,
-            cleanupPolicyRelativePath: ".m2/repository"
+            cleanupPolicyRelativePath: ".m2/repository",
+            developerStorageMetadata: DeveloperStorageMetadata(
+                kind: .toolCache,
+                name: "Maven dependency cache"
+            )
         )
         let snapshot = ScanSnapshot(
             completedAt: .now,
