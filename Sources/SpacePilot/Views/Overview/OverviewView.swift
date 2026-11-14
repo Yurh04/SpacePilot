@@ -7,7 +7,7 @@ struct OverviewView: View {
     let latestCleanup: CleanupTransaction?
     let changeHistory: StorageChangeHistory
     let startScan: () -> Void
-    let reviewCleanup: ([ScannedItem]) -> Void
+    let openCleanupCenter: () -> Void
     let openStorage: () -> Void
     let openRecentChanges: () -> Void
     let openInstallers: () -> Void
@@ -220,9 +220,7 @@ struct OverviewView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             cleanupRecommendationsCard(
-                projection,
-                recentCleanup: recentCleanup,
-                recentStorageChanges: recentStorageChanges
+                projection
             )
 
             if let recentStorageChanges {
@@ -237,60 +235,11 @@ struct OverviewView: View {
     }
 
     private func cleanupRecommendationsCard(
-        _ projection: OverviewProjection,
-        recentCleanup: OverviewDashboardState.RecentCleanup?,
-        recentStorageChanges: OverviewDashboardState.RecentStorageChanges?
+        _ projection: OverviewProjection
     ) -> some View {
         GroupBox {
-            VStack(alignment: .leading, spacing: 14) {
-                cleanupAction(projection)
-                Divider()
-
-                HStack {
-                    Label(L10n.text(.overviewTopOpportunities), systemImage: "sparkles")
-                        .font(.headline)
-                    Spacer()
-                    Text(ByteCount.string(projection.reclaimableBytes))
-                        .foregroundStyle(.secondary)
-                        .monospacedDigit()
-                }
-
-                if projection.preselectedRecommendations.isEmpty {
-                    Label(
-                        L10n.text(.overviewNoRecommendations),
-                        systemImage: "checkmark.circle"
-                    )
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 12)
-                } else {
-                    let previewLimit = recommendationPreviewLimit(
-                        recentCleanup: recentCleanup,
-                        recentStorageChanges: recentStorageChanges
-                    )
-                    ForEach(
-                        Array(
-                            projection.preselectedRecommendations
-                                .prefix(previewLimit)
-                                .enumerated()
-                        ),
-                        id: \.element.id
-                    ) { index, item in
-                        if index > 0 {
-                            Divider()
-                        }
-                        StorageItemRow(item: item)
-                            .padding(.vertical, 6)
-                    }
-
-                    Divider()
-                    HStack {
-                        Text(L10n.itemCount(projection.preselectedRecommendations.count))
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                    }
-                }
-            }
-            .padding(6)
+            cleanupAction(projection)
+                .padding(6)
         }
     }
 
@@ -331,11 +280,10 @@ struct OverviewView: View {
 
             Spacer()
 
-            Button(L10n.reviewCleanup(ByteCount.string(projection.reclaimableBytes))) {
-                reviewCleanup(projection.preselectedRecommendations)
+            Button(L10n.text(.overviewReviewSafeCleanup)) {
+                openCleanupCenter()
             }
             .buttonStyle(.borderedProminent)
-            .disabled(projection.preselectedRecommendations.isEmpty)
         }
     }
 
@@ -491,15 +439,6 @@ struct OverviewView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
         }
-    }
-
-    private func recommendationPreviewLimit(
-        recentCleanup: OverviewDashboardState.RecentCleanup?,
-        recentStorageChanges: OverviewDashboardState.RecentStorageChanges?
-    ) -> Int {
-        if recentCleanup != nil && recentStorageChanges != nil { return 2 }
-        if recentCleanup != nil || recentStorageChanges != nil { return 3 }
-        return 4
     }
 
     private func recentChangeMetric(

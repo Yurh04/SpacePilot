@@ -6,7 +6,6 @@ final class PackageSmokeTests: XCTestCase {
         XCTAssertEqual(NavigationDestination.allCases.map(\.rawValue), [
             "overview",
             "applicationCaches",
-            "developerTools",
             "storage",
             "applications",
             "developerAI",

@@ -3,6 +3,7 @@ import Foundation
 public struct AppSnapshotProjection: Sendable {
     public let snapshotID: UUID
     public let overview: OverviewProjection
+    public let safeCleanup: SafeCleanupProjection
     public let applicationCaches: ApplicationCacheProjection
     public let storage: StorageProjection
     public let applications: ApplicationListProjection
@@ -14,6 +15,7 @@ public struct AppSnapshotProjection: Sendable {
         self.init(
             snapshotID: snapshot.id,
             overview: OverviewProjection(snapshot: snapshot),
+            safeCleanup: SafeCleanupProjection(snapshot: snapshot),
             applicationCaches: ApplicationCacheProjection(snapshot: snapshot),
             storage: StorageProjection(snapshot: snapshot),
             applications: ApplicationListProjection(snapshot: snapshot, searchText: ""),
@@ -36,6 +38,11 @@ public struct AppSnapshotProjection: Sendable {
         try checkCancellation()
         let snapshot = snapshot.mergingAIProductFamilies()
         let overview = try OverviewProjection(
+            snapshot: snapshot,
+            checkCancellation: checkCancellation
+        )
+        try checkCancellation()
+        let safeCleanup = try SafeCleanupProjection(
             snapshot: snapshot,
             checkCancellation: checkCancellation
         )
@@ -68,6 +75,7 @@ public struct AppSnapshotProjection: Sendable {
         return Self(
             snapshotID: snapshot.id,
             overview: overview,
+            safeCleanup: safeCleanup,
             applicationCaches: applicationCaches,
             storage: storage,
             applications: applications,
@@ -79,6 +87,7 @@ public struct AppSnapshotProjection: Sendable {
     private init(
         snapshotID: UUID,
         overview: OverviewProjection,
+        safeCleanup: SafeCleanupProjection,
         applicationCaches: ApplicationCacheProjection,
         storage: StorageProjection,
         applications: ApplicationListProjection,
@@ -87,11 +96,45 @@ public struct AppSnapshotProjection: Sendable {
     ) {
         self.snapshotID = snapshotID
         self.overview = overview
+        self.safeCleanup = safeCleanup
         self.applicationCaches = applicationCaches
         self.storage = storage
         self.applications = applications
         self.developerAI = developerAI
         self.developerStorage = developerStorage
+    }
+}
+
+public struct SafeCleanupProjection: Sendable {
+    public let items: [ScannedItem]
+    public let totalBytes: Int64
+
+    public init(snapshot: ScanSnapshot) {
+        self = try! Self(snapshot: snapshot, checkCancellation: {})
+    }
+
+    init(
+        snapshot: ScanSnapshot,
+        checkCancellation: @escaping @Sendable () throws -> Void
+    ) throws {
+        var safeItems: [ScannedItem] = []
+        var total: Int64 = 0
+        var checkpoint = ProjectionCancellationCheckpoint(
+            checkCancellation: checkCancellation
+        )
+        for item in snapshot.items where item.risk == .safe {
+            try checkpoint.checkPeriodically()
+            safeItems.append(item)
+            total += item.allocatedSize
+        }
+        items = safeItems.sorted {
+            if $0.allocatedSize != $1.allocatedSize {
+                return $0.allocatedSize > $1.allocatedSize
+            }
+            return $0.url.path < $1.url.path
+        }
+        totalBytes = total
+        try checkCancellation()
     }
 }
 

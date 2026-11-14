@@ -10,8 +10,8 @@ final class LocalizationTests: XCTestCase {
 
         XCTAssertEqual(L10n.title(for: NavigationDestination.storage, locale: english), "Storage")
         XCTAssertEqual(L10n.title(for: NavigationDestination.storage, locale: chinese), "储存空间")
-        XCTAssertEqual(L10n.title(for: NavigationDestination.applicationCaches, locale: english), "Application Caches")
-        XCTAssertEqual(L10n.title(for: NavigationDestination.applicationCaches, locale: chinese), "应用缓存")
+        XCTAssertEqual(L10n.title(for: NavigationDestination.applicationCaches, locale: english), "Cleanup Center")
+        XCTAssertEqual(L10n.title(for: NavigationDestination.applicationCaches, locale: chinese), "清理中心")
         XCTAssertEqual(L10n.title(for: AIApplicationTab.plugins, locale: english), "Plugins")
         XCTAssertEqual(L10n.title(for: AIApplicationTab.plugins, locale: chinese), "插件")
         XCTAssertEqual(L10n.text(.developerToolsTitle, locale: english), "Developer Tools")

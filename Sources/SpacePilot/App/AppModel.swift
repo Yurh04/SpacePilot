@@ -24,6 +24,7 @@ final class AppModel {
     var storageChangeHistory = StorageChangeHistory()
     var storageItemMode: StorageItemMode = .largest
     var storageCategorySelection: StorageCategorySelection = .all
+    var cleanupCenterSection: CleanupCenterSection = .recommended
     var aiQueryProjection: AIApplicationQueryProjection?
     var scanStage: ScanStage?
     var scanProgress = 0.0
@@ -400,9 +401,11 @@ final class AppModel {
         case .overview, .storage:
             .full
         case .applicationCaches:
-            .applicationCaches
-        case .developerTools:
-            .developerTools
+            switch cleanupCenterSection {
+            case .recommended: .full
+            case .applicationCaches: .applicationCaches
+            case .developerTools: .developerTools
+            }
         case .applications:
             .applications
         case .developerAI:

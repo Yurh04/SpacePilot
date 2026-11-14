@@ -1,7 +1,6 @@
 public enum NavigationDestination: String, CaseIterable, Identifiable, Sendable {
     case overview
     case applicationCaches
-    case developerTools
     case storage
     case applications
     case developerAI
@@ -12,8 +11,7 @@ public enum NavigationDestination: String, CaseIterable, Identifiable, Sendable 
     public var systemImage: String {
         switch self {
         case .overview: "gauge.with.dots.needle.50percent"
-        case .applicationCaches: "internaldrive.fill"
-        case .developerTools: "hammer"
+        case .applicationCaches: "sparkles"
         case .storage: "internaldrive"
         case .applications: "square.grid.2x2"
         case .developerAI: "sparkles.rectangle.stack"

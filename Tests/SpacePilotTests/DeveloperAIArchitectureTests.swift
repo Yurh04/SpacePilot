@@ -57,14 +57,17 @@ final class DeveloperAIArchitectureTests: XCTestCase {
         XCTAssertFalse(source.contains("DeveloperStorageView("))
     }
 
-    func testDeveloperToolsAreTopLevelAndDefaultToNoSelection() throws {
+    func testDeveloperToolsAreIntegratedIntoCleanupCenterAndDefaultToNoSelection() throws {
         let rowSource = try source(at: "Sources/SpacePilot/Views/DeveloperAI/DeveloperAISidebarRow.swift")
         let rootSource = try source(at: "Sources/SpacePilot/Views/AppRootView.swift")
+        let centerSource = try source(at: "Sources/SpacePilot/Views/Cleanup/CleanupCenterView.swift")
         let viewSource = try source(at: "Sources/SpacePilot/Views/DeveloperAI/DeveloperStorageView.swift")
 
         XCTAssertFalse(rowSource.contains("case developerTools"))
-        XCTAssertTrue(rootSource.contains("case .developerTools:"))
-        XCTAssertTrue(rootSource.contains("DeveloperStorageView("))
+        XCTAssertFalse(rootSource.contains("case .developerTools:"))
+        XCTAssertTrue(rootSource.contains("CleanupCenterView("))
+        XCTAssertTrue(centerSource.contains("case .developerTools:"))
+        XCTAssertTrue(centerSource.contains("DeveloperStorageView("))
         XCTAssertTrue(viewSource.contains("@State private var selectedItemIDs: Set<UUID> = []"))
         XCTAssertTrue(viewSource.contains("reviewCleanup(selected)"))
         XCTAssertTrue(viewSource.contains(".onDoubleClickRevealInFinder(item.url)"))

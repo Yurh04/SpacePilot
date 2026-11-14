@@ -26,9 +26,9 @@
 | FSEvents、变化合并和最近空间变化 | `FileSystemChangeMonitor.swift`、`FileSystemChangeReconciler.swift`、`StorageChangeTracker.swift` | `FileSystemChangeMonitorTests.swift`、`StorageChangeTrackerTests.swift` |
 | SQLite 快照、索引和统计 | `Sources/SpacePilotCore/Persistence/SQLiteIndexStore.swift`、`IndexSchema.swift` | `SQLiteIndexStoreTests.swift` |
 | 快照、所有权和变化历史模型 | `Models/ScanSnapshot.swift`、`ScannedItem.swift`、`StorageIntelligence.swift`、`StorageChangeHistory.swift` | `ModelAggregationTests.swift`、`StorageChangeHistoryTests.swift` |
-| 界面投影和数量限制 | `Models/AppSnapshotProjection.swift`、`ApplicationCacheProjection.swift`、`ViewProjections.swift` | `ViewProjectionTests.swift` |
+| 界面投影和数量限制 | `Models/AppSnapshotProjection.swift`（含 `SafeCleanupProjection`）、`ApplicationCacheProjection.swift`、`ViewProjections.swift` | `ViewProjectionTests.swift` |
 | 概览和储存界面 | `Views/Overview/`、`Views/Storage/StorageView.swift`、`StorageCapacityOverview.swift` | `OverviewDashboardStateTests.swift`、`OverviewChartArchitectureTests.swift`、`StorageWorkbenchArchitectureTests.swift` |
-| 应用缓存界面 | `Views/Cleanup/ApplicationCacheView.swift` | `ApplicationCacheArchitectureTests.swift` |
+| 统一清理中心与应用缓存界面 | `Views/Cleanup/CleanupCenterView.swift`、`ApplicationCacheView.swift`、`Views/DeveloperAI/DeveloperStorageView.swift` | `ApplicationCacheArchitectureTests.swift`、`DeveloperAIArchitectureTests.swift`、`SidebarRuntimeLayoutTests.swift` |
 
 ## 应用程序
 
@@ -59,7 +59,7 @@
 | Plugin 目录、清单和组件 | `Sources/SpacePilotCore/Plugins/` | `PluginRootDiscoveryTests.swift`、`PluginScannerTests.swift` |
 | Skill 目录、清单和冲突 | `Sources/SpacePilotCore/Skills/` | `SkillScannerTests.swift`、`SkillConflictDetectorTests.swift` |
 | 开发与 AI 界面 | `Sources/SpacePilot/Views/DeveloperAI/` | `DeveloperAIArchitectureTests.swift`、AI 管理测试 |
-| 顶层开发工具界面与模拟器分组 | `Sources/SpacePilot/Views/DeveloperAI/DeveloperStorageView.swift`、`AppRootView.swift`、`NavigationDestination.swift` | `DeveloperAIArchitectureTests.swift`、`SidebarRuntimeLayoutTests.swift`、`ScanScopeArchitectureTests.swift` |
+| 清理中心内的开发工具与模拟器分组 | `Sources/SpacePilot/Views/DeveloperAI/DeveloperStorageView.swift`、`Views/Cleanup/CleanupCenterView.swift`、`AppRootView.swift` | `DeveloperAIArchitectureTests.swift`、`SidebarRuntimeLayoutTests.swift`、`ScanScopeArchitectureTests.swift` |
 
 ## 清理与安全
 

@@ -33,7 +33,6 @@ struct ApplicationCacheView: View {
                 }
             }
         }
-        .navigationTitle(L10n.text(.cacheTitle))
         .onAppear { selectSafeItemsIfNeeded() }
         .onChange(of: projectionSignature) { _, _ in
             selectedItemIDs = []

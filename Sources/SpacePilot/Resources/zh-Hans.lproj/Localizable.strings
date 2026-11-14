@@ -20,7 +20,7 @@
 "common.space" = "空间";
 "common.version" = "版本";
 "nav.applications" = "应用程序";
-"nav.application-caches" = "应用缓存";
+"nav.application-caches" = "清理中心";
 "nav.cleanup-history" = "清理历史";
 "nav.developer-ai" = "开发与 AI";
 "nav.overview" = "概览";

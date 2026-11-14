@@ -555,7 +555,7 @@ enum L10n {
     }
 
     static func applicationCaches(locale: Locale? = nil) -> String {
-        value("nav.application-caches", default: "Application Caches", locale: locale)
+        value("nav.application-caches", default: "Cleanup Center", locale: locale)
     }
 
     static func developerAI(locale: Locale? = nil) -> String {
@@ -694,7 +694,6 @@ enum L10n {
         switch destination {
         case .overview: overview(locale: locale)
         case .applicationCaches: applicationCaches(locale: locale)
-        case .developerTools: text(.developerToolsTitle, locale: locale)
         case .storage: storage(locale: locale)
         case .applications: applications(locale: locale)
         case .developerAI: developerAI(locale: locale)

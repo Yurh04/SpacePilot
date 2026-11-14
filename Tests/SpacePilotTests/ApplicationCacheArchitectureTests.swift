@@ -34,9 +34,33 @@ final class ApplicationCacheArchitectureTests: XCTestCase {
         )
 
         XCTAssertTrue(root.contains("case .applicationCaches:"))
-        XCTAssertTrue(root.contains("ApplicationCacheView("))
-        XCTAssertTrue(root.contains("scan: { model.startScan(scope: .applicationCaches) }"))
+        XCTAssertTrue(root.contains("CleanupCenterView("))
+        XCTAssertTrue(root.contains("scanApplicationCaches:"))
+        XCTAssertTrue(root.contains("model.startScan(scope: .applicationCaches)"))
         XCTAssertTrue(model.contains("case .applicationCaches:"))
+    }
+
+    func testCleanupCenterOwnsRecommendedApplicationAndDeveloperSections() throws {
+        let source = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "Sources/SpacePilot/Views/Cleanup/CleanupCenterView.swift"
+            ),
+            encoding: .utf8
+        )
+        let navigation = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "Sources/SpacePilotCore/Models/NavigationDestination.swift"
+            ),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(source.contains("case recommended"))
+        XCTAssertTrue(source.contains("case applicationCaches"))
+        XCTAssertTrue(source.contains("case developerTools"))
+        XCTAssertTrue(source.contains("ApplicationCacheView("))
+        XCTAssertTrue(source.contains("DeveloperStorageView("))
+        XCTAssertTrue(source.contains("RecommendedCleanupView("))
+        XCTAssertFalse(navigation.contains("case developerTools"))
     }
 
     private var repositoryRoot: URL {

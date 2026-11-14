@@ -20,7 +20,7 @@
 "common.space" = "Space";
 "common.version" = "Version";
 "nav.applications" = "Applications";
-"nav.application-caches" = "Application Caches";
+"nav.application-caches" = "Cleanup Center";
 "nav.cleanup-history" = "Cleanup History";
 "nav.developer-ai" = "Developer & AI";
 "nav.overview" = "Overview";

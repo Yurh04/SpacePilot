@@ -151,8 +151,8 @@ final class OverviewChartArchitectureTests: XCTestCase {
         let source = try source(at: "Sources/SpacePilot/Views/Overview/OverviewView.swift")
 
         XCTAssertTrue(source.contains("LazyVStack(alignment: .leading, spacing: 16)"))
-        XCTAssertTrue(source.contains("recommendationPreviewLimit("))
-        XCTAssertTrue(source.contains(".prefix(previewLimit)"))
+        XCTAssertTrue(source.contains("openCleanupCenter()"))
+        XCTAssertFalse(source.contains("ForEach(\n                        Array(\n                            projection.preselectedRecommendations"))
         XCTAssertTrue(source.contains("GridItem(.flexible(), spacing: 10)"))
         XCTAssertTrue(source.contains("GroupBox"))
         XCTAssertTrue(source.contains(".contentTransition(.numericText())"))
@@ -162,7 +162,7 @@ final class OverviewChartArchitectureTests: XCTestCase {
         let source = try source(at: "Sources/SpacePilot/Views/Overview/OverviewView.swift")
         let start = try XCTUnwrap(source.range(of: "private func recentChangesSummary"))
         let end = try XCTUnwrap(
-            source.range(of: "private func recommendationPreviewLimit", range: start.upperBound..<source.endIndex)
+            source.range(of: "private func recentChangeMetric", range: start.upperBound..<source.endIndex)
         )
         let summary = String(source[start.lowerBound..<end.lowerBound])
 

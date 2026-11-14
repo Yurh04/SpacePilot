@@ -125,6 +125,8 @@ final class ViewProjectionTests: XCTestCase {
         let projection = AppSnapshotProjection(snapshot: snapshot)
 
         XCTAssertEqual(projection.overview.recommendations.count, 8)
+        XCTAssertEqual(projection.safeCleanup.items.count, 500)
+        XCTAssertEqual(projection.safeCleanup.totalBytes, items.reduce(0) { $0 + $1.allocatedSize })
         XCTAssertEqual(projection.overview.recommendations.map(\.allocatedSize), Array((492..<500).reversed()).map(Int64.init))
         XCTAssertEqual(projection.overview.reclaimableBytes, items.reduce(0) { $0 + $1.allocatedSize })
         XCTAssertEqual(projection.storage.largestItems.count, 100)

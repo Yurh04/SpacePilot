@@ -54,7 +54,10 @@ struct AppRootView: View {
                 latestCleanup: model.cleanupHistory.first,
                 changeHistory: model.storageChangeHistory,
                 startScan: { model.startScan(scope: .full) },
-                reviewCleanup: model.prepareCleanup,
+                openCleanupCenter: {
+                    model.cleanupCenterSection = .recommended
+                    model.selection = .applicationCaches
+                },
                 openStorage: {
                     model.storageItemMode = .largest
                     model.storageCategorySelection = .all
@@ -77,19 +80,22 @@ struct AppRootView: View {
                 }
             )
         case .applicationCaches:
-            ApplicationCacheView(
-                projection: model.projection?.applicationCaches,
+            CleanupCenterView(
+                section: $model.cleanupCenterSection,
+                safeCleanup: model.projection?.safeCleanup,
+                applicationCaches: model.projection?.applicationCaches,
+                developerStorage: model.projection?.developerStorage,
                 hasSnapshot: model.latestSnapshot != nil,
                 searchText: model.searchText,
-                scan: { model.startScan(scope: .applicationCaches) },
-                reviewCleanup: model.prepareApplicationCacheCleanup
-            )
-        case .developerTools:
-            DeveloperStorageView(
-                projection: model.projection?.developerStorage,
-                searchText: model.searchText,
-                scan: { model.startScan(scope: .developerTools) },
-                reviewCleanup: model.prepareCleanup
+                scanApplicationCaches: {
+                    model.startScan(scope: .applicationCaches)
+                },
+                scanDeveloperTools: {
+                    model.startScan(scope: .developerTools)
+                },
+                reviewSafeCleanup: model.prepareApplicationCacheCleanup,
+                reviewApplicationCaches: model.prepareApplicationCacheCleanup,
+                reviewDeveloperStorage: model.prepareCleanup
             )
         case .storage:
             StorageView(

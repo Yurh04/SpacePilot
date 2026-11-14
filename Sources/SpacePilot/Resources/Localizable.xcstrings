@@ -123,8 +123,8 @@
     },
     "nav.application-caches": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Application Caches" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "应用缓存" } }
+        "en": { "stringUnit": { "state": "translated", "value": "Cleanup Center" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "清理中心" } }
       }
     },
     "ai.agent.form-factors": {

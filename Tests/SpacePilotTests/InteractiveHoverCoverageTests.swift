@@ -16,6 +16,7 @@ final class InteractiveHoverCoverageTests: XCTestCase {
             "DeveloperAI/GlobalPluginsView.swift", "DeveloperAI/GlobalSkillsView.swift",
             "DeveloperAI/MCPServersView.swift", "DeveloperAI/OtherAIToolsView.swift",
             "DeveloperAI/ProjectApprovalBar.swift", "Cleanup/ApplicationCacheView.swift",
+            "Cleanup/CleanupCenterView.swift",
             "History/CleanupHistoryView.swift",
             "Overview/OverviewView.swift", "Settings/SettingsView.swift",
             "Shared/CleanupConfirmationView.swift", "Shared/FinderReveal.swift",

@@ -4,6 +4,8 @@ import XCTest
 
 @MainActor
 final class PresentationModeTests: XCTestCase {
+    private static var retainedClosedWindowFixtures: [AnyObject] = []
+
     private let defaultsKey = AppPresentationMode.defaultsKey
 
     override func tearDown() {
@@ -74,6 +76,12 @@ final class PresentationModeTests: XCTestCase {
 
         panel.close()
         window.close()
+
+        // macOS 26 can release an NSWindow transform animation after XCTest has already
+        // torn down this method. Keep the closed AppKit graph alive for the test process
+        // so the next async test cannot become the accidental teardown point.
+        Self.retainedClosedWindowFixtures.append(controller)
+        Self.retainedClosedWindowFixtures.append(window)
     }
 
     private var repositoryRoot: URL {
