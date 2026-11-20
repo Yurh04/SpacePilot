@@ -63,6 +63,20 @@ final class ApplicationCacheArchitectureTests: XCTestCase {
         XCTAssertFalse(navigation.contains("case developerTools"))
     }
 
+    func testRecommendedCleanupKeepsItsActionBarVisibleAboveGlobalStatus() throws {
+        let source = try String(
+            contentsOf: repositoryRoot.appending(
+                path: "Sources/SpacePilot/Views/Cleanup/CleanupCenterView.swift"
+            ),
+            encoding: .utf8
+        )
+
+        XCTAssertTrue(source.contains("sectionContent\n                .frame(minHeight: 0, maxHeight: .infinity)"))
+        XCTAssertTrue(source.contains(".frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)"))
+        XCTAssertTrue(source.contains(".frame(minHeight: 0, maxHeight: .infinity)\n                .layoutPriority(1)"))
+        XCTAssertTrue(source.contains("actionBar(projection)\n                .fixedSize(horizontal: false, vertical: true)"))
+    }
+
     private var repositoryRoot: URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

@@ -42,32 +42,39 @@ struct CleanupCenterView: View {
 
             Divider()
 
-            switch section {
-            case .recommended:
-                RecommendedCleanupView(
-                    projection: safeCleanup,
-                    hasSnapshot: hasSnapshot,
-                    searchText: searchText,
-                    reviewCleanup: reviewSafeCleanup
-                )
-            case .applicationCaches:
-                ApplicationCacheView(
-                    projection: applicationCaches,
-                    hasSnapshot: hasSnapshot,
-                    searchText: searchText,
-                    scan: scanApplicationCaches,
-                    reviewCleanup: reviewApplicationCaches
-                )
-            case .developerTools:
-                DeveloperStorageView(
-                    projection: developerStorage,
-                    searchText: searchText,
-                    scan: scanDeveloperTools,
-                    reviewCleanup: reviewDeveloperStorage
-                )
-            }
+            sectionContent
+                .frame(minHeight: 0, maxHeight: .infinity)
         }
+        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         .navigationTitle(L10n.applicationCaches())
+    }
+
+    @ViewBuilder
+    private var sectionContent: some View {
+        switch section {
+        case .recommended:
+            RecommendedCleanupView(
+                projection: safeCleanup,
+                hasSnapshot: hasSnapshot,
+                searchText: searchText,
+                reviewCleanup: reviewSafeCleanup
+            )
+        case .applicationCaches:
+            ApplicationCacheView(
+                projection: applicationCaches,
+                hasSnapshot: hasSnapshot,
+                searchText: searchText,
+                scan: scanApplicationCaches,
+                reviewCleanup: reviewApplicationCaches
+            )
+        case .developerTools:
+            DeveloperStorageView(
+                projection: developerStorage,
+                searchText: searchText,
+                scan: scanDeveloperTools,
+                reviewCleanup: reviewDeveloperStorage
+            )
+        }
     }
 }
 
@@ -137,10 +144,13 @@ private struct RecommendedCleanupView: View {
                     .padding(.vertical, 4)
                 }
                 .listStyle(.inset)
+                .frame(minHeight: 0, maxHeight: .infinity)
+                .layoutPriority(1)
                 .nativeTableHoverHighlight { filteredItems.indices.contains($0) }
             }
 
             actionBar(projection)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(20)
         .frame(minWidth: 0, maxWidth: .infinity, maxHeight: .infinity)
